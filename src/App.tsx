@@ -728,7 +728,8 @@ function AdaptiveUI({
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
             <span>Keluar Map</span>
           </button>
-          <button
+          {(isAdmin || !LOCAL_ONLY) && (
+<button
             id="btn-nav-backup-download"
             onClick={onOpenBackupModal}
             className="flex items-center gap-1.5 bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 hover:text-white px-3.5 py-2 rounded-full font-bold transition-all duration-200 backdrop-blur-md shadow-lg border border-cyan-500/40 text-[12px] cursor-pointer"
@@ -738,6 +739,7 @@ function AdaptiveUI({
             <span className="hidden sm:inline">Unduh Cadangan Map</span>
             <span className="sm:hidden">Unduh Map</span>
           </button>
+)}
         </div>
         <div className="absolute right-0 top-0 pointer-events-auto">
           {isAdmin && !LOCAL_ONLY && <AuthButton />}
@@ -809,7 +811,8 @@ function AdaptiveUI({
                 </span>
               </button>
 
-              <button
+              {(isAdmin || !LOCAL_ONLY) && (
+<button
                 id="btn-dock-backup-download"
                 className="w-full flex items-center justify-between bg-gradient-to-r from-purple-950/80 to-cyan-950/80 hover:from-purple-900 hover:to-cyan-900 active:scale-95 text-xs font-bold py-2.5 px-3 rounded-xl transition-all border border-cyan-500/40 text-left text-white shadow-lg shadow-cyan-950/50 cursor-pointer group"
                 onClick={onOpenBackupModal}
@@ -822,6 +825,7 @@ function AdaptiveUI({
                   ZIP / JSON
                 </span>
               </button>
+)}
 
               <button
                 className="w-full flex items-center justify-between bg-indigo-950/80 hover:bg-indigo-900 active:scale-95 text-xs font-bold py-2.5 px-3 rounded-xl transition-all border border-indigo-500/50 text-left text-white shadow-lg shadow-indigo-950/50 cursor-pointer group"
@@ -1208,8 +1212,14 @@ export default function App() {
     }
   }, [isCloudAdmin, workspaceLoaded]);
 
-  const [appState, setAppState] = useState<"select_mode" | "scanning" | "downloading" | "ready" | "playing">("select_mode");
-  const [activeMode, setActiveMode] = useState<"admin" | "guest" | null>(null);
+  const [appState, setAppState] = useState<"select_mode" | "scanning" | "downloading" | "ready" | "playing">(
+    // Mode lokal: aplikasi langsung masuk lab (admin bawaan) tanpa layar pilih mode / unduh.
+    // "Keluar Map" tetap membuka layar pilih mode bila ingin berganti ke Mode Mahasiswa.
+    LOCAL_ONLY && TRIAL_NO_AUTH ? "downloading" : "select_mode",
+  );
+  const [activeMode, setActiveMode] = useState<"admin" | "guest" | null>(
+    LOCAL_ONLY && TRIAL_NO_AUTH ? "admin" : null,
+  );
   const [pendingModels, setPendingModels] = useState<Set<string>>(new Set());
   const [isScanning, setIsScanning] = useState(false);
   const [scanTotalSize, setScanTotalSize] = useState<number>(0);
@@ -1246,7 +1256,7 @@ export default function App() {
   const handleSelectAdmin = async () => {
     if (isAdmin) {
       setActiveMode("admin");
-      setAppState("scanning");
+      setAppState(LOCAL_ONLY ? "downloading" : "scanning");
     } else {
       try {
         const { signInWithGoogle } = await import("./lib/firebase");
@@ -1267,7 +1277,7 @@ export default function App() {
     if (intendedAdmin && appState === "select_mode") {
       if (isAdmin) {
         setActiveMode("admin");
-        setAppState("scanning");
+        setAppState(LOCAL_ONLY ? "downloading" : "scanning");
         setIntendedAdmin(false);
       } else if (user && !user.isAnonymous) {
         alert("Akses ditolak. Anda harus login dengan akun admin (ranggadino1@gmail.com).");
@@ -1291,14 +1301,15 @@ export default function App() {
       }
     })();
     setActiveMode("guest");
-    setAppState("scanning");
+    setAppState(LOCAL_ONLY ? "downloading" : "scanning");
   };
 
   useEffect(() => {
     if (appState === "downloading" && workspaceLoaded) {
       // Short delay to avoid visual glitch if models load extremely fast
       const timer = setTimeout(() => {
-        setAppState("ready");
+        // Mode lokal: semua aset sudah ada di aplikasi, langsung masuk lab tanpa layar unduh
+        setAppState(LOCAL_ONLY ? "playing" : "ready");
       }, 300);
       return () => clearTimeout(timer);
     }
@@ -2274,11 +2285,11 @@ export default function App() {
       {appState === "playing" && loadingModelIds.size > 0 && (
         <div className="fixed bottom-6 left-6 z-[9000] bg-neutral-900/90 border border-white/10 px-4 py-3 rounded-2xl flex items-center gap-3 shadow-xl backdrop-blur-md">
           <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-white text-sm font-medium">Mendownload {loadingModelIds.size} asset...</span>
+          <span className="text-white text-sm font-medium">{LOCAL_ONLY ? "Memuat" : "Mendownload"} {loadingModelIds.size} aset...</span>
         </div>
       )}
 
-      {appState !== "playing" && (
+      {appState !== "playing" && !(LOCAL_ONLY && appState === "downloading") && (
         <EVEntranceScreen
           appState={appState}
           setAppState={setAppState}
