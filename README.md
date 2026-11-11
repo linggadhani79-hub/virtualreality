@@ -80,6 +80,7 @@ lalu ganti sidik jari di `assetlinks.json`.
 
 ## Struktur penting
 
+- `src/components/SampleEVCar.tsx` — stasiun contoh mobil listrik (model `public/models/contoh-mobil-listrik.glb`, tombol 3D Komponen / Jalankan / Putar / Reset)
 - `src/components/GuardianBoundary.tsx` — penanda batas ruang
 - `src/components/WebXRControllerManager.tsx` — tangan, laser, controller kiri/kanan
 - `src/components/PhoneVR.tsx`, `src/lib/phoneVR.ts` — mode VR HP

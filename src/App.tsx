@@ -28,6 +28,7 @@ import { VROptimizer } from "./components/VROptimizer";
 import { WebXRControllerManager } from "./components/WebXRControllerManager";
 import { EVEntranceScreen } from "./components/EVEntranceScreen";
 import { GuardianBoundary } from "./components/GuardianBoundary";
+import { SampleEVCar } from "./components/SampleEVCar";
 import { PhoneVRRenderer, PhoneVROverlay } from "./components/PhoneVR";
 import { phoneVR, startPhoneVR, stopPhoneVR } from "./lib/phoneVR";
 
@@ -619,6 +620,8 @@ function AdaptiveUI({
   onExitMap,
   onOpenBackupModal,
   onStartPhoneVR,
+  sampleCarVisible,
+  onToggleSampleCar,
 }: {
   viewMode: "tpp" | "fpp" | "dev";
   setViewMode: (mode: "tpp" | "fpp" | "dev") => void;
@@ -629,6 +632,8 @@ function AdaptiveUI({
   onExitMap: () => void;
   onOpenBackupModal: () => void;
   onStartPhoneVR: () => Promise<{ ok: boolean; reason?: string }>;
+  sampleCarVisible: boolean;
+  onToggleSampleCar: () => void;
 }) {
   const [xrError, setXrError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -835,6 +840,20 @@ function AdaptiveUI({
                 </div>
                 <span className="text-[10px] bg-indigo-500/40 text-indigo-100 px-2 py-0.5 rounded font-mono font-bold border border-indigo-400/30">
                   🎮 HUB SINKRON
+                </span>
+              </button>
+
+              <button
+                id="btn-toggle-sample-car"
+                className="w-full flex items-center justify-between bg-emerald-950/80 hover:bg-emerald-900 active:scale-95 text-xs font-bold py-2.5 px-3 rounded-xl transition-all border border-emerald-500/40 text-left text-white shadow-lg cursor-pointer"
+                onClick={onToggleSampleCar}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="text-base">🚗</span>
+                  <span>Contoh Mobil Listrik</span>
+                </div>
+                <span className="text-[10px] bg-emerald-500/30 text-emerald-100 px-2 py-0.5 rounded font-mono font-bold border border-emerald-400/30">
+                  {sampleCarVisible ? "TAMPIL" : "SEMBUNYI"}
                 </span>
               </button>
 
@@ -1075,6 +1094,9 @@ export default function App() {
   };
 
   const [uploadedModels, setUploadedModels] = useState<UploadedModelData[]>([]);
+  // Contoh mobil listrik bawaan: otomatis tampil bila map masih kosong, bisa diatur manual lewat tombol
+  const [sampleCarPref, setSampleCarPref] = useState<boolean | null>(null);
+  const sampleCarVisible = sampleCarPref ?? uploadedModels.length === 0;
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [threeScene, setThreeScene] = useState<THREE.Scene | null>(null);
   const uploadedModelsRef = useRef<UploadedModelData[]>([]);
@@ -2051,6 +2073,8 @@ export default function App() {
 
               <Player viewMode={viewMode} yaw={yaw} pitch={pitch} />
 
+              {sampleCarVisible && <SampleEVCar />}
+
               {/* User Uploaded Assets (GLB and FBX) */}
               {uploadedModels.map((model) => (
                 model.type === "screen" ? (
@@ -2200,6 +2224,8 @@ export default function App() {
                 }}
                 onOpenBackupModal={() => setShowBackupModal(true)}
                 onStartPhoneVR={handleStartPhoneVR}
+                sampleCarVisible={sampleCarVisible}
+                onToggleSampleCar={() => setSampleCarPref(!sampleCarVisible)}
               />
             </>
           )}
