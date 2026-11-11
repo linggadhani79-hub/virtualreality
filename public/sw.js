@@ -10,7 +10,11 @@ async function precache() {
   let { files } = await res.json();
   // Model 3D punya dua tingkat kualitas; simpan hanya yang dipakai perangkat ini
   // (Quest / HP: "-lite", PC: "-hq"). Tingkat lain tetap diambil saat diminta.
-  const lite = /OculusBrowser|Quest|Pico|Android|iPhone|iPad|iPod/i.test(self.navigator.userAgent);
+  // Halaman memberi tahu tingkat yang dipakainya lewat alamat pendaftaran (/sw.js?tier=lite),
+  // supaya selalu sama dengan pilihan "Kualitas Aset" pengguna; tebakan dari jenis perangkat
+  // hanya cadangan.
+  const asked = new URL(self.location.href).searchParams.get("tier");
+  const lite = asked ? asked === "lite" : /OculusBrowser|Quest|Pico|Android|iPhone|iPad|iPod/i.test(self.navigator.userAgent);
   const skip = lite ? /-hq\.glb$/ : /-lite\.glb$/;
   files = files.filter((f) => !skip.test(f));
   // Satu per satu supaya satu berkas gagal tidak membatalkan semuanya

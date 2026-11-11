@@ -7,9 +7,8 @@ import { modelUrl } from "../lib/quality";
 /**
  * Stasiun contoh mobil listrik (BEV).
  *
- * - Model mobil: public/models/contoh-mobil-listrik.glb — model asli dengan kualitas penuh
- *   (±754 rb segitiga, tekstur 2K asli tidak diubah). Hanya 4 roda dipisah menjadi node sendiri
- *   agar bisa berputar, lalu dikompres Meshopt (28 MB → ±13 MB). Lihat scripts/build-car-model.mjs.
+ * - Model mobil: public/models/mobil-{hq,lite}.glb. Empat roda dipisah menjadi node sendiri agar
+ *   bisa berputar (scripts/build-car-model.mjs) dan kaca digelapkan (scripts/darken-car-glass.mjs).
  *   Berkasnya ikut di dalam aplikasi dan disimpan service worker, jadi tersedia offline.
  * - Mode "Komponen": bodi menjadi tembus pandang dan komponen EV di dalamnya bisa dipilih.
  * - Tombol 3D interaktif (mouse, laser controller Quest, atau tatapan di VR HP):
@@ -591,13 +590,14 @@ export function SampleEVCar({
 
         {(xray || !model) && (
           <group rotation={[0, Math.PI / 2, 0]} scale={1.08}>
-            {!chassis && (
+            {!model && (
             <mesh position={[0, 0.2, 0]} raycast={noRaycast}>
               <boxGeometry args={[1.5, 0.05, 3.6]} />
               <meshStandardMaterial color="#334155" roughness={0.6} metalness={0.5} />
             </mesh>
             )}
-            {!chassis && WHEELS.map((p, i) => (
+            {/* Roda pengganti hanya bila model mobil gagal dimuat: tidak pernah menumpuk roda asli */}
+            {!model && WHEELS.map((p, i) => (
               <mesh
                 key={i}
                 ref={(m) => {
@@ -608,7 +608,7 @@ export function SampleEVCar({
                 raycast={noRaycast}
               >
                 <cylinderGeometry args={[0.33, 0.33, 0.2, 20]} />
-                <meshStandardMaterial color="#0f172a" roughness={0.9} transparent opacity={model ? 0.35 : 1} />
+                <meshStandardMaterial color="#0f172a" roughness={0.9} />
               </mesh>
             ))}
             {PARTS.map((part) => {

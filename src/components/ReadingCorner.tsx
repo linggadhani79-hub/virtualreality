@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { roundedRectShape, wrapText } from "../lib/glb";
 import { TeachingModule, getModules, loadModules, subscribeModules } from "../lib/modules";
 import { playVRClickSound } from "../lib/vrAudio";
@@ -134,27 +135,74 @@ function makeCoverTexture(mod: TeachingModule) {
   const ctx = c.getContext("2d")!;
   ctx.fillStyle = mod.color;
   ctx.fillRect(0, 0, 384, 512);
-  ctx.fillStyle = "rgba(0,0,0,0.22)";
-  ctx.fillRect(0, 0, 30, 512);
-  ctx.fillStyle = "rgba(255,255,255,0.9)";
-  ctx.fillRect(56, 56, 272, 8);
-  ctx.fillStyle = "#ffffff";
+  // gradasi lembut + lipatan punggung buku supaya sampul tidak tampak datar
+  const g = ctx.createLinearGradient(0, 0, 384, 512);
+  g.addColorStop(0, "rgba(255,255,255,0.16)");
+  g.addColorStop(1, "rgba(0,0,0,0.22)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 384, 512);
+  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  ctx.fillRect(0, 0, 26, 512);
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
+  ctx.fillRect(26, 0, 4, 512);
+  // bingkai timbul
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  (ctx as any).roundRect?.(46, 22, 316, 468, 14) ?? ctx.rect(46, 22, 316, 468);
+  ctx.stroke();
+  // label + ikon petir
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
   ctx.textBaseline = "top";
-  ctx.font = "900 46px system-ui, sans-serif";
-  let y = 92;
+  ctx.font = "800 22px system-ui, sans-serif";
+  ctx.fillText("MODUL AJAR", 68, 46);
+  ctx.beginPath();
+  ctx.moveTo(326, 40);
+  ctx.lineTo(304, 76);
+  ctx.lineTo(320, 76);
+  ctx.lineTo(310, 104);
+  ctx.lineTo(340, 64);
+  ctx.lineTo(322, 64);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillRect(68, 80, 150, 6);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "900 44px system-ui, sans-serif";
+  let y = 124;
   for (const line of wrapText(ctx, mod.title, 270).slice(0, 5)) {
-    ctx.fillText(line, 56, y);
-    y += 56;
+    ctx.fillText(line, 68, y);
+    y += 54;
   }
-  ctx.font = "700 28px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.85)";
-  ctx.fillText(`${mod.slides.length} slide`, 56, 430);
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.beginPath();
+  (ctx as any).roundRect?.(68, 424, 140, 44, 22) ?? ctx.rect(68, 424, 140, 44);
+  ctx.fill();
+  ctx.font = "700 26px system-ui, sans-serif";
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "center";
+  ctx.fillText(`${mod.slides.length} slide`, 138, 433);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
+  t.anisotropy = 8;
   return t;
 }
 
+// Ukuran buku (meter): lebar, tebal, panjang
+const BOOK_W = 0.3;
+const BOOK_T = 0.05;
+const BOOK_L = 0.4;
+const LEAN = 0.2; // kemiringan buku saat berdiri di penyangga (radian)
+const coverGeometry = new RoundedBoxGeometry(BOOK_W, 0.007, BOOK_L, 2, 0.0034);
+const spineGeometry = new RoundedBoxGeometry(0.014, BOOK_T, BOOK_L, 3, 0.0068);
+const pagesGeometry = new RoundedBoxGeometry(BOOK_W - 0.022, BOOK_T - 0.012, BOOK_L - 0.016, 2, 0.004);
+const standPlate = new RoundedBoxGeometry(0.25, 0.3, 0.012, 2, 0.0058);
+const standLip = new RoundedBoxGeometry(0.25, 0.014, 0.075, 2, 0.0068);
+const standLeg = new RoundedBoxGeometry(0.035, 0.3, 0.012, 2, 0.0058);
+
+/**
+ * Buku modul: tergeletak di meja; saat dipilih, buku berdiri bersandar pada penyangganya
+ * dengan sampul menghadap pembaca (dan layar besar menampilkan isinya).
+ */
 function Book({
   mod,
   position,
@@ -170,52 +218,92 @@ function Book({
   const cover = useMemo(() => makeCoverTexture(mod), [mod]);
   useEffect(() => () => cover.dispose(), [cover]);
   const ref = useRef<THREE.Group>(null);
+  const t = useRef(0);
 
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.05);
-    if (!ref.current) return;
-    // buku yang dibuka / disorot terangkat sedikit
-    ref.current.position.y = THREE.MathUtils.damp(ref.current.position.y, open ? 0.1 : hot ? 0.04 : 0, 10, delta);
-    ref.current.rotation.x = THREE.MathUtils.damp(ref.current.rotation.x, open ? 0.5 : 0, 10, delta);
+    const g = ref.current;
+    if (!g) return;
+    t.current = THREE.MathUtils.damp(t.current, open ? 1 : 0, 7, delta);
+    const k = t.current;
+    // dari rebah (dekat pembaca) → berdiri bersandar di penyangga, sedikit terangkat di tengah gerakan
+    g.position.z = THREE.MathUtils.lerp(-0.3, 0.2, k);
+    g.position.y = Math.sin(Math.PI * k) * 0.07 + (hot && !open ? 0.025 : 0) * (1 - k);
+    g.rotation.x = -k * (Math.PI / 2 - LEAN);
   });
 
   const pick = (e?: any) => {
     e?.stopPropagation?.();
     onPick();
   };
+  const glow = open ? 0.35 : hot ? 0.25 : 0.03;
 
   return (
     <group position={position}>
-      <group ref={ref}>
-        <mesh
-          name={`Book_${mod.id}`}
-          position={[0, 0.03, 0]}
-          userData={{ isInteractableMesh: true, isVRButton: true, onClick: pick }}
-          onClick={pick}
-          onPointerOver={(e) => {
-            e.stopPropagation();
-            setHot(true);
-          }}
-          onPointerOut={() => setHot(false)}
-        >
-          <boxGeometry args={[0.3, 0.06, 0.4]} />
-          <meshStandardMaterial color={mod.color} roughness={0.6} emissive={mod.color} emissiveIntensity={open ? 0.5 : hot ? 0.3 : 0.05} />
+      {/* penyangga buku */}
+      <group position={[0, 0, 0.2]}>
+        <mesh geometry={standLip} position={[0, 0.007, -0.02]} raycast={noRaycast}>
+          <meshStandardMaterial color="#1e293b" metalness={0.7} roughness={0.4} />
         </mesh>
-        {/* halaman */}
-        <mesh position={[0.008, 0.03, 0]} raycast={noRaycast}>
-          <boxGeometry args={[0.29, 0.046, 0.385]} />
-          <meshStandardMaterial color="#f8fafc" roughness={0.9} />
+        <mesh geometry={standPlate} position={[0, 0.155, 0.04]} rotation={[LEAN, 0, 0]} raycast={noRaycast}>
+          <meshStandardMaterial color="#1e293b" metalness={0.7} roughness={0.4} />
         </mesh>
-        {/* sampul (judul terbaca dari sisi pembaca) */}
-        <mesh position={[0, 0.0615, 0]} rotation={[-Math.PI / 2, 0, Math.PI]} raycast={noRaycast}>
-          <planeGeometry args={[0.3, 0.4]} />
-          <meshBasicMaterial map={cover} toneMapped={false} />
+        <mesh geometry={standLeg} position={[0, 0.14, 0.115]} rotation={[-0.42, 0, 0]} raycast={noRaycast}>
+          <meshStandardMaterial color="#334155" metalness={0.7} roughness={0.4} />
         </mesh>
+      </group>
+
+      {/* buku: titik putar di tepi bawah sampul belakang */}
+      <group ref={ref} position={[0, 0, -0.3]}>
+        <group position={[0, 0, BOOK_L / 2]}>
+          {/* kotak pilih (tak terlihat) */}
+          <mesh
+            name={`Book_${mod.id}`}
+            position={[0, BOOK_T / 2, 0]}
+            userData={{ isInteractableMesh: true, isVRButton: true, onClick: pick }}
+            onClick={pick}
+            onPointerOver={(e) => {
+              e.stopPropagation();
+              setHot(true);
+            }}
+            onPointerOut={() => setHot(false)}
+          >
+            <boxGeometry args={[BOOK_W + 0.02, BOOK_T + 0.02, BOOK_L + 0.02]} />
+            <meshBasicMaterial colorWrite={false} depthWrite={false} />
+          </mesh>
+          {/* sampul belakang, punggung, sampul depan */}
+          <mesh geometry={coverGeometry} position={[0, 0.0035, 0]} raycast={noRaycast}>
+            <meshStandardMaterial color={mod.color} roughness={0.55} emissive={mod.color} emissiveIntensity={glow} />
+          </mesh>
+          <mesh geometry={spineGeometry} position={[BOOK_W / 2 - 0.006, BOOK_T / 2, 0]} raycast={noRaycast}>
+            <meshStandardMaterial color={mod.color} roughness={0.55} emissive={mod.color} emissiveIntensity={glow} />
+          </mesh>
+          <mesh geometry={coverGeometry} position={[0, BOOK_T - 0.0035, 0]} raycast={noRaycast}>
+            <meshStandardMaterial color={mod.color} roughness={0.55} emissive={mod.color} emissiveIntensity={glow} />
+          </mesh>
+          {/* blok halaman */}
+          <mesh geometry={pagesGeometry} position={[-0.008, BOOK_T / 2, 0]} raycast={noRaycast}>
+            <meshStandardMaterial color="#f5f0e1" roughness={0.95} />
+          </mesh>
+          {/* pita pembatas */}
+          <mesh position={[-0.06, BOOK_T / 2, -BOOK_L / 2 - 0.02]} raycast={noRaycast}>
+            <boxGeometry args={[0.018, 0.003, 0.07]} />
+            <meshStandardMaterial color="#facc15" roughness={0.7} />
+          </mesh>
+          {/* gambar sampul (judul terbaca dari sisi pembaca) */}
+          <mesh position={[0, BOOK_T + 0.0006, 0]} rotation={[-Math.PI / 2, 0, Math.PI]} raycast={noRaycast}>
+            <planeGeometry args={[BOOK_W - 0.006, BOOK_L - 0.006]} />
+            <meshBasicMaterial map={cover} toneMapped={false} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
+          </mesh>
+        </group>
       </group>
     </group>
   );
 }
 
+const screenFrame = new RoundedBoxGeometry(SCREEN_W + 0.24, SCREEN_H + 0.24, 0.1, 3, 0.045);
+const tableTop = new RoundedBoxGeometry(3.0, 0.07, 0.84, 3, 0.03);
+const tableApron = new RoundedBoxGeometry(2.84, 0.09, 0.7, 2, 0.02);
 const navGeometry = new THREE.ExtrudeGeometry(roundedRectShape(0.46, 0.2, 0.05), {
   depth: 0.03,
   bevelEnabled: true,
@@ -326,7 +414,7 @@ export function ReadingCorner({
       {/* ---------- Layar besar ---------- */}
       <group position={[0, 0, 0]}>
         <mesh position={[0, 0.55 + SCREEN_H / 2, 0.05]} raycast={noRaycast}>
-          <boxGeometry args={[SCREEN_W + 0.24, SCREEN_H + 0.24, 0.1]} />
+          <primitive object={screenFrame} attach="geometry" />
           <meshStandardMaterial color="#0b1220" metalness={0.6} roughness={0.4} />
         </mesh>
         <mesh position={[0, 0.55 + SCREEN_H / 2, -0.005]} rotation={[0, Math.PI, 0]} raycast={noRaycast}>
@@ -341,12 +429,10 @@ export function ReadingCorner({
 
       {/* ---------- Meja buku ---------- */}
       <group position={[0, 0, -3.1]}>
-        <mesh position={[0, 0.86, 0]}>
-          <boxGeometry args={[3.0, 0.07, 0.8]} />
-          <meshStandardMaterial color="#8b5a2b" roughness={0.65} />
+        <mesh geometry={tableTop} position={[0, 0.86, 0]}>
+          <meshStandardMaterial color="#9a6a3a" roughness={0.6} />
         </mesh>
-        <mesh position={[0, 0.82, 0]} raycast={noRaycast}>
-          <boxGeometry args={[3.04, 0.03, 0.84]} />
+        <mesh geometry={tableApron} position={[0, 0.79, 0]} raycast={noRaycast}>
           <meshStandardMaterial color="#1e293b" metalness={0.6} roughness={0.4} />
         </mesh>
         {[
@@ -355,10 +441,16 @@ export function ReadingCorner({
           [-1.38, 0.32],
           [1.38, 0.32],
         ].map(([x, z], i) => (
-          <mesh key={i} position={[x, 0.41, z]} raycast={noRaycast}>
-            <boxGeometry args={[0.07, 0.82, 0.07]} />
-            <meshStandardMaterial color="#334155" metalness={0.7} roughness={0.4} />
-          </mesh>
+          <group key={i} position={[x, 0, z]}>
+            <mesh position={[0, 0.4, 0]} raycast={noRaycast}>
+              <cylinderGeometry args={[0.03, 0.022, 0.78, 14]} />
+              <meshStandardMaterial color="#334155" metalness={0.75} roughness={0.35} />
+            </mesh>
+            <mesh position={[0, 0.012, 0]} raycast={noRaycast}>
+              <cylinderGeometry args={[0.04, 0.045, 0.024, 14]} />
+              <meshStandardMaterial color="#0f172a" roughness={0.8} />
+            </mesh>
+          </group>
         ))}
 
         {shown.map((m, i) => (
@@ -366,7 +458,7 @@ export function ReadingCorner({
             key={m.id}
             mod={m}
             open={m.id === openId}
-            position={[(i - (shown.length - 1) / 2) * spacing, 0.895, -0.08]}
+            position={[(i - (shown.length - 1) / 2) * spacing, 0.896, -0.04]}
             onPick={() => {
               playVRClickSound();
               setOpenId((cur) => (cur === m.id ? null : m.id));

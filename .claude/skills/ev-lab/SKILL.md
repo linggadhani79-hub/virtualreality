@@ -25,18 +25,22 @@ dilanggar (tanpa database, aset ditanam, tanpa unggah/unduh, langsung pakai, des
 | Berkas | Isi |
 |---|---|
 | `src/App.tsx` | Aplikasi utama, `Player` (gerak, kamera), UI 2D, dok tombol |
-| `src/components/TestLabEnvironment.tsx` | Hanggar, aspal, marka, peralatan, penempatan stasiun |
+| `src/components/TestLabEnvironment.tsx` | Hanggar, aspal, marka, poster, langit, penempatan semua stasiun & zona |
+| `src/components/LabProps.tsx` | Peralatan buatan sendiri (charger, kerucut, pembatas, bengkel, lift, troli, lemari APD, APAR) dengan bentuk membulat |
 | `src/components/SampleEVCar.tsx` | Mobil, mode Komponen (sasis asli + titik sorot), panel tombol 3D |
-| `src/components/LabStations.tsx` | `ExhibitStand` (etalase), `QuizStation` (tanya jawab + bank soal) |
-| `src/components/ReadingCorner.tsx` | Meja buku + layar slideshow modul ajar |
+| `src/components/LabStations.tsx` | `ExhibitStand` (etalase, `low` = panggung rendah), `InfoSign`, `StaticModel`, `Scenery` (taman/pohon), `QuizStation` |
+| `src/components/ReadingCorner.tsx` | Meja buku (buku berdiri di penyangga saat dipilih) + layar slideshow modul ajar |
 | `src/components/ModuleEditor.tsx`, `src/lib/modules.ts` | Editor admin & data modul ajar |
-| `src/components/WebXRControllerManager.tsx` | Tangan, laser, pemilihan dengan controller |
+| `src/components/WebXRControllerManager.tsx` | Tangan VR (tanpa gambar controller; jari mengikuti trigger/grip/tombol), laser, pemilihan |
 | `src/components/GuardianBoundary.tsx` | Penanda batas ruang VR |
 | `src/components/PhoneVR.tsx`, `src/lib/phoneVR.ts` | VR HP (layar ganda, giroskop, tatapan) |
 | `src/lib/glb.ts` | `loadGlb` (cache + Meshopt), `fitModel`, bantuan kanvas |
 | `src/lib/quality.ts` | Tingkat kualitas `hq`/`lite`, `modelUrl(nama)` |
 | `src/lib/worldBounds.ts` | Dinding yang menahan pemain |
 | `scripts/build-car-model.mjs` | Mengolah model mobil (pisah roda per komponen mesh, kompres) |
+| `scripts/darken-car-glass.mjs` | Menggelapkan kaca mobil pada tekstur (dijalankan pada `mobil-*.glb`) |
+| `scripts/build-part-model.mjs` | Mengolah model komponen/pemandangan menjadi `-hq` / `-lite` |
+| `public/xr-profiles/` | Tata letak tombol controller (JSON) agar pustaka XR tidak mengambil dari CDN |
 
 ## Aturan membuat objek 3D yang bisa dipilih
 
@@ -57,16 +61,24 @@ Satu objek harus bisa dipilih dengan mouse, laser Quest, dan tatapan VR HP. Sela
 
 1. Berkas mentah dari pemilik (Google Drive / folder `aset-mentah/`). Unduhan Drive:
    `https://drive.usercontent.google.com/download?id=<ID>&export=download&confirm=t`.
-2. Buat dua tingkat dan simpan ke `public/models/<nama>-hq.glb` dan `<nama>-lite.glb`
-   (gltf-transform: `simplify` + `textureCompress` WebP + `meshopt`; butuh `meshoptimizer`, `sharp`).
-   Patokan: lite ±100–250 rb segitiga & tekstur 1K; hq ±300–750 rb & 2K. Di VR tiap benda digambar
-   dua kali. Model mobil memakai `scripts/build-car-model.mjs` (roda = komponen mesh terpisah;
-   jangan dipotong dengan silinder).
+2. Buat dua tingkat dengan `scripts/build-part-model.mjs` dan simpan ke
+   `public/models/<nama>-hq.glb` dan `<nama>-lite.glb` (butuh `npm i --no-save meshoptimizer sharp`).
+   Patokan lite: mesin/sasis ±60 rb segitiga, benda kecil ±25–30 rb, tekstur 1K; hq ±100–250 rb & 2K.
+   **Jangan menurunkan model Meshy di bawah ±60 % dari angka itu**: atlas UV-nya terpecah-pecah
+   sehingga teksturnya menjadi acak (terlihat seperti krom pecah). Model berisi ribuan kepingan
+   lepas (pohon) memakai penyederhana kasar otomatis; beri galat 0.05.
+   Di VR tiap benda digambar dua kali: dari titik mulai sekarang ±500 rb segitiga per mata (lite).
+   Model mobil memakai `scripts/build-car-model.mjs` (roda = komponen mesh terpisah; jangan
+   dipotong dengan silinder), lalu `scripts/darken-car-glass.mjs`.
 3. Muat dengan `loadGlb(modelUrl("nama"))` + `fitModel(root, meter)`; tempatkan lewat
    `ExhibitStand` atau komponen baru di `TestLabEnvironment.tsx`.
 4. Tata letak hanggar: X −14..14, Z −14..6, kolom tiap 4 m di Z = −12, −8, −4, 0, 4 (lebar bebas
    antar kolom 3,6 m — poster dinding samping jangan lebih lebar dari itu). Pemain mulai di (0,0,0)
    menghadap −Z; lintasan mobil di Z = −6.
+5. Zona: kiri depan = etalase komponen EV (baterai, motor listrik); kanan tengah = rangka & roda EV;
+   belakang kiri = **bengkel non-EV** (sasis tangga di lift, mesin bensin, V8, piston, rem) +
+   poster perbandingan di dinding belakang; belakang kanan = pengisian; depan kiri = kuis;
+   depan kanan = pojok baca; luar pintu = taman & pohon.
 
 ## Menguji
 
@@ -75,7 +87,10 @@ Satu objek harus bisa dipilih dengan mouse, laser Quest, dan tatapan VR HP. Sela
   `--use-gl=swiftshader --enable-unsafe-swiftshader`). Saat `npm run dev`, `window.__evlab`
   berisi `{ scene, gl, camera }`: cari objek dengan `scene.traverse` dan panggil
   `userData.onClick({})` untuk menekan tombol 3D.
-- Emulasi Quest: bundel `iwer` (`new XRDevice(metaQuest3).installRuntime()`) lewat `addInitScript`.
+- Emulasi Quest: bundel `iwer` (`new XRDevice(metaQuest3).installRuntime({ forceInstall: true })`)
+  lewat `addInitScript`; atur `device.controllers.left/right` (posisi, `updateButtonValue`).
+- VR HP di Chromium headless: timpa `DeviceOrientationEvent.requestPermission` agar mengembalikan
+  `"granted"`. User agent yang ditimpa Playwright tidak berlaku di service worker.
   Emulator bawaan `@react-three/xr` dimatikan karena bentrok versi three.js.
 - Uji offline pada build produksi (`NODE_ENV=production node dist/server.cjs`), lalu
   `context.setOffline(true)`.
@@ -83,6 +98,8 @@ Satu objek harus bisa dipilih dengan mouse, laser Quest, dan tatapan VR HP. Sela
 
 ## Yang belum ada / diketahui kurang
 
+- Jangan menaruh bidang besar yang nyaris berimpit (selisih < 2 cm) dengan lantai: tembus di VR HP.
+- Service worker menyimpan tingkat kualitas yang dikirim halaman (`/sw.js?tier=`).
 - Tabrakan dengan peralatan (hanya dinding hanggar yang menahan pemain).
 - Slide modul hanya teks (belum gambar/video).
 - Modul buatan admin tersimpan di perangkat itu; agar berlaku di semua perangkat, simpan JSON-nya

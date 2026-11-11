@@ -1,3 +1,4 @@
+import { qualityTier } from "./lib/quality";
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
@@ -21,7 +22,9 @@ createRoot(document.getElementById('root')!).render(
 // dalam iframe pratinjau AI Studio)
 if (import.meta.env.PROD && "serviceWorker" in navigator && window.self === window.top) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    // Tingkat kualitas ikut di alamat: bila pengguna mengganti "Kualitas Aset", service worker baru
+    // terpasang dan menyimpan model tingkat itu untuk dipakai offline.
+    navigator.serviceWorker.register(`/sw.js?tier=${qualityTier}`).catch(() => {});
     // Minta browser tidak menghapus simpanan offline saat ruang penyimpanan menipis
     navigator.storage?.persist?.().catch(() => {});
   });

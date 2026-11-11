@@ -48,6 +48,7 @@ export function ExhibitStand({
   tilt = 0,
   modelRotation = [0, 0, 0],
   tint,
+  low = false,
 }: {
   /** nama model tanpa akhiran kualitas, mis. "baterai" */
   model: string;
@@ -65,12 +66,13 @@ export function ExhibitStand({
   modelRotation?: [number, number, number];
   /** warna logam untuk model tanpa tekstur */
   tint?: string;
+  /** panggung rendah (untuk benda besar seperti sasis) */
+  low?: boolean;
 }) {
   const [object, setObject] = useState<THREE.Object3D | null>(null);
   const [spinning, setSpinning] = useState(true);
   const [hot, setHot] = useState(false);
   const turntable = useRef<THREE.Group>(null);
-  const { canvas, texture } = useCanvasTexture(1024, 640);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,6 +105,99 @@ export function ExhibitStand({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model, size]);
 
+  useFrame((_, delta) => {
+    if (spinning && turntable.current) turntable.current.rotation.y += Math.min(delta, 0.05) * 0.35;
+  });
+
+  const toggle = (e?: any) => {
+    e?.stopPropagation?.();
+    playVRClickSound();
+    setSpinning((v) => !v);
+  };
+
+  const pedestalR = Math.max(0.75, size * 0.52);
+  const pickH = low ? Math.max(0.5, size * 0.3) : size * 0.75;
+  const top = low ? 0.24 : 0.79; // tinggi permukaan meja putar
+
+  return (
+    <group position={position} rotation={[0, facing, 0]} name={`Exhibit_${model}`}>
+      {/* Alas */}
+      <mesh position={[0, 0.045, 0]} raycast={noRaycast}>
+        <cylinderGeometry args={[pedestalR + 0.12, pedestalR + 0.2, 0.09, 40]} />
+        <meshStandardMaterial color="#111827" metalness={0.7} roughness={0.4} />
+      </mesh>
+      <mesh position={[0, 0.09 + (top - 0.17) / 2, 0]} raycast={noRaycast}>
+        <cylinderGeometry args={[pedestalR * (low ? 0.92 : 0.55), pedestalR * (low ? 0.96 : 0.7), top - 0.17, 40]} />
+        <meshStandardMaterial color="#1e293b" metalness={0.6} roughness={0.45} />
+      </mesh>
+      <mesh position={[0, top - 0.045, 0]} raycast={noRaycast}>
+        <cylinderGeometry args={[pedestalR, pedestalR, 0.07, 48]} />
+        <meshStandardMaterial color="#e2e8f0" metalness={0.3} roughness={0.35} />
+      </mesh>
+      <mesh position={[0, top - 0.065, 0]} raycast={noRaycast}>
+        <cylinderGeometry args={[pedestalR + 0.012, pedestalR + 0.012, 0.022, 48]} />
+        <meshBasicMaterial color={accent} toneMapped={false} />
+      </mesh>
+
+      {/* Model di meja putar */}
+      <group ref={turntable} position={[0, top, 0]}>
+        <group rotation={[tilt, 0, 0]} position={[0, tilt ? Math.sin(Math.abs(tilt)) * size * 0.36 : 0, 0]}>
+          {object && <primitive object={object} />}
+        </group>
+      </group>
+
+      {/* Kotak pilih (tak terlihat) */}
+      <mesh
+        name={`Exhibit_pick_${model}`}
+        position={[0, top + 0.01 + pickH / 2, 0]}
+        userData={{ isInteractableMesh: true, onClick: toggle }}
+        onClick={toggle}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setHot(true);
+        }}
+        onPointerOut={() => setHot(false)}
+      >
+        <cylinderGeometry args={[pedestalR * 0.95, pedestalR * 0.95, pickH, 16]} />
+        <meshBasicMaterial colorWrite={false} depthWrite={false} />
+      </mesh>
+      <mesh position={[0, top, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
+        <ringGeometry args={[pedestalR * 0.9, pedestalR * 0.97, 48]} />
+        <meshBasicMaterial color={accent} transparent opacity={hot ? 0.95 : 0.35} toneMapped={false} />
+      </mesh>
+
+      {/* Papan keterangan di depan etalase */}
+      <InfoSign
+        position={[0, 0, pedestalR + 0.55]}
+        title={title}
+        subtitle={subtitle}
+        facts={facts}
+        accent={accent}
+        footer="Pilih etalase untuk menghentikan / memutar"
+      />
+    </group>
+  );
+}
+
+/** Papan keterangan miring di atas tiang (teks digambar ke kanvas). */
+export function InfoSign({
+  title,
+  subtitle,
+  facts,
+  accent = "#22d3ee",
+  position,
+  facing = 0,
+  footer,
+}: {
+  title: string;
+  subtitle: string;
+  facts: string[];
+  accent?: string;
+  position: [number, number, number];
+  facing?: number;
+  footer?: string;
+}) {
+  const { canvas, texture } = useCanvasTexture(1024, 640);
   useEffect(() => {
     const ctx = canvas.getContext("2d")!;
     const W = canvas.width;
@@ -137,82 +232,73 @@ export function ExhibitStand({
       }
       y += 14;
     }
-    ctx.fillStyle = "#64748b";
-    ctx.font = "600 26px system-ui, sans-serif";
-    ctx.fillText("Pilih etalase untuk menghentikan / memutar", 46, H - 60);
+    if (footer) {
+      ctx.fillStyle = "#64748b";
+      ctx.font = "600 26px system-ui, sans-serif";
+      ctx.fillText(footer, 46, H - 60);
+    }
     texture.needsUpdate = true;
-  }, [canvas, texture, title, subtitle, facts, accent]);
-
-  useFrame((_, delta) => {
-    if (spinning && turntable.current) turntable.current.rotation.y += Math.min(delta, 0.05) * 0.35;
-  });
-
-  const toggle = (e?: any) => {
-    e?.stopPropagation?.();
-    playVRClickSound();
-    setSpinning((v) => !v);
-  };
-
-  const pedestalR = Math.max(0.75, size * 0.52);
+  }, [canvas, texture, title, subtitle, facts, accent, footer]);
 
   return (
-    <group position={position} rotation={[0, facing, 0]} name={`Exhibit_${model}`}>
-      {/* Alas */}
-      <mesh position={[0, 0.045, 0]} raycast={noRaycast}>
-        <cylinderGeometry args={[pedestalR + 0.12, pedestalR + 0.2, 0.09, 40]} />
+    <group position={position} rotation={[0, facing, 0]}>
+      <mesh position={[0, 0.012, 0]} raycast={noRaycast}>
+        <cylinderGeometry args={[0.16, 0.18, 0.024, 20]} />
         <meshStandardMaterial color="#111827" metalness={0.7} roughness={0.4} />
       </mesh>
-      <mesh position={[0, 0.4, 0]} raycast={noRaycast}>
-        <cylinderGeometry args={[pedestalR * 0.55, pedestalR * 0.7, 0.62, 40]} />
-        <meshStandardMaterial color="#1e293b" metalness={0.6} roughness={0.45} />
+      <mesh position={[0, 0.5, 0]} raycast={noRaycast}>
+        <cylinderGeometry args={[0.03, 0.04, 1.0, 12]} />
+        <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.35} />
       </mesh>
-      <mesh position={[0, 0.745, 0]} raycast={noRaycast}>
-        <cylinderGeometry args={[pedestalR, pedestalR, 0.07, 48]} />
-        <meshStandardMaterial color="#e2e8f0" metalness={0.3} roughness={0.35} />
-      </mesh>
-      <mesh position={[0, 0.725, 0]} raycast={noRaycast}>
-        <cylinderGeometry args={[pedestalR + 0.012, pedestalR + 0.012, 0.022, 48]} />
-        <meshBasicMaterial color={accent} toneMapped={false} />
-      </mesh>
-
-      {/* Model di meja putar */}
-      <group ref={turntable} position={[0, 0.79, 0]}>
-        <group rotation={[tilt, 0, 0]} position={[0, tilt ? Math.sin(Math.abs(tilt)) * size * 0.36 : 0, 0]}>
-          {object && <primitive object={object} />}
-        </group>
-      </group>
-
-      {/* Kotak pilih (tak terlihat) */}
-      <mesh
-        name={`Exhibit_pick_${model}`}
-        position={[0, 0.8 + size * 0.35, 0]}
-        userData={{ isInteractableMesh: true, onClick: toggle }}
-        onClick={toggle}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          setHot(true);
-        }}
-        onPointerOut={() => setHot(false)}
-      >
-        <cylinderGeometry args={[pedestalR * 0.95, pedestalR * 0.95, size * 0.75, 16]} />
-        <meshBasicMaterial colorWrite={false} depthWrite={false} />
-      </mesh>
-      <mesh position={[0, 0.79, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
-        <ringGeometry args={[pedestalR * 0.9, pedestalR * 0.97, 48]} />
-        <meshBasicMaterial color={accent} transparent opacity={hot ? 0.95 : 0.35} toneMapped={false} />
-      </mesh>
-
-      {/* Papan keterangan di depan etalase */}
-      <group position={[0, 0, pedestalR + 0.55]}>
-        <mesh position={[0, 0.5, 0]} raycast={noRaycast}>
-          <cylinderGeometry args={[0.03, 0.04, 1.0, 12]} />
-          <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.35} />
+      <group position={[0, 1.08, 0.02]} rotation={[-0.5, 0, 0]}>
+        <mesh geometry={signBack} position={[0, 0, -0.014]} raycast={noRaycast}>
+          <meshStandardMaterial color="#0b1220" metalness={0.6} roughness={0.4} />
         </mesh>
-        <mesh position={[0, 1.08, 0.02]} rotation={[-0.5, 0, 0]} raycast={noRaycast}>
+        <mesh raycast={noRaycast}>
           <planeGeometry args={[1.1, 0.6875]} />
-          <meshBasicMaterial map={texture} transparent toneMapped={false} side={THREE.DoubleSide} />
+          <meshBasicMaterial map={texture} transparent toneMapped={false} />
         </mesh>
       </group>
+    </group>
+  );
+}
+
+const signBack = new THREE.ExtrudeGeometry(roundedRectShape(1.14, 0.73, 0.05), { depth: 0.02, bevelEnabled: false, curveSegments: 6 }).translate(0, 0, -0.012);
+
+/** Model diam (tanpa meja putar), mis. sasis di atas lift. */
+export function StaticModel({
+  model,
+  size,
+  position,
+  rotation = 0,
+}: {
+  model: string;
+  size: number;
+  position: [number, number, number];
+  rotation?: number;
+}) {
+  const [object, setObject] = useState<THREE.Object3D | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    loadGlb(modelUrl(model))
+      .then((root) => {
+        if (cancelled) return;
+        fitModel(root, size);
+        disableRaycast(root);
+        root.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (m.isMesh && (m.material as THREE.MeshStandardMaterial).map) (m.material as THREE.MeshStandardMaterial).map!.anisotropy = 8;
+        });
+        setObject(root);
+      })
+      .catch((err) => console.warn(`[StaticModel] Model ${model} gagal dimuat:`, err));
+    return () => {
+      cancelled = true;
+    };
+  }, [model, size]);
+  return (
+    <group position={position} rotation={[0, rotation, 0]}>
+      {object && <primitive object={object} />}
     </group>
   );
 }
@@ -583,5 +669,55 @@ export function QuizStation({
         <AnswerButton letter="▶" label={nextLabel} state="idle" position={[0, 0.53, 0]} onPress={next} />
       )}
     </group>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Pemandangan (taman, pohon): satu model dipakai di banyak tempat     */
+/* ------------------------------------------------------------------ */
+
+export function Scenery({
+  model,
+  size,
+  places,
+}: {
+  model: string;
+  /** panjang sisi terpanjang, meter */
+  size: number;
+  /** [x, z, putaran Y, skala] tiap salinan; geometri & tekstur dipakai bersama */
+  places: [number, number, number?, number?][];
+}) {
+  const [copies, setCopies] = useState<THREE.Object3D[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    loadGlb(modelUrl(model))
+      .then((root) => {
+        if (cancelled) return;
+        fitModel(root, size);
+        disableRaycast(root);
+        root.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (!m.isMesh) return;
+          const mat = m.material as THREE.MeshStandardMaterial;
+          mat.side = THREE.DoubleSide; // daun & rumput tipis terlihat dari dua sisi
+          mat.metalness = 0;
+          mat.roughness = 1;
+        });
+        setCopies(places.map((_, i) => (i === 0 ? root : root.clone())));
+      })
+      .catch((err) => console.warn(`[Scenery] Model ${model} gagal dimuat:`, err));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model, size]);
+  return (
+    <>
+      {copies.map((o, i) => (
+        <group key={i} position={[places[i][0], 0, places[i][1]]} rotation={[0, places[i][2] ?? 0, 0]} scale={places[i][3] ?? 1}>
+          <primitive object={o} />
+        </group>
+      ))}
+    </>
   );
 }
