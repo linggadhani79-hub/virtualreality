@@ -169,24 +169,124 @@ const CAR_INFO: PartDef = {
   size: [0, 0, 0],
 };
 
-function makeLabelTexture(label: string, icon: string) {
+type IconName = "search" | "play" | "pause" | "rotate" | "reset";
+
+// Ikon digambar sebagai vektor (bukan emoji) supaya tampil sama di Quest, HP, dan PC
+function drawIcon(ctx: CanvasRenderingContext2D, icon: IconName, cx: number, cy: number, r: number) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.lineWidth = r * 0.26;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#ffffff";
+  ctx.fillStyle = "#ffffff";
+  const arrowHead = (x: number, y: number, ang: number) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(ang);
+    ctx.beginPath();
+    ctx.moveTo(r * 0.42, 0);
+    ctx.lineTo(-r * 0.28, -r * 0.4);
+    ctx.lineTo(-r * 0.28, r * 0.4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  };
+  if (icon === "search") {
+    ctx.beginPath();
+    ctx.arc(-r * 0.18, -r * 0.18, r * 0.58, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(r * 0.28, r * 0.28);
+    ctx.lineTo(r * 0.85, r * 0.85);
+    ctx.stroke();
+  } else if (icon === "play") {
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.5, -r * 0.8);
+    ctx.lineTo(r * 0.85, 0);
+    ctx.lineTo(-r * 0.5, r * 0.8);
+    ctx.closePath();
+    ctx.fill();
+  } else if (icon === "pause") {
+    ctx.fillRect(-r * 0.6, -r * 0.75, r * 0.42, r * 1.5);
+    ctx.fillRect(r * 0.18, -r * 0.75, r * 0.42, r * 1.5);
+  } else if (icon === "rotate") {
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.7, -Math.PI * 0.35, Math.PI * 1.25);
+    ctx.stroke();
+    arrowHead(Math.cos(-Math.PI * 0.35) * r * 0.7, Math.sin(-Math.PI * 0.35) * r * 0.7, -Math.PI * 0.35 - Math.PI / 2 + 0.25);
+  } else {
+    // reset = panah melingkar berlawanan arah (cermin dari ikon putar)
+    ctx.scale(-1, 1);
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.7, -Math.PI * 0.35, Math.PI * 1.25);
+    ctx.stroke();
+    arrowHead(Math.cos(-Math.PI * 0.35) * r * 0.7, Math.sin(-Math.PI * 0.35) * r * 0.7, -Math.PI * 0.35 - Math.PI / 2 + 0.25);
+  }
+  ctx.restore();
+}
+
+function makeLabelTexture(label: string, icon: IconName) {
   const c = document.createElement("canvas");
-  c.width = 256;
-  c.height = 160;
+  c.width = 384;
+  c.height = 256;
   const ctx = c.getContext("2d")!;
+  ctx.shadowColor = "rgba(0,0,0,0.45)";
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 3;
+  drawIcon(ctx, icon, 192, 86, 52);
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = "64px system-ui, sans-serif";
-  ctx.fillText(icon, 128, 56);
-  ctx.font = "bold 34px system-ui, sans-serif";
-  ctx.fillText(label, 128, 124);
+  ctx.font = "800 58px system-ui, sans-serif";
+  ctx.fillText(label, 192, 204, 360);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
   return t;
 }
 
-/** Tombol 3D yang bisa ditekan dengan mouse, laser controller, atau tatapan. */
+function roundedRectShape(w: number, h: number, r: number) {
+  const s = new THREE.Shape();
+  const x = -w / 2;
+  const y = -h / 2;
+  s.moveTo(x + r, y);
+  s.lineTo(x + w - r, y);
+  s.quadraticCurveTo(x + w, y, x + w, y + r);
+  s.lineTo(x + w, y + h - r);
+  s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  s.lineTo(x + r, y + h);
+  s.quadraticCurveTo(x, y + h, x, y + h - r);
+  s.lineTo(x, y + r);
+  s.quadraticCurveTo(x, y, x + r, y);
+  return s;
+}
+
+const BTN_W = 0.42;
+const BTN_H = 0.3;
+// Geometri dipakai bersama oleh semua tombol
+const capGeometry = new THREE.ExtrudeGeometry(roundedRectShape(BTN_W, BTN_H, 0.06), {
+  depth: 0.035,
+  bevelEnabled: true,
+  bevelThickness: 0.012,
+  bevelSize: 0.012,
+  bevelSegments: 3,
+  curveSegments: 8,
+});
+const bezelGeometry = new THREE.ExtrudeGeometry(roundedRectShape(BTN_W + 0.07, BTN_H + 0.07, 0.085), {
+  depth: 0.02,
+  bevelEnabled: true,
+  bevelThickness: 0.006,
+  bevelSize: 0.006,
+  bevelSegments: 2,
+  curveSegments: 8,
+});
+const glowGeometry = new THREE.ShapeGeometry(roundedRectShape(BTN_W + 0.1, BTN_H + 0.1, 0.1), 8);
+
+/**
+ * Tombol 3D: tutup mengilap di atas bingkai logam, ikut tertekan saat dipilih, dan
+ * berpendar sesuai keadaan. Bisa ditekan dengan mouse, laser controller, atau tatapan.
+ */
 function Button3D({
   label,
   icon,
@@ -196,54 +296,120 @@ function Button3D({
   onPress,
 }: {
   label: string;
-  icon: string;
+  icon: IconName;
   color: string;
   active?: boolean;
   position: [number, number, number];
   onPress: () => void;
 }) {
   const [hot, setHot] = useState(false);
+  const capRef = useRef<THREE.Group>(null);
+  const capMat = useRef<THREE.MeshStandardMaterial>(null);
+  const glowMat = useRef<THREE.MeshBasicMaterial>(null);
+  const pulse = useRef(0);
   const texture = useMemo(() => makeLabelTexture(label, icon), [label, icon]);
   useEffect(() => () => texture.dispose(), [texture]);
+
   const press = (e?: any) => {
     e?.stopPropagation?.();
+    pulse.current = 1; // animasi tertekan
     onPress();
   };
+
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 0.05);
+    pulse.current = Math.max(0, pulse.current - delta * 4);
+    const depth = Math.max(active ? 0.6 : 0, pulse.current);
+    if (capRef.current) {
+      capRef.current.position.z = THREE.MathUtils.damp(capRef.current.position.z, 0.03 - depth * 0.022, 18, delta);
+      const s = hot ? 1.04 : 1;
+      capRef.current.scale.x = capRef.current.scale.y = THREE.MathUtils.damp(capRef.current.scale.x, s, 14, delta);
+    }
+    if (capMat.current) {
+      capMat.current.emissiveIntensity = THREE.MathUtils.damp(capMat.current.emissiveIntensity, active ? 0.55 : hot ? 0.3 : 0.04, 10, delta);
+    }
+    if (glowMat.current) {
+      glowMat.current.opacity = THREE.MathUtils.damp(glowMat.current.opacity, active ? 0.9 : hot ? 0.55 : 0.12, 10, delta);
+    }
+  });
+
   return (
     <group position={position}>
-      <mesh
-        name={`SampleEV_btn_${label}`}
-        position={[0, 0, active ? -0.015 : 0]}
-        scale={hot ? 1.06 : 1}
-        userData={{ isVRButton: true, isInteractableMesh: true, onClick: press }}
-        onClick={press}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          setHot(true);
-        }}
-        onPointerOut={() => setHot(false)}
-      >
-        <boxGeometry args={[0.44, 0.28, 0.05]} />
-        <meshStandardMaterial
-          color={color}
-          emissive={color}
-          emissiveIntensity={active ? 0.9 : hot ? 0.5 : 0.15}
-          roughness={0.4}
-        />
+      {/* Pendar di sekeliling tombol */}
+      <mesh geometry={glowGeometry} position={[0, 0, 0.002]} raycast={noRaycast}>
+        <meshBasicMaterial ref={glowMat} color={color} transparent opacity={0.12} depthWrite={false} toneMapped={false} />
       </mesh>
-      <mesh position={[0, 0, active ? 0.012 : 0.027]} raycast={() => null}>
-        <planeGeometry args={[0.4, 0.25]} />
-        <meshBasicMaterial map={texture} transparent depthWrite={false} toneMapped={false} />
+      {/* Bingkai logam */}
+      <mesh geometry={bezelGeometry} position={[0, 0, 0.004]} raycast={noRaycast}>
+        <meshStandardMaterial color="#111827" metalness={0.85} roughness={0.3} />
       </mesh>
+      <group ref={capRef} position={[0, 0, 0.03]}>
+        <mesh
+          name={`SampleEV_btn_${label}`}
+          geometry={capGeometry}
+          userData={{ isVRButton: true, isInteractableMesh: true, onClick: press }}
+          onClick={press}
+          onPointerOver={(e) => {
+            e.stopPropagation();
+            setHot(true);
+          }}
+          onPointerOut={() => setHot(false)}
+        >
+          <meshStandardMaterial
+            ref={capMat}
+            color={color}
+            emissive={color}
+            emissiveIntensity={0.04}
+            roughness={0.3}
+            metalness={0.1}
+            envMapIntensity={0.35}
+          />
+        </mesh>
+        <mesh position={[0, 0.005, 0.05]} raycast={noRaycast}>
+          <planeGeometry args={[0.39, 0.26]} />
+          <meshBasicMaterial map={texture} transparent depthWrite={false} toneMapped={false} />
+        </mesh>
+      </group>
     </group>
   );
 }
+
+function makeConsoleTitleTexture() {
+  const c = document.createElement("canvas");
+  c.width = 1024;
+  c.height = 64;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#67e8f9";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "800 38px system-ui, sans-serif";
+  ctx.fillText("P A N E L   K O N T R O L   ·   M O B I L   L I S T R I K", 512, 34);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+const consoleGeometry = new THREE.ExtrudeGeometry(roundedRectShape(2.36, 0.62, 0.09), {
+  depth: 0.05,
+  bevelEnabled: true,
+  bevelThickness: 0.015,
+  bevelSize: 0.015,
+  bevelSegments: 3,
+  curveSegments: 8,
+});
 
 const _cam = new THREE.Vector3();
 const _panel = new THREE.Vector3();
 const noRaycast = () => null;
 
-export function SampleEVCar({ position = [0, 0, -6] as [number, number, number] }) {
+export function SampleEVCar({
+  position = [0, 0, -6] as [number, number, number],
+  showPlatform = true,
+}: {
+  position?: [number, number, number];
+  /** Panggung gelap + garis lintasan; matikan bila lantai sudah disediakan lingkungan lab */
+  showPlatform?: boolean;
+}) {
   const { invalidate } = useThree();
   const [selected, setSelected] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -252,6 +418,8 @@ export function SampleEVCar({ position = [0, 0, -6] as [number, number, number] 
   const [spinning, setSpinning] = useState(false);
   const [model, setModel] = useState<THREE.Object3D | null>(null);
 
+  const consoleTitle = useMemo(makeConsoleTitleTexture, []);
+  useEffect(() => () => consoleTitle.dispose(), [consoleTitle]);
   const panelRef = useRef<THREE.Mesh>(null);
   const carRef = useRef<THREE.Group>(null);
   const wheelRefs = useRef<THREE.Mesh[]>([]);
@@ -388,6 +556,8 @@ export function SampleEVCar({ position = [0, 0, -6] as [number, number, number] 
   return (
     <group position={position} name="SampleEVCar">
       {/* Panggung & lintasan */}
+      {showPlatform && (
+        <>
       <mesh position={[0, 0.006, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
         <planeGeometry args={[DRIVE_RANGE * 2 + CAR_LENGTH + 0.6, 2.9]} />
         <meshStandardMaterial color="#0f172a" roughness={0.85} />
@@ -398,6 +568,8 @@ export function SampleEVCar({ position = [0, 0, -6] as [number, number, number] 
           <meshBasicMaterial color="#22d3ee" />
         </mesh>
       ))}
+        </>
+      )}
 
       {/* Mobil: panjang searah sumbu X sehingga terlihat dari samping */}
       <group ref={carRef}>
@@ -481,30 +653,51 @@ export function SampleEVCar({ position = [0, 0, -6] as [number, number, number] 
         )}
       </group>
 
-      {/* Papan informasi (selalu menghadap pengguna) */}
-      <mesh ref={panelRef} position={[0, 2.75, -0.6]} raycast={noRaycast} renderOrder={10}>
-        <planeGeometry args={[3.2, 1.375]} />
+      {/* Papan informasi di sisi kiri mobil (selalu menghadap pengguna) + tiangnya */}
+      <mesh position={[-4.6, 0.85, -1.6]} raycast={noRaycast}>
+        <cylinderGeometry args={[0.045, 0.06, 1.7, 14]} />
+        <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.35} />
+      </mesh>
+      <mesh ref={panelRef} position={[-4.6, 2.35, -1.6]} raycast={noRaycast} renderOrder={10}>
+        <planeGeometry args={[3.0, 1.29]} />
         <meshBasicMaterial map={texture} transparent side={THREE.DoubleSide} depthWrite={false} toneMapped={false} />
       </mesh>
 
       {/* Konsol tombol interaktif di depan mobil */}
       <group position={[0, 0, 2.9]}>
-        <mesh position={[0, 0.27, 0.04]} raycast={noRaycast}>
-          <boxGeometry args={[0.12, 0.54, 0.12]} />
-          <meshStandardMaterial color="#1e293b" roughness={0.6} metalness={0.4} />
+        {/* Tiang & kaki */}
+        <mesh position={[0, 0.03, 0.05]} raycast={noRaycast}>
+          <cylinderGeometry args={[0.34, 0.38, 0.06, 28]} />
+          <meshStandardMaterial color="#111827" metalness={0.8} roughness={0.35} />
+        </mesh>
+        <mesh position={[0, 0.3, 0.05]} raycast={noRaycast}>
+          <cylinderGeometry args={[0.07, 0.09, 0.52, 20]} />
+          <meshStandardMaterial color="#334155" metalness={0.85} roughness={0.3} />
+        </mesh>
+        <mesh position={[0, 0.3, 0.05]} raycast={noRaycast}>
+          <cylinderGeometry args={[0.076, 0.076, 0.03, 20]} />
+          <meshBasicMaterial color="#22d3ee" toneMapped={false} />
         </mesh>
         {/* Rendah & miring supaya tidak menutupi mobil, tetap mudah dibidik laser */}
-        <group position={[0, 0.62, 0]} rotation={[-0.95, 0, 0]}>
-          <mesh position={[0, 0, -0.04]} raycast={noRaycast}>
-            <boxGeometry args={[2.16, 0.42, 0.04]} />
-            <meshStandardMaterial color="#0f172a" roughness={0.5} metalness={0.3} />
+        <group position={[0, 0.66, 0]} rotation={[-0.95, 0, 0]}>
+          <mesh geometry={consoleGeometry} position={[0, 0.03, -0.07]} raycast={noRaycast}>
+            <meshStandardMaterial color="#0b1220" metalness={0.7} roughness={0.35} />
+          </mesh>
+          {/* Garis lampu aksen */}
+          <mesh position={[0, -0.235, 0.001]} raycast={noRaycast}>
+            <planeGeometry args={[2.1, 0.018]} />
+            <meshBasicMaterial color="#22d3ee" toneMapped={false} />
+          </mesh>
+          <mesh position={[0, 0.265, 0.001]} raycast={noRaycast}>
+            <planeGeometry args={[1.5, 0.094]} />
+            <meshBasicMaterial map={consoleTitle} transparent depthWrite={false} toneMapped={false} />
           </mesh>
           <Button3D
             label="KOMPONEN"
-            icon="🔍"
+            icon="search"
             color="#0891b2"
             active={xray}
-            position={[-0.78, 0, 0]}
+            position={[-0.81, 0, 0]}
             onPress={() => {
               setXray((v) => !v);
               setSelected(null);
@@ -512,10 +705,10 @@ export function SampleEVCar({ position = [0, 0, -6] as [number, number, number] 
           />
           <Button3D
             label={driving ? "BERHENTI" : "JALANKAN"}
-            icon={driving ? "⏸" : "▶"}
+            icon={driving ? "pause" : "play"}
             color="#16a34a"
             active={driving}
-            position={[-0.26, 0, 0]}
+            position={[-0.27, 0, 0]}
             onPress={() => {
               setSpinning(false);
               if (carRef.current) carRef.current.rotation.y = 0;
@@ -524,16 +717,16 @@ export function SampleEVCar({ position = [0, 0, -6] as [number, number, number] 
           />
           <Button3D
             label="PUTAR"
-            icon="⟳"
+            icon="rotate"
             color="#7c3aed"
             active={spinning}
-            position={[0.26, 0, 0]}
+            position={[0.27, 0, 0]}
             onPress={() => {
               setDriving(false);
               setSpinning((v) => !v);
             }}
           />
-          <Button3D label="RESET" icon="↺" color="#b45309" position={[0.78, 0, 0]} onPress={reset} />
+          <Button3D label="RESET" icon="reset" color="#d97706" position={[0.81, 0, 0]} onPress={reset} />
         </group>
       </group>
     </group>

@@ -29,6 +29,7 @@ import { WebXRControllerManager } from "./components/WebXRControllerManager";
 import { EVEntranceScreen } from "./components/EVEntranceScreen";
 import { GuardianBoundary } from "./components/GuardianBoundary";
 import { SampleEVCar } from "./components/SampleEVCar";
+import { TestLabEnvironment } from "./components/TestLabEnvironment";
 import { PhoneVRRenderer, PhoneVROverlay } from "./components/PhoneVR";
 import { phoneVR, startPhoneVR, stopPhoneVR } from "./lib/phoneVR";
 
@@ -850,7 +851,7 @@ function AdaptiveUI({
               >
                 <div className="flex items-center gap-1.5">
                   <span className="text-base">🚗</span>
-                  <span>Contoh Mobil Listrik</span>
+                  <span>Lab Uji Kendaraan</span>
                 </div>
                 <span className="text-[10px] bg-emerald-500/30 text-emerald-100 px-2 py-0.5 rounded font-mono font-bold border border-emerald-400/30">
                   {sampleCarVisible ? "TAMPIL" : "SEMBUNYI"}
@@ -2073,7 +2074,12 @@ export default function App() {
 
               <Player viewMode={viewMode} yaw={yaw} pitch={pitch} />
 
-              {sampleCarVisible && <SampleEVCar />}
+              {sampleCarVisible && (
+                <>
+                  <TestLabEnvironment />
+                  <SampleEVCar showPlatform={false} />
+                </>
+              )}
 
               {/* User Uploaded Assets (GLB and FBX) */}
               {uploadedModels.map((model) => (
