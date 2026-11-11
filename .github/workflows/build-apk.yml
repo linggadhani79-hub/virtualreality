@@ -1,0 +1,46 @@
+name: Build APK (Meta Quest & Android)
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: "Alamat web aplikasi (https://...). Kosongkan untuk memakai android/app-config.properties"
+        required: false
+        default: ""
+  push:
+    paths:
+      - "android/**"
+      - ".github/workflows/build-apk.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Build APK
+        working-directory: android
+        env:
+          APP_URL_INPUT: ${{ inputs.app_url }}
+        run: |
+          ARGS=""
+          if [ -n "$APP_URL_INPUT" ]; then ARGS="-PappUrl=$APP_URL_INPUT"; fi
+          if [ -z "$APP_URL_INPUT" ] && grep -q "GANTI-DENGAN-ALAMAT-ANDA" app-config.properties; then
+            echo "::warning::APP_URL masih contoh. Ubah android/app-config.properties atau isi kolom app_url, lalu build ulang."
+          fi
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease $ARGS -PversionCode=${{ github.run_number }}
+          cp app/build/outputs/apk/release/app-release.apk ../smart-vocational-ev.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smart-vocational-ev-apk
+          path: smart-vocational-ev.apk

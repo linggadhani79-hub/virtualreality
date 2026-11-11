@@ -1,0 +1,15 @@
+# Cloudflare Workers (Workers Builds / "wrangler deploy")
+#   Build command : npm run build:web
+#   Deploy command: npx wrangler deploy
+# "name" harus sama dengan nama proyek Worker di dashboard Cloudflare.
+name = "virtualreality"
+main = "worker/index.ts"
+compatibility_date = "2025-01-01"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+# Aplikasi satu halaman: alamat yang tidak dikenal diarahkan ke index.html
+not_found_handling = "single-page-application"
+# Hanya /api/* yang melewati Worker; berkas lain langsung dari CDN
+run_worker_first = ["/api/*"]

@@ -102,6 +102,14 @@ async function startServer() {
     }
   });
 
+  // Digital Asset Links untuk APK Android / Meta Quest (express.static melewati folder ber-titik)
+  app.get("/.well-known/assetlinks.json", (_req, res) => {
+    const base = process.env.NODE_ENV === "production" ? "dist" : "public";
+    res.type("application/json");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.sendFile(path.join(process.cwd(), base, ".well-known", "assetlinks.json"), { dotfiles: "allow" });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

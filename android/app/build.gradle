@@ -1,0 +1,81 @@
+plugins {
+    id 'com.android.application'
+}
+
+// ---- Baca pengaturan dari android/app-config.properties (bisa ditimpa dengan -PappUrl=...) ----
+def cfg = new Properties()
+rootProject.file('app-config.properties').withInputStream { cfg.load(it) }
+
+def appUrl = ((project.findProperty('appUrl') ?: cfg.getProperty('APP_URL')) ?: '').toString().trim()
+if (!appUrl.startsWith('https://')) {
+    throw new GradleException("APP_URL harus diawali https:// (sekarang: '${appUrl}'). Ubah di android/app-config.properties")
+}
+def appUri = new URI(appUrl)
+def hostName = appUri.host
+def launchPath = appUri.rawPath ?: '/'
+if (launchPath.isEmpty()) launchPath = '/'
+def launchUrl = "https://${hostName}${launchPath}"
+def scopeUrl = "https://${hostName}/"
+
+def appName = (cfg.getProperty('APP_NAME') ?: 'Smart Vocational EV').trim()
+def appLongName = (cfg.getProperty('APP_LONG_NAME') ?: appName).trim()
+
+android {
+    namespace 'id.smartvocational.evlab'
+    compileSdkVersion 36
+
+    defaultConfig {
+        applicationId 'id.smartvocational.evlab'
+        minSdkVersion 24
+        targetSdkVersion 35
+        versionCode((project.findProperty('versionCode') ?: cfg.getProperty('VERSION_CODE') ?: '1').toString().toInteger())
+        versionName((cfg.getProperty('VERSION_NAME') ?: '1.0.0').trim())
+
+        resValue 'string', 'appName', appLongName
+        resValue 'string', 'launcherName', appName
+        resValue 'string', 'launchUrl', launchUrl
+        resValue 'string', 'fullScopeUrl', scopeUrl
+        resValue 'string', 'webManifestUrl', "https://${hostName}/manifest.webmanifest"
+        resValue 'string', 'hostName', hostName
+        resValue 'string', 'providerAuthority', 'id.smartvocational.evlab.fileprovider'
+        // Digital Asset Links: menghubungkan APK dengan situs agar tampil layar penuh tanpa bilah alamat
+        resValue 'string', 'assetStatements',
+                '[{ \\"relation\\": [\\"delegate_permission/common.handle_all_urls\\"],' +
+                ' \\"target\\": {\\"namespace\\": \\"web\\", \\"site\\": \\"https://' + hostName + '\\"}}]'
+    }
+
+    signingConfigs {
+        // Kunci khusus sideload (bukan untuk Play Store / Meta Store). Sidik jarinya dicatat di
+        // public/.well-known/assetlinks.json. Untuk rilis toko, ganti lewat variabel lingkungan.
+        sideload {
+            storeFile file(System.getenv('EVLAB_KEYSTORE_FILE') ?: rootProject.file('sideload.keystore'))
+            storePassword System.getenv('EVLAB_KEYSTORE_PASSWORD') ?: 'evlab-sideload'
+            keyAlias System.getenv('EVLAB_KEY_ALIAS') ?: 'evlab'
+            keyPassword System.getenv('EVLAB_KEY_PASSWORD') ?: 'evlab-sideload'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            signingConfig signingConfigs.sideload
+        }
+        debug {
+            signingConfig signingConfigs.sideload
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.4'
+}

@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "id.smartvocational.evlab",
+      "sha256_cert_fingerprints": [
+        "36:05:56:52:C7:38:4C:FF:76:9E:D7:C3:AD:99:7E:8E:94:B0:04:F5:B5:1E:5C:44:65:22:0B:2F:45:53:A6:51"
+      ]
+    }
+  }
+]

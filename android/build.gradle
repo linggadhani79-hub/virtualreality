@@ -1,0 +1,22 @@
+// Top-level build file. Proyek ini adalah Trusted Web Activity (TWA):
+// APK ringan yang membuka aplikasi web WebXR dalam mode layar penuh.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.9.1'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+tasks.register('clean', Delete) {
+    delete rootProject.layout.buildDirectory
+}

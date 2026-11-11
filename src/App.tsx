@@ -3,13 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, lazy, Suspense } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
   OrbitControls,
   MapControls,
   Html,
   Environment,
+  Lightformer,
   Grid,
   Sky,
 } from "@react-three/drei";
@@ -21,12 +22,20 @@ import { QuestControllerModal, QuestControllerToast, QuestLocomotion, updateQues
 import { useKeyboardKeys } from "./hooks/useKeyboardKeys";
 import { UploadedObject, InteractiveObject } from "./components/UploadedObject";
 import { VideoScreenObject } from "./components/VideoScreenObject";
-import { ModelUploader, UploadedModelData } from "./components/ModelUploader";
+import type { UploadedModelData } from "./components/ModelUploader";
 import { AuthButton } from "./components/AuthButton";
 import { VROptimizer } from "./components/VROptimizer";
 import { WebXRControllerManager } from "./components/WebXRControllerManager";
 import { EVEntranceScreen } from "./components/EVEntranceScreen";
-import { MapBackupModal } from "./components/MapBackupModal";
+import { GuardianBoundary } from "./components/GuardianBoundary";
+import { SampleEVCar } from "./components/SampleEVCar";
+import { TestLabEnvironment } from "./components/TestLabEnvironment";
+import { PhoneVRRenderer, PhoneVROverlay } from "./components/PhoneVR";
+import { phoneVR, startPhoneVR, stopPhoneVR } from "./lib/phoneVR";
+
+// Panel khusus admin dimuat belakangan supaya siswa (Quest / HP) membuka aplikasi lebih cepat
+const ModelUploader = lazy(() => import("./components/ModelUploader").then((m) => ({ default: m.ModelUploader })));
+const MapBackupModal = lazy(() => import("./components/MapBackupModal").then((m) => ({ default: m.MapBackupModal })));
 import { Volume2 } from "lucide-react";
 
 import {
@@ -49,6 +58,13 @@ const isMobile =
 
 const store = createXRStore({
   controller: false,
+  // Emulator bawaan tidak cocok dengan versi three.js proyek ini (error saat render), jadi dimatikan
+  emulate: false,
+  // "bounded-floor" memberi akses ke batas ruang (Guardian) headset; opsional agar HP tetap bisa masuk VR
+  customSessionInit: {
+    requiredFeatures: ["local-floor"],
+    optionalFeatures: ["bounded-floor", "hand-tracking", "layers"],
+  },
 });
 
 // Pre-allocated reusable objects for Player movement and collision to eliminate GC stuttering
@@ -258,6 +274,9 @@ function Player({
     if (keys["KeyS"] || keys["ArrowDown"]) moveZ += 1;
     if (keys["KeyA"] || keys["ArrowLeft"]) moveX -= 1;
     if (keys["KeyD"] || keys["ArrowRight"]) moveX += 1;
+
+    // VR HP (Cardboard): tahan layar untuk berjalan ke arah pandangan
+    if (phoneVR.active && phoneVR.walking) moveZ -= 0.4; // pelan agar tidak pusing
 
     // WebXR / Meta Quest 2 Controller Thumbstick & Button Inputs
     const session = state.gl.xr?.getSession();
@@ -526,11 +545,23 @@ function Player({
           playerRef.current.position.y + 1.2,
           playerRef.current.position.z,
         );
-        camera.rotation.set(0, 0, 0);
-        camera.rotation.order = "YXZ";
-        camera.rotation.y = yaw.current;
-        camera.rotation.x = pitch.current;
+        if (phoneVR.active && phoneVR.hasOrientation) {
+          // VR HP: kepala mengikuti giroskop, stik kanan / geser tetap memutar badan
+          tempQuaternion.setFromAxisAngle(tempFloorRayDir, -yaw.current);
+          camera.quaternion.copy(phoneVR.quaternion).premultiply(tempQuaternion);
+        } else {
+          camera.rotation.set(0, 0, 0);
+          camera.rotation.order = "YXZ";
+          camera.rotation.y = yaw.current;
+          camera.rotation.x = pitch.current;
+        }
       }
+    }
+
+    if (isPresenting && playerRef.current) {
+      // Di VR, rig pemain harus terlihat: di dalamnya ada tangan/controller, penanda batas ruang
+      // dan penanda kaki (mode FPV 2D menyembunyikan rig ini).
+      playerRef.current.visible = true;
     }
 
     if (playerRef.current) {
@@ -559,7 +590,9 @@ function Player({
 
   return (
     <group ref={playerRef} position={[0, 0, 0]}>
-      <XROrigin />
+      <XROrigin>
+        <GuardianBoundary />
+      </XROrigin>
       <UserFootprintMarker isNearWallRef={isNearWallRef} />
       <group visible={!isPresenting && viewMode !== "fpp"}>
         <HumanCharacter ref={characterRef} isMovingRef={isMovingRef} />
@@ -569,10 +602,12 @@ function Player({
 }
 
 function SceneBridge({ onScene }: { onScene: (scene: THREE.Scene) => void }) {
-  const { scene } = useThree();
+  const { scene, gl, camera } = useThree();
   useEffect(() => {
     onScene(scene);
-  }, [scene, onScene]);
+    // Hanya saat pengembangan: memudahkan pemeriksaan scene dari konsol browser
+    if (import.meta.env.DEV) (window as any).__evlab = { scene, gl, camera };
+  }, [scene, gl, camera, onScene]);
   return null;
 }
 
@@ -585,6 +620,9 @@ function AdaptiveUI({
   activeMode,
   onExitMap,
   onOpenBackupModal,
+  onStartPhoneVR,
+  sampleCarVisible,
+  onToggleSampleCar,
 }: {
   viewMode: "tpp" | "fpp" | "dev";
   setViewMode: (mode: "tpp" | "fpp" | "dev") => void;
@@ -594,6 +632,9 @@ function AdaptiveUI({
   activeMode: "admin" | "guest" | null;
   onExitMap: () => void;
   onOpenBackupModal: () => void;
+  onStartPhoneVR: () => Promise<{ ok: boolean; reason?: string }>;
+  sampleCarVisible: boolean;
+  onToggleSampleCar: () => void;
 }) {
   const [xrError, setXrError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -617,14 +658,16 @@ function AdaptiveUI({
     setIsPlayingAudio(false);
     try {
       setXrError(null);
-      if (!("xr" in navigator)) {
-        setXrError("WebXR tidak didukung di browser ini. Buka aplikasi di Meta Quest Browser untuk masuk VR 360°.");
-        return;
-      }
-      const supported = await navigator.xr?.isSessionSupported("immersive-vr");
+      const supported =
+        "xr" in navigator && (await navigator.xr?.isSessionSupported("immersive-vr").catch(() => false));
       if (!supported) {
+        // HP tanpa WebXR (mis. iPhone): otomatis pakai mode VR HP layar-ganda
+        if (isMobile) {
+          await startPhoneVrSession();
+          return;
+        }
         setXrError(
-          "Mode Immersive VR tidak didukung oleh browser ini. Gunakan Meta Quest Browser atau WebXR-compatible browser.",
+          "Mode Immersive VR tidak didukung oleh browser ini. Gunakan Meta Quest Browser, atau buka di HP lalu pilih VR HP (Cardboard).",
         );
         return;
       }
@@ -632,6 +675,17 @@ function AdaptiveUI({
     } catch (err: any) {
       setXrError("Gagal masuk VR: " + err.message);
     }
+  };
+
+  const startPhoneVrSession = async () => {
+    setShowVrModal(false);
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    setIsPlayingAudio(false);
+    setXrError(null);
+    const res = await onStartPhoneVR();
+    if (!res.ok) setXrError("Gagal masuk VR HP: " + (res.reason || "sensor tidak tersedia"));
   };
 
   const toggleWelcomeSpeech = () => {
@@ -787,6 +841,20 @@ function AdaptiveUI({
                 </div>
                 <span className="text-[10px] bg-indigo-500/40 text-indigo-100 px-2 py-0.5 rounded font-mono font-bold border border-indigo-400/30">
                   🎮 HUB SINKRON
+                </span>
+              </button>
+
+              <button
+                id="btn-toggle-sample-car"
+                className="w-full flex items-center justify-between bg-emerald-950/80 hover:bg-emerald-900 active:scale-95 text-xs font-bold py-2.5 px-3 rounded-xl transition-all border border-emerald-500/40 text-left text-white shadow-lg cursor-pointer"
+                onClick={onToggleSampleCar}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="text-base">🚗</span>
+                  <span>Lab Uji Kendaraan</span>
+                </div>
+                <span className="text-[10px] bg-emerald-500/30 text-emerald-100 px-2 py-0.5 rounded font-mono font-bold border border-emerald-400/30">
+                  {sampleCarVisible ? "TAMPIL" : "SEMBUNYI"}
                 </span>
               </button>
 
@@ -956,19 +1024,28 @@ function AdaptiveUI({
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap items-center gap-3 pt-2">
               <button
                 onClick={closeVrModal}
-                className="w-full sm:w-1/2 bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold py-3 px-4 rounded-xl border border-white/10 transition-all cursor-pointer text-center"
+                className="w-full sm:flex-1 bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold py-3 px-4 rounded-xl border border-white/10 transition-all cursor-pointer text-center"
               >
                 💻 Mode Browser (2D)
               </button>
               <button
                 onClick={startVrSession}
-                className="w-full sm:w-1/2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-bold py-3 px-4 rounded-xl shadow-lg shadow-emerald-600/30 transition-all cursor-pointer text-center flex items-center justify-center gap-2"
+                className="w-full sm:flex-1 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-bold py-3 px-4 rounded-xl shadow-lg shadow-emerald-600/30 transition-all cursor-pointer text-center flex items-center justify-center gap-2"
               >
                 <span>🥽 Masuk VR 360° (Meta Quest)</span>
               </button>
+              {isMobile && (
+                <button
+                  id="btn-start-phone-vr"
+                  onClick={startPhoneVrSession}
+                  className="w-full bg-sky-600 hover:bg-sky-500 active:scale-95 text-white text-xs font-bold py-3 px-4 rounded-xl shadow-lg shadow-sky-600/30 transition-all cursor-pointer text-center"
+                >
+                  📱 VR HP (Cardboard / VR Box)
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -989,7 +1066,22 @@ export default function App() {
   const [mobileMode, setMobileMode] = useState(isMobile);
   const [isDraggingAny, setIsDraggingAny] = useState(false);
   const [isVRActive, setIsVRActive] = useState(false);
+  const [phoneVRActive, setPhoneVRActive] = useState(false);
   const isDraggingAnyRef = useRef(false);
+
+  const handleStartPhoneVR = useCallback(async () => {
+    const res = await startPhoneVR();
+    if (res.ok) {
+      setViewMode("fpp");
+      setPhoneVRActive(true);
+    }
+    return res;
+  }, []);
+
+  const handleExitPhoneVR = useCallback(() => {
+    stopPhoneVR();
+    setPhoneVRActive(false);
+  }, []);
 
   useEffect(() => {
     return store.subscribe((state) => {
@@ -1003,6 +1095,9 @@ export default function App() {
   };
 
   const [uploadedModels, setUploadedModels] = useState<UploadedModelData[]>([]);
+  // Contoh mobil listrik bawaan: otomatis tampil bila map masih kosong, bisa diatur manual lewat tombol
+  const [sampleCarPref, setSampleCarPref] = useState<boolean | null>(null);
+  const sampleCarVisible = sampleCarPref ?? uploadedModels.length === 0;
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [threeScene, setThreeScene] = useState<THREE.Scene | null>(null);
   const uploadedModelsRef = useRef<UploadedModelData[]>([]);
@@ -1915,7 +2010,7 @@ export default function App() {
       {appState !== "select_mode" && (
         <>
           {/* Title Header - only in 2D mode */}
-          {!isVRActive && (
+          {!isVRActive && !phoneVRActive && (
             <div className="absolute top-0 left-0 w-full p-6 z-10 pointer-events-none flex justify-center">
               <div className="bg-white/10 backdrop-blur-md text-white px-6 py-2.5 rounded-full border border-white/20 text-xs tracking-[0.2em] font-semibold uppercase shadow-2xl flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
@@ -1948,6 +2043,7 @@ export default function App() {
               {/* Modul Optimasi & Input Meta Quest */}
               <VROptimizer isPresenting={isVRActive} />
               <WebXRControllerManager />
+              {phoneVRActive && !isVRActive && <PhoneVRRenderer />}
 
               {/* Titik Spawn Awal & Indikator Berdiri Permanen (World Spawn Station) */}
               <VRFloorIndicator />
@@ -1963,10 +2059,27 @@ export default function App() {
               {!isVRActive && (
                 <Sky distance={450000} sunPosition={[100, 30, 100]} inclination={0.3} azimuth={0.25} />
               )}
-              <Environment preset="city" background={!isVRActive} />
+              {/* Pantulan lingkungan dibuat lokal (tanpa unduh HDR 1,5 MB dari CDN luar):
+                  lebih ringan dan aplikasi tidak gagal tampil saat CDN tidak terjangkau. */}
+              <Environment resolution={128} frames={1}>
+                <color attach="background" args={["#8fa3b8"]} />
+                <Lightformer form="rect" intensity={3} color="#ffffff" position={[0, 6, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[12, 12, 1]} />
+                <Lightformer form="rect" intensity={1.6} color="#dbeafe" position={[-8, 2, 0]} rotation={[0, Math.PI / 2, 0]} scale={[14, 5, 1]} />
+                <Lightformer form="rect" intensity={1.6} color="#fff7ed" position={[8, 2, 0]} rotation={[0, -Math.PI / 2, 0]} scale={[14, 5, 1]} />
+                <Lightformer form="rect" intensity={1.2} color="#e2e8f0" position={[0, 2, -8]} scale={[14, 5, 1]} />
+                <Lightformer form="rect" intensity={1.2} color="#e2e8f0" position={[0, 2, 8]} rotation={[0, Math.PI, 0]} scale={[14, 5, 1]} />
+                <Lightformer form="rect" intensity={0.4} color="#334155" position={[0, -4, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[20, 20, 1]} />
+              </Environment>
               {activeIsAdmin && <WorkspaceManager />}
 
               <Player viewMode={viewMode} yaw={yaw} pitch={pitch} />
+
+              {sampleCarVisible && (
+                <>
+                  <TestLabEnvironment />
+                  <SampleEVCar showPlatform={false} />
+                </>
+              )}
 
               {/* User Uploaded Assets (GLB and FBX) */}
               {uploadedModels.map((model) => (
@@ -2031,7 +2144,8 @@ export default function App() {
               ))}
 
               {/* Clean Subtle Floor Grid aligned at Y = 0 */}
-              <Grid
+{!sampleCarVisible && (
+                            <Grid
                 position={[0, 0.001, 0]}
                 args={[120, 120]}
                 cellSize={1}
@@ -2044,6 +2158,7 @@ export default function App() {
                 fadeStrength={1.5}
                 infiniteGrid
               />
+              )}
 
               {/* Floor Plane Mesh */}
               <mesh
@@ -2083,9 +2198,12 @@ export default function App() {
             </XR>
           </Canvas>
 
-          {!isVRActive && (
+          {phoneVRActive && !isVRActive && <PhoneVROverlay onExit={handleExitPhoneVR} />}
+
+          {!isVRActive && !phoneVRActive && (
             <>
               {activeIsAdmin && (
+                <Suspense fallback={null}>
                 <ModelUploader
                   uploadedModels={uploadedModels}
                   libraryAssets={libraryAssets}
@@ -2098,6 +2216,7 @@ export default function App() {
                   onClearAll={handleClearAllModels}
                   onOpenBackupModal={() => setShowBackupModal(true)}
                 />
+                </Suspense>
               )}
 
               <AdaptiveUI
@@ -2112,11 +2231,16 @@ export default function App() {
                   setAppState("select_mode");
                 }}
                 onOpenBackupModal={() => setShowBackupModal(true)}
+                onStartPhoneVR={handleStartPhoneVR}
+                sampleCarVisible={sampleCarVisible}
+                onToggleSampleCar={() => setSampleCarPref(!sampleCarVisible)}
               />
             </>
           )}
 
           {/* Pusat Unduh & Cadangan Data Map Modal */}
+          {showBackupModal && (
+          <Suspense fallback={null}>
           <MapBackupModal
             isOpen={showBackupModal}
             onClose={() => setShowBackupModal(false)}
@@ -2131,6 +2255,8 @@ export default function App() {
             scene={threeScene || undefined}
             isAdmin={activeIsAdmin}
           />
+          </Suspense>
+          )}
       </>
       )}
 
