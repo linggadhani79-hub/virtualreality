@@ -26,10 +26,17 @@ Media ajar kendaraan listrik (EV) berbasis **WebXR**. Satu kode sumber, bisa dij
 
 - **Mobil listrik** di lintasan uji dengan panel tombol 3D: Komponen (bodi tembus pandang, sasis asli
   dengan titik sorot komponen yang bisa dipilih), Jalankan (roda ikut berputar), Putar, Reset.
-- **Etalase komponen**: paket baterai traksi dan unit penggerak listrik di atas meja putar, masing-masing
-  dengan papan keterangan.
+- **Zona EV**: etalase paket baterai traksi dan motor listrik (dinamo) di meja putar, serta
+  rangka & roda EV tanpa bodi di panggung rendah — masing-masing dengan papan keterangan.
+- **Bengkel non-EV (pembanding)**: sasis tangga di atas lift, mesin bensin 4 silinder, mesin V8,
+  piston, dan rem cakram, plus poster "Mobil Listrik vs Mobil Bensin" di dinding belakang.
+- **Peralatan**: lemari APD tegangan tinggi, bengkel dengan papan perkakas berisolasi, troli
+  diagnostik, pengisi daya DC, APAR; taman dan pepohonan di luar pintu.
 - **Tanya jawab**: kios kuis 10 soal pilihan ganda dengan penjelasan dan skor (tanpa internet).
-- **Pojok baca**: buku-buku modul ajar di meja; memilih buku membukanya sebagai slideshow di layar besar.
+- **Pojok baca**: buku-buku modul ajar di meja; buku yang dipilih berdiri di penyangganya dan
+  isinya tampil sebagai slideshow di layar besar.
+- **Tangan VR**: di Quest yang tampil hanya tangan (tanpa gambar controller); posisinya mengikuti
+  controller dan jarinya menekuk mengikuti trigger, grip, serta tombol/stik jempol.
 - **Modul Ajar Digital (admin)**: tombol di panel kanan untuk menulis modul dan slide. Tersimpan di
   perangkat; agar berlaku di semua perangkat, tekan *Salin JSON* dan simpan sebagai
   `public/lab/modul.json`, lalu build ulang.
@@ -125,7 +132,7 @@ lalu ganti sidik jari di `assetlinks.json`.
 ## Struktur penting
 
 - `src/components/TestLabEnvironment.tsx` — lingkungan Ruang Uji Kendaraan (aspal, lintasan, hanggar, charger, poster)
-- `src/components/SampleEVCar.tsx` — stasiun contoh mobil listrik (model `public/models/contoh-mobil-listrik.glb`, tombol 3D Komponen / Jalankan / Putar / Reset)
+- `src/components/SampleEVCar.tsx` — stasiun contoh mobil listrik (model `public/models/mobil-{hq,lite}.glb`, tombol 3D Komponen / Jalankan / Putar / Reset)
 - `src/components/GuardianBoundary.tsx` — penanda batas ruang
 - `src/components/WebXRControllerManager.tsx` — tangan, laser, controller kiri/kanan
 - `src/components/PhoneVR.tsx`, `src/lib/phoneVR.ts` — mode VR HP

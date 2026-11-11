@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { playVRClickSound, playVRHoverSound } from "../lib/vrAudio";
 import { triggerQuestHaptics } from "./QuestControllerManager";
 import { useXR } from "@react-three/xr";
@@ -30,160 +31,117 @@ const _tempRayDirection = new THREE.Vector3();
 const _tempHitPoint = new THREE.Vector3();
 const _tempScale = new THREE.Vector3(1, 1, 1);
 
-// Build lightweight, stylish 3D Quest Controller Visual Representation
+type FingerRig = { joints: THREE.Object3D[]; kind: "index" | "grip" | "thumb" };
+
+/**
+ * Tangan VR (tanpa gambar controller). Dipasang pada "grip space" controller, jadi posisinya
+ * selalu sama dengan controller yang dipegang, dan jarinya mengikuti tombol:
+ * telunjuk = trigger, tiga jari lain = grip, jempol = stik / tombol A·B·X·Y.
+ *
+ * Arah lokal (tangan kanan; tangan kiri dicerminkan pada sumbu X): jari menunjuk ke -Z,
+ * telapak menghadap -X, jempol di atas (+Y), pergelangan ke arah +Z.
+ */
 function createControllerVisual(handedness: "left" | "right"): THREE.Group {
   const group = new THREE.Group();
   group.name = `VR_ControllerModel_${handedness}`;
 
   const isLeft = handedness === "left";
   const mirrorX = isLeft ? -1 : 1;
-  // Kiri = biru, kanan = oranye, supaya mudah dibedakan di dalam VR
+  // Manset kiri = biru, kanan = oranye, supaya mudah dibedakan di dalam VR
   const accent = isLeft ? 0x38bdf8 : 0xfb923c;
-  const accentDark = isLeft ? 0x0284c7 : 0xc2410c;
 
-  // 1. Ergonomic Handle Grip
-  const handleGeo = new THREE.CylinderGeometry(0.016, 0.019, 0.12, 16);
-  handleGeo.rotateX(Math.PI / 12);
-  const handleMat = new THREE.MeshStandardMaterial({
-    color: 0x1e293b,
-    roughness: 0.5,
-    metalness: 0.2,
-  });
-  const handle = new THREE.Mesh(handleGeo, handleMat);
-  handle.position.set(0, -0.04, 0.01);
-  group.add(handle);
-
-  // 2. Top Faceplate
-  const faceGeo = new THREE.CylinderGeometry(0.026, 0.024, 0.012, 16);
-  faceGeo.rotateX(Math.PI / 8);
-  const faceMat = new THREE.MeshStandardMaterial({
-    color: 0x0f172a,
-    roughness: 0.4,
-    metalness: 0.3,
-  });
-  const face = new THREE.Mesh(faceGeo, faceMat);
-  face.position.set(0, 0.015, -0.01);
-  group.add(face);
-
-  // 3. Thumbstick with Glowing Accent
-  const stickBaseGeo = new THREE.CylinderGeometry(0.007, 0.007, 0.008, 12);
-  const stickTopGeo = new THREE.SphereGeometry(0.008, 12, 8);
-  stickTopGeo.scale(1, 0.4, 1);
-  const stickMat = new THREE.MeshStandardMaterial({
-    color: accent,
-    emissive: accentDark,
-    emissiveIntensity: 0.6,
-    roughness: 0.3,
-  });
-  const stick = new THREE.Group();
-  const stickBase = new THREE.Mesh(stickBaseGeo, handleMat);
-  const stickTop = new THREE.Mesh(stickTopGeo, stickMat);
-  stickTop.position.y = 0.005;
-  stick.add(stickBase);
-  stick.add(stickTop);
-  stick.position.set(mirrorX * 0.008, 0.022, -0.012);
-  stick.rotation.x = -Math.PI / 10;
-  group.add(stick);
-
-  // 4. Action Buttons (A/B or X/Y)
-  const btnGeo = new THREE.CylinderGeometry(0.004, 0.004, 0.004, 10);
-  const btnMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.4 });
-  const btn1 = new THREE.Mesh(btnGeo, btnMat);
-  btn1.position.set(-mirrorX * 0.009, 0.023, -0.006);
-  btn1.rotation.x = -Math.PI / 8;
-  const btn2 = new THREE.Mesh(btnGeo, btnMat);
-  btn2.position.set(-mirrorX * 0.009, 0.021, -0.016);
-  btn2.rotation.x = -Math.PI / 8;
-  group.add(btn1);
-  group.add(btn2);
-
-  // 5. Index Trigger underneath
-  const triggerGeo = new THREE.BoxGeometry(0.012, 0.02, 0.018);
-  const trigger = new THREE.Mesh(triggerGeo, handleMat);
-  trigger.position.set(0, 0.005, -0.035);
-  trigger.rotation.x = Math.PI / 6;
-  group.add(trigger);
-
-  // 6. Signature VR Tracking Halo / Ring
-  const ringGeo = new THREE.TorusGeometry(0.042, 0.004, 8, 24, Math.PI * 1.5);
-  ringGeo.rotateX(Math.PI / 3);
-  ringGeo.rotateZ(mirrorX * Math.PI / 6);
-  const ringMat = new THREE.MeshStandardMaterial({
-    color: 0x0f172a,
-    roughness: 0.4,
-  });
-  const ring = new THREE.Mesh(ringGeo, ringMat);
-  ring.position.set(mirrorX * 0.005, 0.02, -0.02);
-  group.add(ring);
-
-  // 7. Glowing LED Status Indicator
-  const ledGeo = new THREE.SphereGeometry(0.002, 8, 8);
-  const ledMat = new THREE.MeshBasicMaterial({ color: accent });
-  const led = new THREE.Mesh(ledGeo, ledMat);
-  led.position.set(0, 0.025, 0.005);
-  group.add(led);
-
-  // 8. Stylised hand holding the controller (fingers follow trigger / grip)
-  const skinMat = new THREE.MeshStandardMaterial({
-    color: 0xdbe4ee,
-    roughness: 0.75,
-    metalness: 0,
-    transparent: true,
-    opacity: 0.82,
-  });
+  const skinMat = new THREE.MeshStandardMaterial({ color: 0xdfe5ec, roughness: 0.62, metalness: 0 });
+  const padMat = new THREE.MeshStandardMaterial({ color: 0xcfd8e3, roughness: 0.7, metalness: 0 });
+  const cuffMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.55, metalness: 0.1 });
   const bandMat = new THREE.MeshBasicMaterial({ color: accent });
+
   const hand = new THREE.Group();
+  const PX = mirrorX * 0.03; // bidang telapak
 
-  const palm = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.088, 0.078), skinMat);
-  palm.position.set(mirrorX * 0.034, -0.045, 0.004);
+  // Telapak: kotak membulat + bantalan pangkal jempol & sisi kelingking
+  const palm = new THREE.Mesh(new RoundedBoxGeometry(0.03, 0.092, 0.088, 4, 0.0145), skinMat);
+  palm.position.set(PX, -0.04, 0.006);
   hand.add(palm);
+  const thenar = new THREE.Mesh(new THREE.SphereGeometry(0.021, 14, 10), padMat);
+  thenar.scale.set(0.75, 1, 1.35);
+  thenar.position.set(PX - mirrorX * 0.007, -0.012, 0.022);
+  hand.add(thenar);
+  const heel = new THREE.Mesh(new THREE.SphereGeometry(0.02, 14, 10), padMat);
+  heel.scale.set(0.7, 1.25, 1.3);
+  heel.position.set(PX - mirrorX * 0.006, -0.062, 0.024);
+  hand.add(heel);
 
-  const wrist = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.032, 0.05, 14), skinMat);
+  // Pergelangan + manset sarung tangan
+  const wristGeo = new THREE.CylinderGeometry(0.031, 0.034, 0.06, 18);
+  wristGeo.rotateX(Math.PI / 2);
+  const wrist = new THREE.Mesh(wristGeo, skinMat);
   wrist.scale.set(0.62, 1, 1);
-  wrist.position.set(mirrorX * 0.034, -0.112, 0.012);
+  wrist.position.set(PX, -0.042, 0.072);
   hand.add(wrist);
-
-  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.0335, 0.0335, 0.012, 14), bandMat);
-  band.scale.set(0.62, 1, 1);
-  band.position.set(mirrorX * 0.034, -0.118, 0.012);
+  const cuffGeo = new THREE.CylinderGeometry(0.036, 0.039, 0.05, 18);
+  cuffGeo.rotateX(Math.PI / 2);
+  const cuff = new THREE.Mesh(cuffGeo, cuffMat);
+  cuff.scale.set(0.66, 1, 1);
+  cuff.position.set(PX, -0.042, 0.118);
+  hand.add(cuff);
+  const bandGeo = new THREE.TorusGeometry(0.0375, 0.004, 6, 22);
+  const band = new THREE.Mesh(bandGeo, bandMat);
+  band.scale.set(0.66, 1, 1);
+  band.position.set(PX, -0.042, 0.094);
   hand.add(band);
 
-  const fingerCurls: { a: THREE.Object3D; b: THREE.Object3D; isIndex: boolean }[] = [];
-  const fingerYs = [-0.008, -0.031, -0.053, -0.074];
-  const fingerLens = [0.04, 0.044, 0.041, 0.033];
+  // Satu jari = rantai ruas kapsul; tiap ruas memanjang ke -Z dari sendinya
+  const fingers: FingerRig[] = [];
+  const buildFinger = (lengths: number[], radius: number, kind: FingerRig["kind"]) => {
+    const joints: THREE.Object3D[] = [];
+    let parent: THREE.Object3D | null = null;
+    let root: THREE.Object3D | null = null;
+    lengths.forEach((len, i) => {
+      const joint = new THREE.Group();
+      const r = radius * (1 - i * 0.1);
+      const geo = new THREE.CapsuleGeometry(r, len, 4, 10);
+      geo.rotateX(Math.PI / 2);
+      geo.translate(0, 0, -len / 2);
+      joint.add(new THREE.Mesh(geo, skinMat));
+      if (parent) {
+        joint.position.set(0, 0, -lengths[i - 1]);
+        parent.add(joint);
+      } else {
+        root = joint;
+      }
+      parent = joint;
+      joints.push(joint);
+    });
+    fingers.push({ joints, kind });
+    return root as unknown as THREE.Object3D;
+  };
+
+  const fingerYs = [-0.004, -0.027, -0.05, -0.071];
+  const fingerLens = [0.04, 0.044, 0.04, 0.031];
+  const fingerRadii = [0.0088, 0.009, 0.0085, 0.0076];
+  const fan = [0.07, 0.0, -0.06, -0.14]; // jari sedikit mengipas
   for (let f = 0; f < 4; f++) {
     const len = fingerLens[f];
-    const knuckle = new THREE.Group();
-    knuckle.position.set(mirrorX * 0.034, fingerYs[f], -0.035);
-    const seg1Geo = new THREE.CapsuleGeometry(0.0085, len, 3, 8);
-    seg1Geo.rotateX(Math.PI / 2);
-    seg1Geo.translate(0, 0, -len / 2);
-    knuckle.add(new THREE.Mesh(seg1Geo, skinMat));
-    const mid = new THREE.Group();
-    mid.position.set(0, 0, -len);
-    const seg2Geo = new THREE.CapsuleGeometry(0.0078, len * 0.75, 3, 8);
-    seg2Geo.rotateX(Math.PI / 2);
-    seg2Geo.translate(0, 0, (-len * 0.75) / 2);
-    mid.add(new THREE.Mesh(seg2Geo, skinMat));
-    knuckle.add(mid);
-    hand.add(knuckle);
-    fingerCurls.push({ a: knuckle, b: mid, isIndex: f === 0 });
+    const mount = new THREE.Group();
+    mount.position.set(PX, fingerYs[f], -0.036);
+    mount.rotation.x = fan[f];
+    mount.add(buildFinger([len, len * 0.64, len * 0.5], fingerRadii[f], f === 0 ? "index" : "grip"));
+    hand.add(mount);
   }
 
-  const thumbGeo = new THREE.CapsuleGeometry(0.0095, 0.045, 3, 8);
-  thumbGeo.rotateX(Math.PI / 2);
-  thumbGeo.translate(0, 0, -0.0225);
-  const thumb = new THREE.Mesh(thumbGeo, skinMat);
-  thumb.position.set(mirrorX * 0.03, 0.012, 0.03);
-  thumb.rotation.set(0.25, mirrorX * 0.75, 0);
-  hand.add(thumb);
+  // Jempol: di atas telapak, mengarah ke depan-dalam
+  const thumbMount = new THREE.Group();
+  thumbMount.position.set(PX - mirrorX * 0.008, 0.004, 0.018);
+  thumbMount.add(buildFinger([0.036, 0.028], 0.0108, "thumb"));
+  hand.add(thumbMount);
 
   group.add(hand);
-  group.userData.fingerCurls = fingerCurls;
+  group.userData.fingers = fingers;
   group.userData.mirrorX = mirrorX;
-  applyFingerCurl(group, 0, 0);
+  group.userData.pose = { trigger: 0, grip: 0, thumb: 0 };
+  applyFingerCurl(group, 0, 0, 0, 1);
 
-  // Prevent raycaster from hitting the controller itself
+  // Prevent raycaster from hitting the hand itself
   group.traverse((child) => {
     child.userData.isLaserHelper = true;
     child.name = `VR_Helper_${handedness}`;
@@ -192,20 +150,47 @@ function createControllerVisual(handedness: "left" | "right"): THREE.Group {
   return group;
 }
 
-// Curl the fingers of a controller visual: index follows the trigger, the rest follow the grip.
-function applyFingerCurl(model: THREE.Group, trigger: number, grip: number) {
-  const curls = model.userData.fingerCurls as
-    | { a: THREE.Object3D; b: THREE.Object3D; isIndex: boolean }[]
-    | undefined;
-  if (!curls) return;
+/**
+ * Tekuk jari mengikuti tombol controller (nilai 0–1). `blend` < 1 menghaluskan gerakan
+ * antar-frame supaya jari tidak meloncat.
+ */
+function applyFingerCurl(model: THREE.Group, trigger: number, grip: number, thumb: number, blend = 1) {
+  const fingers = model.userData.fingers as FingerRig[] | undefined;
+  const pose = model.userData.pose as { trigger: number; grip: number; thumb: number } | undefined;
+  if (!fingers || !pose) return;
+  pose.trigger += (trigger - pose.trigger) * blend;
+  pose.grip += (grip - pose.grip) * blend;
+  pose.thumb += (thumb - pose.thumb) * blend;
   const mirrorX = (model.userData.mirrorX as number) || 1;
-  for (let i = 0; i < curls.length; i++) {
-    const c = curls[i];
-    const v = c.isIndex ? trigger : grip;
-    // Positive rotation about +Y swings -Z towards -X (right hand wraps towards the handle)
-    c.a.rotation.y = mirrorX * (0.65 + 0.5 * v);
-    c.b.rotation.y = mirrorX * (0.8 + 0.6 * v);
+  for (let i = 0; i < fingers.length; i++) {
+    const f = fingers[i];
+    if (f.kind === "thumb") {
+      const v = pose.thumb;
+      // lepas: jempol terangkat; menyentuh stik/tombol: turun dan menekuk ke dalam
+      f.joints[0].rotation.set(0.5 - 0.42 * v, mirrorX * (0.5 + 0.35 * v), 0);
+      f.joints[1].rotation.set(0, mirrorX * (0.15 + 0.6 * v), 0);
+      continue;
+    }
+    const v = f.kind === "index" ? pose.trigger : pose.grip;
+    // Putaran positif pada +Y mengayun -Z ke arah -X (tangan kanan menekuk ke telapak)
+    const rest = f.kind === "index" ? 0.1 : 0.32;
+    f.joints[0].rotation.y = mirrorX * (rest + (1.25 - rest) * v);
+    f.joints[1].rotation.y = mirrorX * (rest * 1.3 + 1.25 * v);
+    f.joints[2].rotation.y = mirrorX * (rest * 1.1 + 0.85 * v);
   }
+}
+
+/** Seberapa "aktif" jempol: menyentuh / menekan stik atau tombol muka, atau stik digerakkan. */
+function thumbActivity(gp: Gamepad): number {
+  let v = 0;
+  for (let i = 2; i < gp.buttons.length; i++) {
+    const b = gp.buttons[i];
+    if (!b) continue;
+    if (b.pressed) v = 1;
+    else if (b.touched) v = Math.max(v, 0.75);
+  }
+  for (let i = 0; i < gp.axes.length; i++) v = Math.max(v, Math.min(1, Math.abs(gp.axes[i]) * 1.5));
+  return v;
 }
 
 export function WebXRControllerManager() {
@@ -464,7 +449,7 @@ export function WebXRControllerManager() {
   };
 
   // High-performance useFrame loop with zero garbage generation
-  useFrame((state) => {
+  useFrame((state, delta) => {
     if (!gl.xr || !gl.xr.isPresenting) {
       controllersRef.current.forEach((c) => {
         if (c.line.visible) c.line.visible = false;
@@ -508,11 +493,15 @@ export function WebXRControllerManager() {
       c.line.visible = true;
       c.beamGlow.visible = true;
       c.reticle.visible = true;
-      c.controllerModel.visible = !c.isTrackedHand;
+      c.controllerModel.visible = true;
 
-      if (c.gamepad && !c.isTrackedHand) {
+      // Jari mengikuti tombol controller yang sedang ditekan / disentuh
+      const blend = 1 - Math.exp(-22 * Math.min(delta, 0.05));
+      if (c.gamepad) {
         const b = c.gamepad.buttons;
-        applyFingerCurl(c.controllerModel, b[0]?.value || 0, b[1]?.value || 0);
+        applyFingerCurl(c.controllerModel, b[0]?.value || 0, b[1]?.value || 0, thumbActivity(c.gamepad), blend);
+      } else {
+        applyFingerCurl(c.controllerModel, 0, 0, 0, blend);
       }
 
       // Extract controller ray origin and forward direction

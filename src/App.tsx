@@ -62,6 +62,9 @@ const isMobile =
 
 const store = createXRStore({
   controller: false,
+  // Tata letak tombol controller dibaca dari berkas lokal (public/xr-profiles), bukan dari CDN:
+  // tanpa ini pustaka XR mencoba mengunduhnya dari internet setiap masuk VR dan gagal saat offline.
+  baseAssetPath: typeof window !== "undefined" ? new URL("/xr-profiles/", window.location.origin).href : undefined,
   // Emulator bawaan tidak cocok dengan versi three.js proyek ini (error saat render), jadi dimatikan
   emulate: false,
   // "bounded-floor" memberi akses ke batas ruang (Guardian) headset; opsional agar HP tetap bisa masuk VR
@@ -2223,13 +2226,16 @@ export default function App() {
               )}
 
               {/* Floor Plane Mesh */}
+              {/* Di lab, tanah diturunkan 6 cm: bidang sebesar ini yang nyaris berimpit dengan aspal
+                  (selisih 9 mm) menembus lantai pada mode VR HP layar-ganda. */}
               <mesh
-                position={[0, -0.001, 0]}
+                position={[0, sampleCarVisible ? -0.06 : -0.001, 0]}
                 rotation={[-Math.PI / 2, 0, 0]}
                 receiveShadow
               >
                 <planeGeometry args={[300, 300]} />
-                <meshStandardMaterial color="#262626" roughness={0.7} metalness={0.2} />
+                {/* Di lab, tanah di luar gedung berupa rumput */}
+                <meshStandardMaterial color={sampleCarVisible ? "#5f8f4e" : "#262626"} roughness={sampleCarVisible ? 1 : 0.7} metalness={sampleCarVisible ? 0 : 0.2} />
               </mesh>
 
               {/* Enable camera OrbitControls specifically in Third Person mode and non-dragging state */}

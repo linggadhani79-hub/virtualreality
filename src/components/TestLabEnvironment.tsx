@@ -1,7 +1,8 @@
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
-import { ExhibitStand, QuizStation } from "./LabStations";
+import { ExhibitStand, InfoSign, QuizStation, Scenery, StaticModel } from "./LabStations";
 import { ReadingCorner } from "./ReadingCorner";
+import { Barrier, Charger, Cone, DiagnosticCart, Extinguisher, Lift, SafetyStation, Workshop } from "./LabProps";
 import { worldBounds } from "../lib/worldBounds";
 
 /**
@@ -246,24 +247,59 @@ function drawFlowPoster(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.fillText("DC-DC Converter: 400 V → 12 V untuk lampu & aksesori", 40, 650);
 }
 
-function drawChargerScreen(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  ctx.fillStyle = "#020617";
+function drawComparePoster(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  posterBase(ctx, w, h, "MOBIL LISTRIK  vs  MOBIL BENSIN", "#b45309");
+  const rows: [string, string, string][] = [
+    ["Sumber energi", "Baterai (listrik)", "Bensin / solar di tangki"],
+    ["Penggerak", "Motor listrik", "Mesin pembakaran dalam"],
+    ["Komponen bergerak", "± 20 buah", "± 2.000 buah"],
+    ["Transmisi", "1 percepatan", "5–8 percepatan / CVT"],
+    ["Efisiensi energi", "± 85–90 %", "± 25–35 %"],
+    ["Emisi knalpot", "Tidak ada", "CO₂, CO, NOx"],
+    ["Perawatan rutin", "Tanpa oli mesin & busi", "Oli, busi, filter, timing belt"],
+    ["Pengereman", "Regeneratif + cakram", "Cakram / tromol"],
+  ];
+  const x0 = 40;
+  const cols = [x0, x0 + 330, x0 + 330 + 430];
+  const top = 150;
+  const rh = (h - top - 40) / (rows.length + 1);
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
+  ctx.font = "900 34px system-ui, sans-serif";
+  ctx.fillStyle = "#15803d";
+  ctx.fillRect(cols[1] - 14, top, 416, rh - 10);
+  ctx.fillStyle = "#b45309";
+  ctx.fillRect(cols[2] - 14, top, w - cols[2] - 26, rh - 10);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText("LISTRIK (BEV)", cols[1], top + rh / 2 - 4);
+  ctx.fillText("BENSIN (ICE)", cols[2], top + rh / 2 - 4);
+  rows.forEach(([k, ev, ice], i) => {
+    const y = top + rh * (i + 1);
+    if (i % 2 === 0) {
+      ctx.fillStyle = "rgba(15,23,42,0.06)";
+      ctx.fillRect(x0 - 14, y, w - 2 * x0 + 28, rh);
+    }
+    ctx.font = "800 30px system-ui, sans-serif";
+    ctx.fillStyle = "#0f172a";
+    ctx.fillText(k, cols[0], y + rh / 2, 310);
+    ctx.font = "600 30px system-ui, sans-serif";
+    ctx.fillStyle = "#166534";
+    ctx.fillText(ev, cols[1], y + rh / 2, 400);
+    ctx.fillStyle = "#9a3412";
+    ctx.fillText(ice, cols[2], y + rh / 2, w - cols[2] - 40);
+  });
+  ctx.textBaseline = "alphabetic";
+}
+
+function drawSky(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, "#3b82c4");
+  g.addColorStop(0.42, "#9cc9ee");
+  g.addColorStop(0.5, "#dcefff");
+  g.addColorStop(0.52, "#b9d3a8");
+  g.addColorStop(1, "#6f9a5a");
+  ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = "#22c55e";
-  ctx.textAlign = "center";
-  ctx.font = "900 54px system-ui, sans-serif";
-  ctx.fillText("DC FAST", w / 2, 70);
-  ctx.fillStyle = "#e2e8f0";
-  ctx.font = "700 40px system-ui, sans-serif";
-  ctx.fillText("CCS2 · 120 kW", w / 2, 130);
-  ctx.strokeStyle = "#22c55e";
-  ctx.lineWidth = 8;
-  ctx.strokeRect(40, 170, w - 80, 46);
-  ctx.fillStyle = "#22c55e";
-  ctx.fillRect(46, 176, (w - 92) * 0.8, 34);
-  ctx.fillStyle = "#e2e8f0";
-  ctx.font = "700 34px system-ui, sans-serif";
-  ctx.fillText("SIAP DIGUNAKAN", w / 2, 250);
 }
 
 /** Dekal datar di atas aspal. */
@@ -302,290 +338,6 @@ function FloorDecal({
   );
 }
 
-function Charger({ position }: { position: [number, number, number] }) {
-  const screen = useCanvasTexture(512, 288, drawChargerScreen);
-  return (
-    <group position={position}>
-      <mesh position={[0, 0.06, 0]}>
-        <boxGeometry args={[0.9, 0.12, 0.7]} />
-        <meshStandardMaterial color="#475569" roughness={0.8} />
-      </mesh>
-      <mesh position={[0, 1.02, 0]}>
-        <boxGeometry args={[0.7, 1.8, 0.45]} />
-        <meshStandardMaterial color="#f1f5f9" roughness={0.35} metalness={0.2} />
-      </mesh>
-      <mesh position={[0, 1.94, 0]}>
-        <boxGeometry args={[0.74, 0.08, 0.49]} />
-        <meshStandardMaterial color="#16a34a" emissive="#16a34a" emissiveIntensity={0.8} />
-      </mesh>
-      <mesh position={[0, 1.4, 0.228]} raycast={noRaycast}>
-        <planeGeometry args={[0.52, 0.29]} />
-        <meshBasicMaterial map={screen} toneMapped={false} />
-      </mesh>
-      <mesh position={[0, 0.9, 0.228]} raycast={noRaycast}>
-        <planeGeometry args={[0.5, 0.06]} />
-        <meshBasicMaterial color="#22c55e" toneMapped={false} />
-      </mesh>
-      {/* Kabel & konektor */}
-      <mesh position={[0.36, 0.95, 0.1]} rotation={[0, Math.PI / 2, 0]} raycast={noRaycast}>
-        <torusGeometry args={[0.42, 0.022, 8, 20, Math.PI]} />
-        <meshStandardMaterial color="#0f172a" roughness={0.7} />
-      </mesh>
-      <mesh position={[0.37, 0.98, 0.5]} rotation={[0.5, 0, 0]}>
-        <boxGeometry args={[0.07, 0.2, 0.1]} />
-        <meshStandardMaterial color="#1e293b" roughness={0.5} />
-      </mesh>
-    </group>
-  );
-}
-
-function Cone({ position }: { position: [number, number, number] }) {
-  return (
-    <group position={position}>
-      <mesh position={[0, 0.02, 0]}>
-        <boxGeometry args={[0.34, 0.04, 0.34]} />
-        <meshStandardMaterial color="#c2410c" roughness={0.8} />
-      </mesh>
-      <mesh position={[0, 0.3, 0]}>
-        <coneGeometry args={[0.13, 0.56, 14]} />
-        <meshStandardMaterial color="#f97316" roughness={0.6} />
-      </mesh>
-      <mesh position={[0, 0.3, 0]}>
-        <cylinderGeometry args={[0.062, 0.088, 0.11, 14]} />
-        <meshBasicMaterial color="#f8fafc" />
-      </mesh>
-    </group>
-  );
-}
-
-function Barrier({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
-  return (
-    <group position={position} rotation={[0, rotation, 0]}>
-      {[-1, 0, 1].map((i) => (
-        <mesh key={i} position={[i * 0.8, 0.4, 0]}>
-          <boxGeometry args={[0.8, 0.8, 0.42]} />
-          <meshStandardMaterial color={i === 0 ? "#f8fafc" : "#dc2626"} roughness={0.55} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-function Workshop({ position }: { position: [number, number, number] }) {
-  return (
-    <group position={position}>
-      {/* Lemari perkakas */}
-      <mesh position={[0, 0.55, 0]}>
-        <boxGeometry args={[0.6, 1.1, 1.2]} />
-        <meshStandardMaterial color="#b91c1c" roughness={0.4} metalness={0.4} />
-      </mesh>
-      {[0.2, 0.45, 0.7, 0.95].map((y) => (
-        <mesh key={y} position={[0.305, y, 0]} raycast={noRaycast}>
-          <boxGeometry args={[0.02, 0.03, 0.9]} />
-          <meshStandardMaterial color="#e2e8f0" metalness={0.8} roughness={0.3} />
-        </mesh>
-      ))}
-      {/* Meja kerja */}
-      <mesh position={[0.05, 0.86, 2.2]}>
-        <boxGeometry args={[0.8, 0.08, 2.2]} />
-        <meshStandardMaterial color="#92400e" roughness={0.7} />
-      </mesh>
-      {[1.25, 3.15].map((z) => (
-        <mesh key={z} position={[0.05, 0.41, z]}>
-          <boxGeometry args={[0.7, 0.82, 0.08]} />
-          <meshStandardMaterial color="#334155" metalness={0.5} roughness={0.5} />
-        </mesh>
-      ))}
-      {/* Modul baterai peraga di atas meja */}
-      <mesh position={[0.05, 1.0, 2.0]}>
-        <boxGeometry args={[0.45, 0.2, 0.7]} />
-        <meshStandardMaterial color="#22c55e" roughness={0.5} />
-      </mesh>
-      <mesh position={[0.05, 0.96, 2.85]}>
-        <cylinderGeometry args={[0.14, 0.14, 0.26, 16]} />
-        <meshStandardMaterial color="#f97316" roughness={0.5} metalness={0.3} />
-      </mesh>
-      {/* Tumpukan ban */}
-      {[0, 1, 2, 3].map((i) => (
-        <mesh key={i} position={[0.25, 0.13 + i * 0.25, -2.2]} rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[0.24, 0.12, 10, 20]} />
-          <meshStandardMaterial color="#111827" roughness={0.95} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-/** Lift dua tiang untuk mengangkat kendaraan. */
-function Lift({ position }: { position: [number, number, number] }) {
-  return (
-    <group position={position}>
-      {[-1.5, 1.5].map((x) => (
-        <group key={x} position={[x, 0, 0]}>
-          <mesh position={[0, 0.03, 0]}>
-            <boxGeometry args={[0.7, 0.06, 0.9]} />
-            <meshStandardMaterial color="#1e293b" metalness={0.6} roughness={0.5} />
-          </mesh>
-          <mesh position={[0, 1.9, 0]}>
-            <boxGeometry args={[0.28, 3.8, 0.34]} />
-            <meshStandardMaterial color="#1d4ed8" metalness={0.5} roughness={0.45} />
-          </mesh>
-          <mesh position={[0, 0.9, 0.18]} raycast={noRaycast}>
-            <boxGeometry args={[0.2, 0.5, 0.04]} />
-            <meshStandardMaterial color="#facc15" roughness={0.6} />
-          </mesh>
-          {/* lengan angkat */}
-          {[-0.75, 0.75].map((z) => (
-            <mesh key={z} position={[-Math.sign(x) * 0.55, 0.42, z * 0.6]} rotation={[0, Math.sign(x) * z * 0.5, 0]}>
-              <boxGeometry args={[1.1, 0.07, 0.11]} />
-              <meshStandardMaterial color="#facc15" metalness={0.4} roughness={0.5} />
-            </mesh>
-          ))}
-        </group>
-      ))}
-      <mesh position={[0, 3.86, 0]} raycast={noRaycast}>
-        <boxGeometry args={[3.28, 0.14, 0.3]} />
-        <meshStandardMaterial color="#1d4ed8" metalness={0.5} roughness={0.45} />
-      </mesh>
-    </group>
-  );
-}
-
-/** Troli alat diagnostik dengan layar. */
-function DiagnosticCart({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
-  const screen = useCanvasTexture(512, 320, (ctx, w, h) => {
-    ctx.fillStyle = "#020617";
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = "#22d3ee";
-    ctx.font = "800 34px system-ui, sans-serif";
-    ctx.fillText("DIAGNOSTIK EV", 24, 44);
-    const rows: [string, string, string][] = [
-      ["Tegangan baterai", "396 V", "#4ade80"],
-      ["SOC", "82 %", "#4ade80"],
-      ["Suhu sel maks", "31 °C", "#4ade80"],
-      ["Isolasi", "> 5 MΩ", "#4ade80"],
-      ["Kode gangguan", "0", "#4ade80"],
-    ];
-    ctx.font = "600 28px system-ui, sans-serif";
-    rows.forEach(([k, v, c], i) => {
-      ctx.fillStyle = "#cbd5e1";
-      ctx.textAlign = "left";
-      ctx.fillText(k, 24, 104 + i * 44);
-      ctx.fillStyle = c;
-      ctx.textAlign = "right";
-      ctx.fillText(v, w - 24, 104 + i * 44);
-    });
-    ctx.textAlign = "left";
-  });
-  return (
-    <group position={position} rotation={[0, rotation, 0]}>
-      <mesh position={[0, 0.5, 0]}>
-        <boxGeometry args={[0.8, 0.9, 0.55]} />
-        <meshStandardMaterial color="#334155" metalness={0.5} roughness={0.5} />
-      </mesh>
-      <mesh position={[0, 0.97, 0]}>
-        <boxGeometry args={[0.86, 0.04, 0.6]} />
-        <meshStandardMaterial color="#0f172a" metalness={0.6} roughness={0.4} />
-      </mesh>
-      <mesh position={[0, 1.3, -0.12]} rotation={[-0.2, 0, 0]}>
-        <boxGeometry args={[0.72, 0.47, 0.04]} />
-        <meshStandardMaterial color="#0f172a" roughness={0.5} />
-      </mesh>
-      <mesh position={[0, 1.3, -0.096]} rotation={[-0.2, 0, 0]} raycast={noRaycast}>
-        <planeGeometry args={[0.67, 0.42]} />
-        <meshBasicMaterial map={screen} toneMapped={false} />
-      </mesh>
-      {[
-        [-0.34, -0.22],
-        [0.34, -0.22],
-        [-0.34, 0.22],
-        [0.34, 0.22],
-      ].map(([x, z], i) => (
-        <mesh key={i} position={[x, 0.05, z]} rotation={[0, 0, Math.PI / 2]} raycast={noRaycast}>
-          <cylinderGeometry args={[0.05, 0.05, 0.04, 12]} />
-          <meshStandardMaterial color="#020617" roughness={0.9} />
-        </mesh>
-      ))}
-      {/* kabel ukur oranye */}
-      <mesh position={[0.3, 1.02, 0.12]} rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast}>
-        <torusGeometry args={[0.09, 0.012, 8, 20]} />
-        <meshStandardMaterial color="#ea580c" roughness={0.6} />
-      </mesh>
-    </group>
-  );
-}
-
-/** Lemari APD di dinding kanan (menghadap -X). */
-function SafetyStation({ position }: { position: [number, number, number] }) {
-  const label = useCanvasTexture(512, 160, (ctx, w, h) => {
-    ctx.fillStyle = "#166534";
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = "#ffffff";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = "900 62px system-ui, sans-serif";
-    ctx.fillText("APD TEGANGAN TINGGI", w / 2, 56, w - 30);
-    ctx.font = "600 34px system-ui, sans-serif";
-    ctx.fillText("Sarung tangan · Kacamata · Sepatu isolasi", w / 2, 118, w - 30);
-  });
-  return (
-    <group position={position} rotation={[0, -Math.PI / 2, 0]}>
-      <mesh position={[0, 1.35, 0]}>
-        <boxGeometry args={[1.6, 1.5, 0.3]} />
-        <meshStandardMaterial color="#f1f5f9" roughness={0.5} />
-      </mesh>
-      <mesh position={[0, 2.25, 0.02]} raycast={noRaycast}>
-        <planeGeometry args={[1.6, 0.5]} />
-        <meshBasicMaterial map={label} toneMapped={false} />
-      </mesh>
-      {/* helm, sarung tangan, sepatu (bentuk sederhana) */}
-      <mesh position={[-0.5, 1.72, 0.2]}>
-        <sphereGeometry args={[0.13, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color="#facc15" roughness={0.5} />
-      </mesh>
-      {[-0.08, 0.14].map((x) => (
-        <mesh key={x} position={[x, 1.6, 0.2]}>
-          <boxGeometry args={[0.13, 0.3, 0.05]} />
-          <meshStandardMaterial color="#ea580c" roughness={0.7} />
-        </mesh>
-      ))}
-      {[0.42, 0.62].map((x) => (
-        <mesh key={x} position={[x, 0.86, 0.22]}>
-          <boxGeometry args={[0.13, 0.2, 0.3]} />
-          <meshStandardMaterial color="#111827" roughness={0.8} />
-        </mesh>
-      ))}
-      <mesh position={[0, 1.35, 0.156]} raycast={noRaycast}>
-        <boxGeometry args={[1.5, 0.03, 0.02]} />
-        <meshStandardMaterial color="#94a3b8" metalness={0.6} roughness={0.4} />
-      </mesh>
-    </group>
-  );
-}
-
-function Extinguisher({ position }: { position: [number, number, number] }) {
-  return (
-    <group position={position}>
-      <mesh position={[0, 0.34, 0]}>
-        <cylinderGeometry args={[0.09, 0.09, 0.56, 16]} />
-        <meshStandardMaterial color="#dc2626" roughness={0.4} metalness={0.3} />
-      </mesh>
-      <mesh position={[0, 0.66, 0]}>
-        <cylinderGeometry args={[0.035, 0.06, 0.1, 12]} />
-        <meshStandardMaterial color="#111827" roughness={0.5} />
-      </mesh>
-      <mesh position={[0.07, 0.6, 0]} rotation={[0, 0, -0.9]} raycast={noRaycast}>
-        <cylinderGeometry args={[0.012, 0.012, 0.26, 8]} />
-        <meshStandardMaterial color="#111827" roughness={0.6} />
-      </mesh>
-      <mesh position={[0, 0.03, 0]}>
-        <cylinderGeometry args={[0.13, 0.13, 0.06, 16]} />
-        <meshStandardMaterial color="#1e293b" roughness={0.6} />
-      </mesh>
-    </group>
-  );
-}
-
 export function TestLabEnvironment() {
   const W = HALL.x1 - HALL.x0;
   const D = HALL.z1 - HALL.z0;
@@ -606,7 +358,11 @@ export function TestLabEnvironment() {
 
   const txtRead = useCanvasTexture(1024, 128, floorText("POJOK BACA", "rgba(125,211,252,0.95)"));
   const txtQuiz = useCanvasTexture(1024, 128, floorText("TANYA JAWAB", "rgba(125,211,252,0.95)"));
-  const txtExhibit = useCanvasTexture(1024, 128, floorText("ETALASE KOMPONEN", "rgba(125,211,252,0.95)"));
+  const txtExhibit = useCanvasTexture(1024, 128, floorText("ETALASE KOMPONEN EV", "rgba(125,211,252,0.95)"));
+  const txtChassis = useCanvasTexture(1024, 128, floorText("RANGKA & RODA EV", "rgba(125,211,252,0.95)"));
+  const txtNonEv = useCanvasTexture(2048, 128, floorText("BENGKEL NON-EV · MESIN BENSIN", "rgba(253,186,116,0.95)"));
+  const compare = useCanvasTexture(1280, 900, drawComparePoster);
+  const sky = useCanvasTexture(16, 256, drawSky);
 
   // Dinding menahan pemain; keluar hanya lewat pintu depan
   useEffect(() => {
@@ -627,8 +383,8 @@ export function TestLabEnvironment() {
         <meshStandardMaterial map={asphalt} color="#b9bdc6" roughness={0.95} metalness={0.02} />
       </mesh>
       {/* Lantai beton di luar pintu */}
-      <mesh position={[cx, 0.004, HALL.z1 + 4]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
-        <planeGeometry args={[W + 6, 8]} />
+      <mesh position={[cx, 0.004, HALL.z1 + 8]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
+        <planeGeometry args={[13, 16]} />
         <meshStandardMaterial color="#6b7280" roughness={0.9} />
       </mesh>
 
@@ -763,14 +519,13 @@ export function TestLabEnvironment() {
         <meshBasicMaterial map={flow} toneMapped={false} />
       </mesh>
 
-      {/* ================= PERALATAN ================= */}
       {/* ================= STASIUN BELAJAR ================= */}
-      {/* Etalase komponen (kiri) */}
-      <FloorDecal position={[-8.2, 1.05]} size={[4.6, 0.58]} map={txtExhibit} />
+      {/* ----- Zona EV: etalase komponen (kiri depan) ----- */}
+      <FloorDecal position={[-8.2, 1.05]} size={[5.2, 0.58]} map={txtExhibit} />
       <ExhibitStand
         model="baterai"
         title="Paket Baterai Traksi"
-        subtitle="Etalase komponen"
+        subtitle="Komponen EV"
         accent="#22c55e"
         position={[-6.4, 0, -1.3]}
         facing={0.35}
@@ -784,30 +539,120 @@ export function TestLabEnvironment() {
       />
       <ExhibitStand
         model="drivetrain"
-        title="Unit Penggerak Listrik"
-        subtitle="Etalase komponen"
+        title="Motor Listrik (Dinamo)"
+        subtitle="Komponen EV"
         accent="#f97316"
-        tint="#aab4c0"
         position={[-10.2, 0, -1.3]}
         facing={0.55}
         size={1.5}
         facts={[
           "Motor listrik, inverter, dan gigi reduksi dalam satu unit (e-axle).",
-          "Inverter mengubah DC baterai menjadi AC 3 fasa untuk motor.",
+          "Lilitan tembaga stator menghasilkan medan putar yang memutar rotor.",
           "Saat mengerem, motor menjadi generator dan mengisi baterai.",
         ]}
       />
+
+      {/* ----- Zona EV: rangka & roda tanpa bodi (kanan tengah) ----- */}
+      <FloorDecal position={[9.3, 1.3]} size={[4.4, 0.52]} map={txtChassis} rotation={Math.PI} />
+      <ExhibitStand
+        model="sasis-ev"
+        low
+        title="Rangka & Roda EV"
+        subtitle="Platform skateboard"
+        accent="#38bdf8"
+        position={[9.3, 0, -1.5]}
+        size={3.0}
+        facts={[
+          "Mobil listrik tanpa bodi: rangka, roda, suspensi, kemudi, dan baterai di lantai.",
+          "Motor menyatu dengan poros roda, jadi tidak perlu gardan dan knalpot.",
+          "Satu platform bisa dipakai untuk banyak bentuk bodi.",
+        ]}
+      />
+
+      {/* ----- Bengkel non-EV untuk perbandingan (belakang kiri) ----- */}
+      <FloorDecal position={[-5.4, -11.85]} size={[16.6, 3.9]} color="#b45309" opacity={0.22} />
+      <FloorDecal position={[-2.4, -10.25]} size={[8.6, 0.54]} map={txtNonEv} lift={0.016} />
+      <Lift position={[-9.5, 0, -11]} armHeight={1.12} />
+      <StaticModel model="sasis-bensin" size={3.5} position={[-9.5, 0.78, -11]} rotation={Math.PI / 2} />
+      <InfoSign
+        position={[-7.1, 0, -9.35]}
+        title="Sasis Tangga (Non-EV)"
+        subtitle="Bengkel non-EV"
+        accent="#f59e0b"
+        facts={[
+          "Rangka baja memanjang menopang mesin, transmisi, gardan, dan tangki.",
+          "Tenaga mesin di depan dikirim ke roda belakang lewat poros kopel.",
+          "Bandingkan dengan rangka EV: lantainya penuh baterai, tanpa poros kopel.",
+        ]}
+      />
+      <ExhibitStand
+        model="mesin-bensin"
+        title="Mesin Bensin 4 Silinder"
+        subtitle="Bengkel non-EV"
+        accent="#f59e0b"
+        position={[-5.6, 0, -12.4]}
+        size={1.35}
+        facts={[
+          "Membakar campuran bensin dan udara di dalam silinder (4 langkah).",
+          "Ribuan komponen bergerak: piston, katup, poros engkol, poros nok.",
+          "Butuh oli, pendingin, busi, dan knalpot; efisiensi hanya ±25–35 %.",
+        ]}
+      />
+      <ExhibitStand
+        model="mesin-v8"
+        title="Mesin V8"
+        subtitle="Bengkel non-EV"
+        accent="#f59e0b"
+        position={[-3.3, 0, -12.4]}
+        size={1.3}
+        facts={[
+          "Delapan silinder tersusun bentuk V untuk tenaga besar.",
+          "Sabuk dan puli memutar alternator, pompa air, dan kompresor AC.",
+          "Pada EV semua itu digerakkan listrik, tanpa sabuk mesin.",
+        ]}
+      />
+      <ExhibitStand
+        model="piston"
+        title="Piston & Batang Torak"
+        subtitle="Bengkel non-EV"
+        accent="#f59e0b"
+        position={[-1.0, 0, -12.4]}
+        size={1.0}
+        facts={[
+          "Ledakan pembakaran mendorong piston naik-turun.",
+          "Batang torak mengubah gerak naik-turun menjadi putaran poros engkol.",
+          "Motor listrik langsung berputar, jadi tidak punya piston.",
+        ]}
+      />
+      <ExhibitStand
+        model="rem"
+        title="Rem Cakram & Kaliper"
+        subtitle="Dipakai EV dan non-EV"
+        accent="#ef4444"
+        position={[1.3, 0, -12.4]}
+        size={0.95}
+        facts={[
+          "Kaliper menjepit cakram sehingga energi gerak menjadi panas.",
+          "Mobil bensin hanya mengandalkan rem gesek seperti ini.",
+          "EV mengerem dulu dengan motor (regeneratif), jadi kampas rem lebih awet.",
+        ]}
+      />
+      {/* Poster perbandingan di dinding belakang */}
+      <mesh position={[4.75, 2.5, HALL.z0 + 0.04]} raycast={noRaycast}>
+        <planeGeometry args={[3.3, 2.32]} />
+        <meshBasicMaterial map={compare} toneMapped={false} />
+      </mesh>
 
       {/* Tanya jawab (dinding depan kiri) */}
       <FloorDecal position={[-9.5, 2.6]} size={[3.6, 0.5]} map={txtQuiz} rotation={Math.PI} />
       <QuizStation position={[-9.5, 0, 5.2]} facing={Math.PI} />
 
       {/* Pojok baca (dinding depan kanan) */}
-      <FloorDecal position={[9.5, 0.2]} size={[3.4, 0.5]} map={txtRead} rotation={Math.PI} />
+      <FloorDecal position={[9.5, 2.05]} size={[3.4, 0.5]} map={txtRead} rotation={Math.PI} />
       <ReadingCorner position={[9.5, 0, 5.72]} />
 
-      <Lift position={[-9.5, 0, -11]} />
-      <DiagnosticCart position={[4.6, 0, -9.6]} rotation={-0.5} />
+      {/* ================= PERALATAN ================= */}
+      <DiagnosticCart position={[5.0, 0, -9.7]} rotation={-0.5} />
       <SafetyStation position={[HALL.x1 - 0.2, 0, 2]} />
       <Extinguisher position={[HALL.x0 + 0.45, 0, -9.6]} />
       <Extinguisher position={[5.6, 0, HALL.z1 - 0.45]} />
@@ -816,7 +661,34 @@ export function TestLabEnvironment() {
       <Charger position={[11.1, 0, -13.2]} />
       <Workshop position={[HALL.x0 + 0.75, 0, -1.6]} />
 
-      {[-10, -6.5, 6.5, 10].map((x) => (
+      {/* ================= LUAR GEDUNG: langit, rumput, taman, pohon ================= */}
+      <mesh raycast={noRaycast} position={[0, 0, 0]}>
+        <sphereGeometry args={[220, 24, 16]} />
+        <meshBasicMaterial map={sky} side={THREE.BackSide} toneMapped={false} fog={false} depthWrite={false} />
+      </mesh>
+      <Scenery
+        model="taman"
+        size={7}
+        places={[
+          [-10.2, 10.6, 0.3],
+          [10.2, 10.8, 2.2],
+          [-18.6, 3.5, 4.1, 0.9],
+          [18.8, 2.5, 1.2, 0.9],
+        ]}
+      />
+      <Scenery
+        model="pohon"
+        size={8.5}
+        places={[
+          [-10.5, 13.5, 0.4],
+          [11, 14.5, 2.6, 1.15],
+          [-19.5, 6, 4.0, 0.9],
+          [20, 4.5, 1.1, 1.05],
+          [0.5, 26, 5.2, 1.3],
+        ]}
+      />
+
+      {[-10, -6.5, 6.2, 12.6].map((x) => (
         <Cone key={`a${x}`} position={[x, 0, LANE_Z + LANE_HALF + 0.95]} />
       ))}
       {[-10, -5, 0, 5, 10].map((x) => (
