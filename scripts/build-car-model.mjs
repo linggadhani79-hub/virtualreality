@@ -1,7 +1,8 @@
 // Cara pakai (sekali saja, di luar build aplikasi):
 //   npm i --no-save meshoptimizer sharp
-//   node scripts/build-car-model.mjs <model-asli.glb> public/models/contoh-mobil-listrik.glb 0.22 2048 25 0.71
-// Argumen: rasio penyederhanaan, ukuran tekstur, iterasi penghalusan bodi, tinggi garis kaca (0-1).
+//   node scripts/build-car-model.mjs <model-asli.glb> public/models/contoh-mobil-listrik.glb 0.5 2048 57 0.71 0.0001
+// Argumen: rasio penyederhanaan, ukuran tekstur, iterasi penghalusan bodi, tinggi garis kaca (0-1),
+// batas galat penyederhanaan.
 // Mengasumsikan mobil memanjang di sumbu X, tinggi di sumbu Y, dan satu mesh bertekstur.
 // Menyiapkan model mobil untuk lab:
 //  1. sederhanakan mesh, 2. pisahkan 4 roda jadi node sendiri (agar bisa berputar),
@@ -17,7 +18,7 @@ const BELT = +(process.argv[7] ?? 0.71);
 await MeshoptEncoder.ready; await MeshoptSimplifier.ready;
 const io = new NodeIO().registerExtensions([...ALL_EXTENSIONS, EXTMeshoptCompression]).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
 const doc = await io.read(inp);
-await doc.transform(dedup(), weld(), simplify({ simplifier: MeshoptSimplifier, ratio: +ratio, error: 0.0004 }), prune());
+await doc.transform(dedup(), weld(), simplify({ simplifier: MeshoptSimplifier, ratio: +ratio, error: +(process.argv[8] ?? 0.0004) }), prune());
 
 const root = doc.getRoot();
 const node = root.listNodes().find(n => n.getMesh());
@@ -154,5 +155,5 @@ wheels.forEach((w, i) => {
   // Peta normal & kekasaran hasil AI berisik: pakai nilai cat yang seragam
   material.setNormalTexture(null).setMetallicRoughnessTexture(null).setMetallicFactor(0.3).setRoughnessFactor(0.38);
 }
-await doc.transform(prune(), textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [+tex, +tex], quality: 90 }), meshopt({ encoder: MeshoptEncoder, level: 'high' }));
+await doc.transform(prune(), textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [+tex, +tex], quality: 96 }), meshopt({ encoder: MeshoptEncoder, level: 'high' }));
 await io.write(out, doc);
