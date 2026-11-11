@@ -28,7 +28,7 @@ import { VROptimizer } from "./components/VROptimizer";
 import { WebXRControllerManager } from "./components/WebXRControllerManager";
 import { EVEntranceScreen } from "./components/EVEntranceScreen";
 import { GuardianBoundary } from "./components/GuardianBoundary";
-import { TRIAL_NO_AUTH } from "./lib/appConfig";
+import { TRIAL_NO_AUTH, LOCAL_ONLY } from "./lib/appConfig";
 import { SampleEVCar } from "./components/SampleEVCar";
 import { TestLabEnvironment } from "./components/TestLabEnvironment";
 import { PhoneVRRenderer, PhoneVROverlay } from "./components/PhoneVR";
@@ -740,7 +740,7 @@ function AdaptiveUI({
           </button>
         </div>
         <div className="absolute right-0 top-0 pointer-events-auto">
-          {isAdmin && <AuthButton />}
+          {isAdmin && !LOCAL_ONLY && <AuthButton />}
         </div>
         {xrError && (
           <div className="bg-red-500/90 backdrop-blur-md text-white px-4 py-3 rounded-xl shadow-xl flex items-center justify-between w-full max-w-md pointer-events-auto border border-red-400">

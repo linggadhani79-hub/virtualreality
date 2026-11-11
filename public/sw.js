@@ -64,9 +64,14 @@ self.addEventListener("fetch", (event) => {
     caches.open(CACHE).then(async (cache) => {
       const hit = await cache.match(req, { ignoreSearch: false });
       if (hit) return hit;
-      const res = await fetch(req);
-      if (res.ok && res.status === 200) cache.put(req, res.clone());
-      return res;
+      try {
+        const res = await fetch(req);
+        if (res.ok && res.status === 200) cache.put(req, res.clone());
+        return res;
+      } catch {
+        // Offline dan berkas memang tidak ada di aplikasi (mis. data /lab opsional)
+        return new Response("", { status: 504, statusText: "Offline" });
+      }
     }),
   );
 });

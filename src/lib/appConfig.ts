@@ -12,3 +12,12 @@ export const TRIAL_NO_AUTH = true;
 
 /** Batas waktu menunggu data cloud; lewat dari ini aplikasi memakai data yang tersimpan di perangkat. */
 export const CLOUD_TIMEOUT_MS = 4000;
+
+/**
+ * MODE LOKAL (tanpa database)
+ *
+ * true (bawaan): tidak ada Firebase. Map dan aset disimpan di perangkat, dan data bawaan diambil
+ * dari folder public/lab yang ikut terpasang bersama aplikasi — seperti game VR offline.
+ * Untuk memakai Firebase lagi, build dengan variabel lingkungan VITE_LOCAL_ONLY=false.
+ */
+export const LOCAL_ONLY = import.meta.env.VITE_LOCAL_ONLY !== "false";
