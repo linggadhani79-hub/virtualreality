@@ -40,12 +40,25 @@ function offlinePrecache(): Plugin {
 }
 
 export default defineConfig(() => {
+  const localOnly = process.env.VITE_LOCAL_ONLY !== 'false';
   return {
     plugins: [react(), tailwindcss(), offlinePrecache()],
     resolve: {
-      alias: {
-        '@': path.resolve(__dirname, '.'),
-      },
+      alias: [
+        {find: '@', replacement: path.resolve(__dirname, '.')},
+        // Mode lokal (bawaan): modul Firebase diganti penyimpanan di perangkat, jadi tidak ada
+        // database / server yang dihubungi dan SDK Firebase tidak ikut dimuat.
+        // Jalankan dengan VITE_LOCAL_ONLY=false untuk memakai Firebase lagi.
+        ...(localOnly
+          ? ['app', 'firestore', 'storage', 'auth'].map((m) => ({
+              find: new RegExp(`^firebase/${m}$`),
+              replacement: path.resolve(__dirname, `src/lib/local/firebase-${m}.ts`),
+            }))
+          : []),
+      ],
+    },
+    define: {
+      'import.meta.env.VITE_LOCAL_ONLY': JSON.stringify(localOnly ? 'true' : 'false'),
     },
     optimizeDeps: {
       include: [

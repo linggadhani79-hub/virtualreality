@@ -22,15 +22,23 @@ Media ajar kendaraan listrik (EV) berbasis **WebXR**. Satu kode sumber, bisa dij
 - **Ringan**: panel admin dimuat terpisah, pencahayaan dibuat lokal (tanpa unduh HDR dari luar),
   berkas aplikasi di-cache (PWA) agar kunjungan berikutnya cepat.
 
-## Mode offline
+## Mode lokal — tanpa database, bisa offline
 
-Semua berkas aplikasi — kode, ikon, lingkungan Ruang Uji, dan model mobil — ikut di dalam aplikasi
-dan disimpan di perangkat saat aplikasi **pertama kali dibuka** (perlu internet sekali, ±16 MB).
-Setelah itu aplikasi bisa dibuka dan dipakai **tanpa internet**, termasuk dari APK di Quest.
+Secara bawaan aplikasi berjalan **tanpa database dan tanpa server** (seperti game VR offline):
 
-Yang tetap butuh internet: map dan aset yang diunggah admin ke cloud (Firebase) pada kunjungan
-pertama, login Google, dan kuis Google Form. Bila cloud tidak terjangkau, aplikasi menunggu paling
-lama 4 detik lalu memakai data yang sudah tersimpan di perangkat.
+- Tidak ada Firebase. Modul Firebase diganti penyimpanan di perangkat (`src/lib/local/`), sehingga
+  aplikasi tidak menghubungi server mana pun dan ukurannya lebih kecil.
+- Semua berkas aplikasi — kode, lingkungan Ruang Uji, model mobil — ikut di dalam aplikasi dan
+  disimpan di perangkat saat **pertama kali dibuka** (perlu internet sekali, ±16 MB). Setelah itu
+  aplikasi bisa dipakai tanpa internet, termasuk dari APK di Quest.
+- Map yang disusun di Mode Admin dan aset yang diunggah tersimpan **di perangkat itu saja**.
+- Agar map/aset tersedia di **semua** perangkat, masukkan ke aplikasi lewat folder
+  [`public/lab/`](public/lab/README.txt) (`workspaces_global.json`, `workspaces_library.json`,
+  `assets/<bufferId>`), lalu build ulang.
+- Kuis Google Form tetap butuh internet.
+
+Untuk memakai Firebase lagi (map bersama lewat cloud, login Google), build dengan
+`VITE_LOCAL_ONLY=false`.
 
 ## Mode uji coba tanpa login
 
@@ -62,8 +70,8 @@ tidak diubah, jadi tetap bisa diimpor dan dijalankan di AI Studio.
 3. Nama proyek di Cloudflare harus sama dengan `name` di [`wrangler.toml`](wrangler.toml)
    (sekarang `virtualreality`). Bila berbeda, ubah `name` di berkas itu.
 4. Deploy. Anda mendapat alamat seperti `https://virtualreality.<akun>.workers.dev`.
-5. Firebase Console → Authentication → Settings → **Authorized domains** → tambahkan domain
-   tersebut (agar login admin Google berfungsi).
+5. Hanya bila memakai Firebase (`VITE_LOCAL_ONLY=false`): Firebase Console → Authentication →
+   Settings → **Authorized domains** → tambahkan domain tersebut.
 
 `worker/index.ts` menyediakan `/api/proxy-asset` di Cloudflare (pengganti server Express); berkas
 lain disajikan langsung dari folder `dist`. Kompresi Draco otomatis saat admin mengunggah model
