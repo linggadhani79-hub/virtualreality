@@ -1,0 +1,19 @@
+{
+  "name": "Smart Vocational untuk Electric Vehicle",
+  "short_name": "Smart Vocational EV",
+  "description": "Laboratorium virtual kendaraan listrik (WebXR) untuk Meta Quest, HP + kacamata VR, dan browser.",
+  "lang": "id",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "categories": ["education"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -16,3 +16,10 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 );
+
+// PWA: cache berkas aplikasi (hanya di build produksi dan bukan di dalam iframe pratinjau AI Studio)
+if (import.meta.env.PROD && "serviceWorker" in navigator && window.self === window.top) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}

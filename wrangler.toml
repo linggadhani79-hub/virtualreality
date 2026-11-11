@@ -1,0 +1,7 @@
+# Cloudflare Pages
+#   Build command        : npm run build:web
+#   Build output directory: dist
+# Fungsi di folder functions/ otomatis menjadi endpoint /api/*
+name = "smart-vocational-ev"
+compatibility_date = "2025-01-01"
+pages_build_output_dir = "dist"

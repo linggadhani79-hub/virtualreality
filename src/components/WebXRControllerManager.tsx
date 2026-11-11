@@ -3,11 +3,15 @@ import { useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { playVRClickSound, playVRHoverSound } from "../lib/vrAudio";
 import { triggerQuestHaptics } from "./QuestControllerManager";
+import { useXR } from "@react-three/xr";
+import { collectRaycastCandidates, dispatchVRSelect, findInteractable as findInteractableIn } from "../lib/vrInteract";
 
 interface ControllerState {
   controller: THREE.XRTargetRaySpace;
   grip: THREE.XRGripSpace;
   handedness: "left" | "right" | "unknown";
+  modelHand: "left" | "right";
+  isTrackedHand: boolean;
   connected: boolean;
   gamepad: Gamepad | null;
   line: THREE.Line;
@@ -33,6 +37,9 @@ function createControllerVisual(handedness: "left" | "right"): THREE.Group {
 
   const isLeft = handedness === "left";
   const mirrorX = isLeft ? -1 : 1;
+  // Kiri = biru, kanan = oranye, supaya mudah dibedakan di dalam VR
+  const accent = isLeft ? 0x38bdf8 : 0xfb923c;
+  const accentDark = isLeft ? 0x0284c7 : 0xc2410c;
 
   // 1. Ergonomic Handle Grip
   const handleGeo = new THREE.CylinderGeometry(0.016, 0.019, 0.12, 16);
@@ -63,8 +70,8 @@ function createControllerVisual(handedness: "left" | "right"): THREE.Group {
   const stickTopGeo = new THREE.SphereGeometry(0.008, 12, 8);
   stickTopGeo.scale(1, 0.4, 1);
   const stickMat = new THREE.MeshStandardMaterial({
-    color: 0x38bdf8,
-    emissive: 0x0284c7,
+    color: accent,
+    emissive: accentDark,
     emissiveIntensity: 0.6,
     roughness: 0.3,
   });
@@ -111,10 +118,70 @@ function createControllerVisual(handedness: "left" | "right"): THREE.Group {
 
   // 7. Glowing LED Status Indicator
   const ledGeo = new THREE.SphereGeometry(0.002, 8, 8);
-  const ledMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+  const ledMat = new THREE.MeshBasicMaterial({ color: accent });
   const led = new THREE.Mesh(ledGeo, ledMat);
   led.position.set(0, 0.025, 0.005);
   group.add(led);
+
+  // 8. Stylised hand holding the controller (fingers follow trigger / grip)
+  const skinMat = new THREE.MeshStandardMaterial({
+    color: 0xdbe4ee,
+    roughness: 0.75,
+    metalness: 0,
+    transparent: true,
+    opacity: 0.82,
+  });
+  const bandMat = new THREE.MeshBasicMaterial({ color: accent });
+  const hand = new THREE.Group();
+
+  const palm = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.088, 0.078), skinMat);
+  palm.position.set(mirrorX * 0.034, -0.045, 0.004);
+  hand.add(palm);
+
+  const wrist = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.032, 0.05, 14), skinMat);
+  wrist.scale.set(0.62, 1, 1);
+  wrist.position.set(mirrorX * 0.034, -0.112, 0.012);
+  hand.add(wrist);
+
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.0335, 0.0335, 0.012, 14), bandMat);
+  band.scale.set(0.62, 1, 1);
+  band.position.set(mirrorX * 0.034, -0.118, 0.012);
+  hand.add(band);
+
+  const fingerCurls: { a: THREE.Object3D; b: THREE.Object3D; isIndex: boolean }[] = [];
+  const fingerYs = [-0.008, -0.031, -0.053, -0.074];
+  const fingerLens = [0.04, 0.044, 0.041, 0.033];
+  for (let f = 0; f < 4; f++) {
+    const len = fingerLens[f];
+    const knuckle = new THREE.Group();
+    knuckle.position.set(mirrorX * 0.034, fingerYs[f], -0.035);
+    const seg1Geo = new THREE.CapsuleGeometry(0.0085, len, 3, 8);
+    seg1Geo.rotateX(Math.PI / 2);
+    seg1Geo.translate(0, 0, -len / 2);
+    knuckle.add(new THREE.Mesh(seg1Geo, skinMat));
+    const mid = new THREE.Group();
+    mid.position.set(0, 0, -len);
+    const seg2Geo = new THREE.CapsuleGeometry(0.0078, len * 0.75, 3, 8);
+    seg2Geo.rotateX(Math.PI / 2);
+    seg2Geo.translate(0, 0, (-len * 0.75) / 2);
+    mid.add(new THREE.Mesh(seg2Geo, skinMat));
+    knuckle.add(mid);
+    hand.add(knuckle);
+    fingerCurls.push({ a: knuckle, b: mid, isIndex: f === 0 });
+  }
+
+  const thumbGeo = new THREE.CapsuleGeometry(0.0095, 0.045, 3, 8);
+  thumbGeo.rotateX(Math.PI / 2);
+  thumbGeo.translate(0, 0, -0.0225);
+  const thumb = new THREE.Mesh(thumbGeo, skinMat);
+  thumb.position.set(mirrorX * 0.03, 0.012, 0.03);
+  thumb.rotation.set(0.25, mirrorX * 0.75, 0);
+  hand.add(thumb);
+
+  group.add(hand);
+  group.userData.fingerCurls = fingerCurls;
+  group.userData.mirrorX = mirrorX;
+  applyFingerCurl(group, 0, 0);
 
   // Prevent raycaster from hitting the controller itself
   group.traverse((child) => {
@@ -125,8 +192,29 @@ function createControllerVisual(handedness: "left" | "right"): THREE.Group {
   return group;
 }
 
+// Curl the fingers of a controller visual: index follows the trigger, the rest follow the grip.
+function applyFingerCurl(model: THREE.Group, trigger: number, grip: number) {
+  const curls = model.userData.fingerCurls as
+    | { a: THREE.Object3D; b: THREE.Object3D; isIndex: boolean }[]
+    | undefined;
+  if (!curls) return;
+  const mirrorX = (model.userData.mirrorX as number) || 1;
+  for (let i = 0; i < curls.length; i++) {
+    const c = curls[i];
+    const v = c.isIndex ? trigger : grip;
+    // Positive rotation about +Y swings -Z towards -X (right hand wraps towards the handle)
+    c.a.rotation.y = mirrorX * (0.65 + 0.5 * v);
+    c.b.rotation.y = mirrorX * (0.8 + 0.6 * v);
+  }
+}
+
 export function WebXRControllerManager() {
   const { gl, scene, camera } = useThree();
+  // The player rig (XROrigin). Controllers must live inside it, otherwise the hands
+  // stay behind at the spawn point when the player walks or turns with the thumbstick.
+  const xrOrigin = useXR((s) => s.origin);
+  const xrOriginRef = useRef<THREE.Object3D | undefined>(undefined);
+  xrOriginRef.current = xrOrigin as THREE.Object3D | undefined;
   const controllersRef = useRef<ControllerState[]>([]);
   const raycasterRef = useRef(new THREE.Raycaster());
   const candidateObjectsRef = useRef<THREE.Object3D[]>([]);
@@ -265,6 +353,8 @@ export function WebXRControllerManager() {
         controller,
         grip,
         handedness: initialHand,
+        modelHand: initialHand,
+        isTrackedHand: false,
         connected: false,
         gamepad: null,
         line,
@@ -282,6 +372,17 @@ export function WebXRControllerManager() {
         const hand = (event.data?.handedness as "left" | "right") || initialHand;
         stateItem.handedness = hand;
         stateItem.gamepad = event.data?.gamepad || null;
+        // Hand-tracking (no controller held): the XR runtime draws the real hand instead
+        stateItem.isTrackedHand = !!event.data?.hand && !event.data?.gamepad;
+
+        // Rebuild the visual when the real handedness differs from the slot's guess,
+        // so the left controller always shows a left hand and vice versa.
+        if (hand !== stateItem.modelHand && (hand === "left" || hand === "right")) {
+          grip.remove(stateItem.controllerModel);
+          stateItem.controllerModel = createControllerVisual(hand);
+          stateItem.modelHand = hand;
+          grip.add(stateItem.controllerModel);
+        }
 
         stateItem.line.visible = true;
         stateItem.beamGlow.visible = true;
@@ -319,62 +420,10 @@ export function WebXRControllerManager() {
         if (target) {
           playVRClickSound();
 
-          const simulatedEvent = {
-            object: target,
-            point: _tempHitPoint.clone(),
-            distance: 0,
+          dispatchVRSelect(target, _tempHitPoint, scene, {
             controllerIndex: i,
             handedness: stateItem.handedness,
-            stopPropagation: () => {},
-            nativeEvent: {},
-          };
-
-          // 1. Direct userData.onClick
-          if (typeof target.userData?.onClick === "function") {
-            try {
-              target.userData.onClick(simulatedEvent);
-            } catch (err) {
-              console.error("[WebXRControllerManager] onClick error:", err);
-            }
-          }
-
-          // 2. Direct userData.onSelect
-          if (typeof target.userData?.onSelect === "function") {
-            try {
-              target.userData.onSelect(simulatedEvent);
-            } catch (err) {
-              console.error("[WebXRControllerManager] onSelect error:", err);
-            }
-          }
-
-          // 3. Dispatch to parent ancestors
-          let parent: THREE.Object3D | null = target.parent;
-          while (parent && parent !== scene) {
-            if (typeof parent.userData?.onClick === "function") {
-              try {
-                parent.userData.onClick(simulatedEvent);
-              } catch (err) {
-                console.error("[WebXRControllerManager] parent onClick error:", err);
-              }
-              break;
-            }
-            if (typeof parent.userData?.onSelect === "function") {
-              try {
-                parent.userData.onSelect(simulatedEvent);
-              } catch (err) {
-                console.error("[WebXRControllerManager] parent onSelect error:", err);
-              }
-              break;
-            }
-            parent = parent.parent;
-          }
-
-          // 4. Dispatch synthetic pointer events
-          try {
-            (target as any).dispatchEvent({ type: "click", ...simulatedEvent });
-            (target as any).dispatchEvent({ type: "pointerdown", ...simulatedEvent });
-            (target as any).dispatchEvent({ type: "pointerup", ...simulatedEvent });
-          } catch {}
+          });
         }
       };
 
@@ -393,8 +442,8 @@ export function WebXRControllerManager() {
         controller.remove(line);
         controller.remove(beamGlow);
         grip.remove(controllerModel);
-        scene.remove(controller);
-        scene.remove(grip);
+        controller.removeFromParent();
+        grip.removeFromParent();
         scene.remove(reticle);
         line.geometry.dispose();
         (line.material as THREE.Material).dispose();
@@ -405,41 +454,13 @@ export function WebXRControllerManager() {
     };
   }, [gl, scene]);
 
-  // Fast helper: Ascend hierarchy to find interactable trigger
-  const findInteractable = (obj: THREE.Object3D | null): THREE.Object3D | null => {
-    let curr = obj;
-    while (curr && curr !== scene) {
-      if (
-        curr.userData?.isInteractableMesh ||
-        curr.userData?.isVRButton ||
-        typeof curr.userData?.onClick === "function" ||
-        typeof curr.userData?.onSelect === "function" ||
-        curr.userData?.isExplodable ||
-        curr.userData?.type === "uploaded" ||
-        curr.userData?.type === "screen"
-      ) {
-        return curr;
-      }
-      curr = curr.parent;
-    }
-    return null;
-  };
+  const findInteractable = (obj: THREE.Object3D | null) => findInteractableIn(obj, scene);
 
   // Pre-filter candidate interactable objects periodically (every 0.5s) to avoid 90Hz scene traversals
   const updateCandidateObjects = (clockTime: number) => {
     if (clockTime - lastCandidateRefreshRef.current < 0.5) return;
     lastCandidateRefreshRef.current = clockTime;
-
-    const list: THREE.Object3D[] = [];
-    scene.traverse((child) => {
-      if (!child.visible) return;
-      if (child.userData?.isLaserHelper || child.name?.startsWith("VR_")) return;
-      if (child.type === "Line" || child.type === "LineSegments") return;
-      if (child instanceof THREE.Mesh) {
-        list.push(child);
-      }
-    });
-    candidateObjectsRef.current = list;
+    candidateObjectsRef.current = collectRaycastCandidates(scene);
   };
 
   // High-performance useFrame loop with zero garbage generation
@@ -455,6 +476,16 @@ export function WebXRControllerManager() {
     }
 
     updateCandidateObjects(state.clock.elapsedTime);
+
+    // Keep controllers inside the player rig so they follow thumbstick locomotion
+    const rig = xrOriginRef.current || scene;
+    for (let idx = 0; idx < controllersRef.current.length; idx++) {
+      const c = controllersRef.current[idx];
+      if (c.controller.parent !== rig) {
+        rig.add(c.controller);
+        rig.add(c.grip);
+      }
+    }
 
     const candidates = candidateObjectsRef.current;
     const activeCam = (gl.xr?.isPresenting && (gl.xr as any).getCamera)
@@ -477,7 +508,12 @@ export function WebXRControllerManager() {
       c.line.visible = true;
       c.beamGlow.visible = true;
       c.reticle.visible = true;
-      c.controllerModel.visible = true;
+      c.controllerModel.visible = !c.isTrackedHand;
+
+      if (c.gamepad && !c.isTrackedHand) {
+        const b = c.gamepad.buttons;
+        applyFingerCurl(c.controllerModel, b[0]?.value || 0, b[1]?.value || 0);
+      }
 
       // Extract controller ray origin and forward direction
       _tempMatrix.identity().extractRotation(c.controller.matrixWorld);
