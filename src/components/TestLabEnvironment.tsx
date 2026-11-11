@@ -2,7 +2,8 @@ import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { ExhibitStand, InfoSign, QuizStation, Scenery, StaticModel } from "./LabStations";
 import { ReadingCorner } from "./ReadingCorner";
-import { Barrier, Charger, Cone, DiagnosticCart, Extinguisher, Lift, SafetyStation, Workshop } from "./LabProps";
+import { Barrier, Cone, DiagnosticCart, Extinguisher, Lift, SafetyStation, Workshop } from "./LabProps";
+import { LabBuilding } from "./LabBuilding";
 import { worldBounds } from "../lib/worldBounds";
 
 /**
@@ -382,11 +383,8 @@ export function TestLabEnvironment() {
         <planeGeometry args={[W, D]} />
         <meshStandardMaterial map={asphalt} color="#b9bdc6" roughness={0.95} metalness={0.02} />
       </mesh>
-      {/* Lantai beton di luar pintu */}
-      <mesh position={[cx, 0.004, HALL.z1 + 8]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
-        <planeGeometry args={[13, 16]} />
-        <meshStandardMaterial color="#6b7280" roughness={0.9} />
-      </mesh>
+      {/* Tampak luar gedung, tanah, dan halaman */}
+      <LabBuilding hall={HALL} />
 
       {/* ----- Lintasan uji (sepanjang X) ----- */}
       <FloorDecal position={[0, LANE_Z - LANE_HALF]} size={[LANE_LEN, 0.12]} />
@@ -538,7 +536,7 @@ export function TestLabEnvironment() {
         ]}
       />
       <ExhibitStand
-        model="drivetrain"
+        model="motor-listrik"
         title="Motor Listrik (Dinamo)"
         subtitle="Komponen EV"
         accent="#f97316"
@@ -552,28 +550,59 @@ export function TestLabEnvironment() {
         ]}
       />
 
+      <ExhibitStand
+        model="inverter"
+        title="Inverter & Elektronika Daya"
+        subtitle="Komponen EV"
+        accent="#38bdf8"
+        position={[-12.5, 0, 2.0]}
+        facing={Math.PI / 2}
+        size={1.3}
+        facts={[
+          "Mengubah arus searah (DC) baterai menjadi arus bolak-balik (AC) 3 fasa untuk motor.",
+          "Mengatur kecepatan dan torsi motor ribuan kali per detik.",
+          "Rumah bersirip membuang panas; label oranye menandai tegangan tinggi.",
+        ]}
+      />
+      <ExhibitStand
+        model="motor-ev"
+        low
+        title="Sepeda Motor Listrik"
+        subtitle="Kendaraan listrik roda dua"
+        accent="#a78bfa"
+        position={[6.6, 0, 3.5]}
+        facing={-Math.PI / 2}
+        size={2.1}
+        facts={[
+          "Prinsipnya sama dengan mobil listrik: baterai, pengendali (controller), dan motor.",
+          "Baterai di tengah rangka; motor memutar roda belakang lewat rantai atau langsung di roda.",
+          "Tanpa kopling, tanpa knalpot, dan torsi langsung besar sejak putaran nol.",
+        ]}
+      />
+
       {/* ----- Zona EV: rangka & roda tanpa bodi (kanan tengah) ----- */}
       <FloorDecal position={[9.3, 1.3]} size={[4.4, 0.52]} map={txtChassis} rotation={Math.PI} />
       <ExhibitStand
-        model="sasis-ev"
+        model="sasis"
         low
         title="Rangka & Roda EV"
-        subtitle="Platform skateboard"
+        subtitle="Sasis mobil listrik contoh"
         accent="#38bdf8"
         position={[9.3, 0, -1.5]}
         size={3.0}
         facts={[
-          "Mobil listrik tanpa bodi: rangka, roda, suspensi, kemudi, dan baterai di lantai.",
-          "Motor menyatu dengan poros roda, jadi tidak perlu gardan dan knalpot.",
-          "Satu platform bisa dipakai untuk banyak bentuk bodi.",
+          "Rangka yang sama dengan di dalam mobil contoh, ditampilkan tanpa bodi.",
+          "Baterai rata di lantai; motor menyatu dengan poros roda.",
+          "Tanpa mesin, tangki, knalpot, dan poros kopel.",
         ]}
       />
 
       {/* ----- Bengkel non-EV untuk perbandingan (belakang kiri) ----- */}
-      <FloorDecal position={[-5.4, -11.85]} size={[16.6, 3.9]} color="#b45309" opacity={0.22} />
+      <FloorDecal position={[-3.75, -11.85]} size={[19.9, 3.9]} color="#b45309" opacity={0.22} />
       <FloorDecal position={[-2.4, -10.25]} size={[8.6, 0.54]} map={txtNonEv} lift={0.016} />
-      <Lift position={[-9.5, 0, -11]} armHeight={1.12} />
-      <StaticModel model="sasis-bensin" size={3.5} position={[-9.5, 0.78, -11]} rotation={Math.PI / 2} />
+      <Lift position={[-9.5, 0, -11]} armHeight={1.12} loadOffset={-0.34}>
+        <StaticModel model="sasis-bensin" size={3.5} position={[0, 0, 0]} rotation={Math.PI / 2} />
+      </Lift>
       <InfoSign
         position={[-7.1, 0, -9.35]}
         title="Sasis Tangga (Non-EV)"
@@ -582,7 +611,7 @@ export function TestLabEnvironment() {
         facts={[
           "Rangka baja memanjang menopang mesin, transmisi, gardan, dan tangki.",
           "Tenaga mesin di depan dikirim ke roda belakang lewat poros kopel.",
-          "Bandingkan dengan rangka EV: lantainya penuh baterai, tanpa poros kopel.",
+          "Tekan tombol NAIK / TURUN di tiang lift untuk melihat bagian bawahnya.",
         ]}
       />
       <ExhibitStand
@@ -637,8 +666,22 @@ export function TestLabEnvironment() {
           "EV mengerem dulu dengan motor (regeneratif), jadi kampas rem lebih awet.",
         ]}
       />
+      <ExhibitStand
+        model="sasis-mesin"
+        low
+        title="Rangka Mobil Bermesin Bensin"
+        subtitle="Bengkel non-EV"
+        accent="#f59e0b"
+        position={[4.3, 0, -11.9]}
+        size={2.8}
+        facts={[
+          "Mesin di depan, lalu transmisi, poros kopel, dan gardan ke roda.",
+          "Perlu tangki bahan bakar, knalpot, dan radiator besar.",
+          "Bandingkan dengan Rangka & Roda EV di sisi kanan lab.",
+        ]}
+      />
       {/* Poster perbandingan di dinding belakang */}
-      <mesh position={[4.75, 2.5, HALL.z0 + 0.04]} raycast={noRaycast}>
+      <mesh position={[4.3, 2.75, HALL.z0 + 0.04]} raycast={noRaycast}>
         <planeGeometry args={[3.3, 2.32]} />
         <meshBasicMaterial map={compare} toneMapped={false} />
       </mesh>
@@ -652,13 +695,39 @@ export function TestLabEnvironment() {
       <ReadingCorner position={[9.5, 0, 5.72]} />
 
       {/* ================= PERALATAN ================= */}
-      <DiagnosticCart position={[5.0, 0, -9.7]} rotation={-0.5} />
+      <DiagnosticCart position={[6.7, 0, -9.5]} rotation={-0.5} />
       <SafetyStation position={[HALL.x1 - 0.2, 0, 2]} />
       <Extinguisher position={[HALL.x0 + 0.45, 0, -9.6]} />
       <Extinguisher position={[5.6, 0, HALL.z1 - 0.45]} />
 
-      <Charger position={[7.9, 0, -13.2]} />
-      <Charger position={[11.1, 0, -13.2]} />
+      {/* ----- Area pengisian: charger asli dari aset pemilik ----- */}
+      <StaticModel model="charger" size={2.0} position={[7.9, 0, -13.1]} />
+      <StaticModel model="stasiun-cas" size={1.9} position={[11.1, 0, -13.0]} />
+      <InfoSign
+        position={[9.5, 0, -12.9]}
+        title="Pengisian Daya EV"
+        subtitle="Area pengisian"
+        accent="#22c55e"
+        facts={[
+          "Kiri: charger DC cepat — arus searah langsung ke baterai, 20–80 % dalam ±30 menit.",
+          "Kanan: stasiun AC — lewat On-Board Charger di mobil, cocok untuk parkir lama.",
+          "Kabel tetap terkunci selama pengisian dan arus baru mengalir setelah mobil memberi izin.",
+        ]}
+      />
+      <ExhibitStand
+        model="konektor"
+        title="Konektor CCS2"
+        subtitle="Area pengisian"
+        accent="#22c55e"
+        position={[12.9, 0, -9.7]}
+        facing={-Math.PI / 2}
+        size={0.75}
+        facts={[
+          "Dua pin besar di bawah untuk DC cepat, bagian atas (Type 2) untuk AC.",
+          "Pin kecil dipakai mobil dan charger untuk saling berkomunikasi.",
+          "Standar pengisian cepat yang dipakai di Indonesia.",
+        ]}
+      />
       <Workshop position={[HALL.x0 + 0.75, 0, -1.6]} />
 
       {/* ================= LUAR GEDUNG: langit, rumput, taman, pohon ================= */}
@@ -670,10 +739,8 @@ export function TestLabEnvironment() {
         model="taman"
         size={7}
         places={[
-          [-10.2, 10.6, 0.3],
-          [10.2, 10.8, 2.2],
-          [-18.6, 3.5, 4.1, 0.9],
-          [18.8, 2.5, 1.2, 0.9],
+          [-10.6, 11.2, 0.3],
+          [10.6, 11.4, 2.2],
         ]}
       />
       <Scenery

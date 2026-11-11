@@ -1,9 +1,10 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 /**
- * Peralatan Ruang Uji (buatan sendiri, tanpa berkas unduhan): pengisi daya, kerucut, pembatas,
+ * Peralatan Ruang Uji (buatan sendiri, tanpa berkas unduhan): kerucut, pembatas,
  * bengkel, lift, troli diagnostik, lemari APD, dan APAR.
  *
  * Semua bentuk memakai sudut membulat, profil putar (lathe), kapsul, dan pipa lengkung supaya
@@ -92,106 +93,6 @@ function lathe(profile: [number, number][], segments = 24) {
 
 const Steel = ({ color = "#475569" }: { color?: string }) => <meshStandardMaterial color={color} metalness={0.75} roughness={0.35} />;
 const Rubber = () => <meshStandardMaterial color="#0b0f17" roughness={0.92} />;
-
-/* ------------------------------------------------------------------ */
-/*  Pengisi daya DC                                                    */
-/* ------------------------------------------------------------------ */
-
-function drawChargerScreen(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, "#03101f");
-  g.addColorStop(1, "#06243a");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, w, h);
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#4ade80";
-  ctx.font = "900 58px system-ui, sans-serif";
-  ctx.fillText("DC FAST", w / 2, 70);
-  ctx.fillStyle = "#e2e8f0";
-  ctx.font = "700 38px system-ui, sans-serif";
-  ctx.fillText("CCS2 · 120 kW", w / 2, 126);
-  ctx.strokeStyle = "#22c55e";
-  ctx.lineWidth = 8;
-  ctx.beginPath();
-  (ctx as any).roundRect?.(40, 160, w - 80, 50, 14) ?? ctx.rect(40, 160, w - 80, 50);
-  ctx.stroke();
-  ctx.fillStyle = "#22c55e";
-  ctx.beginPath();
-  (ctx as any).roundRect?.(48, 168, (w - 96) * 0.8, 34, 8) ?? ctx.rect(48, 168, (w - 96) * 0.8, 34);
-  ctx.fill();
-  ctx.fillStyle = "#e2e8f0";
-  ctx.font = "700 32px system-ui, sans-serif";
-  ctx.fillText("SIAP DIGUNAKAN", w / 2, 254);
-}
-
-export function Charger({ position }: { position: Vec3 }) {
-  const screen = useDrawnTexture(512, 288, drawChargerScreen);
-  return (
-    <group position={position}>
-      {/* umpak beton */}
-      <RBox args={[1.0, 0.14, 0.8]} radius={0.04} position={[0, 0.07, 0]} solid>
-        <meshStandardMaterial color="#6b7280" roughness={0.9} />
-      </RBox>
-      {/* badan */}
-      <RBox args={[0.72, 1.86, 0.46]} radius={0.09} position={[0, 1.07, 0]} solid>
-        <meshStandardMaterial color="#f1f5f9" roughness={0.3} metalness={0.25} />
-      </RBox>
-      {/* panel depan gelap */}
-      <RBox args={[0.6, 1.2, 0.03]} radius={0.012} position={[0, 1.27, 0.222]}>
-        <meshStandardMaterial color="#0b1220" roughness={0.18} metalness={0.5} />
-      </RBox>
-      <mesh position={[0, 1.55, 0.2385]} raycast={noRaycast}>
-        <planeGeometry args={[0.5, 0.281]} />
-        <meshBasicMaterial map={screen} toneMapped={false} />
-      </mesh>
-      {/* pembaca kartu & tombol darurat */}
-      <RBox args={[0.2, 0.13, 0.02]} radius={0.008} position={[-0.13, 1.2, 0.24]}>
-        <meshStandardMaterial color="#1e293b" roughness={0.4} />
-      </RBox>
-      <mesh position={[0.17, 1.2, 0.245]} rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast}>
-        <cylinderGeometry args={[0.045, 0.05, 0.035, 20]} />
-        <meshStandardMaterial color="#dc2626" roughness={0.4} />
-      </mesh>
-      {/* garis lampu status */}
-      <RBox args={[0.5, 0.035, 0.012]} radius={0.005} position={[0, 0.98, 0.24]}>
-        <meshBasicMaterial color="#22c55e" toneMapped={false} />
-      </RBox>
-      {/* mahkota hijau menyala */}
-      <RBox args={[0.76, 0.1, 0.5]} radius={0.045} position={[0, 2.0, 0]}>
-        <meshStandardMaterial color="#16a34a" emissive="#16a34a" emissiveIntensity={0.9} roughness={0.4} />
-      </RBox>
-      {/* dudukan konektor di sisi kanan */}
-      <RBox args={[0.1, 0.26, 0.2]} radius={0.03} position={[0.4, 1.12, 0.05]}>
-        <meshStandardMaterial color="#1e293b" roughness={0.5} />
-      </RBox>
-      {/* konektor CCS2: gagang + moncong */}
-      <group position={[0.47, 1.2, 0.06]} rotation={[0, 0, -0.25]}>
-        <mesh raycast={noRaycast}>
-          <capsuleGeometry args={[0.035, 0.16, 4, 12]} />
-          <meshStandardMaterial color="#111827" roughness={0.45} />
-        </mesh>
-        <mesh position={[0, 0.13, 0.03]} rotation={[0.5, 0, 0]} raycast={noRaycast}>
-          <cylinderGeometry args={[0.045, 0.04, 0.09, 16]} />
-          <meshStandardMaterial color="#334155" roughness={0.4} metalness={0.4} />
-        </mesh>
-      </group>
-      {/* kabel menjuntai */}
-      <Tube
-        radius={0.02}
-        points={[
-          [0.47, 1.08, 0.06],
-          [0.52, 0.8, 0.1],
-          [0.5, 0.42, 0.2],
-          [0.44, 0.32, 0.12],
-          [0.39, 0.5, 0.0],
-          [0.37, 0.75, -0.04],
-        ]}
-      >
-        <Rubber />
-      </Tube>
-    </group>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /*  Kerucut lalu lintas                                                */
@@ -546,10 +447,76 @@ export function Workshop({ position }: { position: Vec3 }) {
 /*  Lift dua tiang                                                     */
 /* ------------------------------------------------------------------ */
 
-export function Lift({ position, armHeight = 0.4 }: { position: Vec3; /** tinggi lengan angkat dari lantai */ armHeight?: number }) {
+function drawLiftPanel(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  ctx.clearRect(0, 0, w, h);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "900 34px system-ui, sans-serif";
+  ctx.fillText("LIFT", w / 2, 30);
+  const arrow = (cy: number, up: boolean) => {
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    const d = up ? -1 : 1;
+    ctx.moveTo(w / 2, cy + d * 30);
+    ctx.lineTo(w / 2 - 34, cy - d * 22);
+    ctx.lineTo(w / 2 + 34, cy - d * 22);
+    ctx.closePath();
+    ctx.fill();
+  };
+  arrow(128, true);
+  arrow(288, false);
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "800 26px system-ui, sans-serif";
+  ctx.fillText("NAIK", w / 2, 200);
+  ctx.fillText("TURUN", w / 2, 360);
+}
+
+const LIFT_MIN = 0.42;
+const LIFT_MAX = 1.75;
+
+/**
+ * Lift dua tiang. Tombol NAIK / TURUN di tiang kanan menggerakkan lengan angkat beserta
+ * muatannya (`children`, mis. sasis). Bisa ditekan dengan mouse, laser Quest, atau tatapan.
+ */
+export function Lift({
+  position,
+  armHeight = 0.4,
+  loadOffset = 0,
+  children,
+}: {
+  position: Vec3;
+  /** tinggi awal lengan angkat dari lantai */
+  armHeight?: number;
+  /** letak dasar muatan relatif terhadap lengan (negatif = roda menggantung di bawah lengan) */
+  loadOffset?: number;
+  children?: React.ReactNode;
+}) {
+  const [target, setTarget] = useState(armHeight);
+  const [hot, setHot] = useState<"up" | "down" | null>(null);
+  const height = useRef(armHeight);
+  const carriages = useRef<(THREE.Group | null)[]>([]);
+  const load = useRef<THREE.Group>(null);
+  const panel = useDrawnTexture(160, 400, drawLiftPanel);
+
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 0.05);
+    // kecepatan tetap seperti lift hidrolik sungguhan
+    const diff = target - height.current;
+    if (Math.abs(diff) > 0.0005) height.current += Math.sign(diff) * Math.min(Math.abs(diff), delta * 0.35);
+    for (const c of carriages.current) if (c) c.position.y = height.current;
+    if (load.current) load.current.position.y = height.current + loadOffset;
+  });
+
+  const press = (dir: "up" | "down") => (e?: any) => {
+    e?.stopPropagation?.();
+    setTarget(dir === "up" ? LIFT_MAX : LIFT_MIN);
+  };
+  const moving = (dir: "up" | "down") => (dir === "up" ? target === LIFT_MAX : target === LIFT_MIN);
+
   return (
     <group position={position}>
-      {[-1.5, 1.5].map((x) => {
+      {[-1.5, 1.5].map((x, pi) => {
         const inward = -Math.sign(x);
         return (
           <group key={x} position={[x, 0, 0]}>
@@ -564,28 +531,35 @@ export function Lift({ position, armHeight = 0.4 }: { position: Vec3; /** tinggi
             <RBox args={[0.03, 3.4, 0.2]} radius={0.01} position={[inward * 0.15, 1.9, 0]}>
               <Steel color="#0f172a" />
             </RBox>
-            {/* kereta angkat + lengan berengsel */}
-            <RBox args={[0.2, 0.34, 0.44]} radius={0.04} position={[inward * 0.2, armHeight + 0.1, 0]}>
-              <meshStandardMaterial color="#facc15" metalness={0.35} roughness={0.45} />
-            </RBox>
-            {[-1, 1].map((s) => (
-              <group key={s} position={[inward * 0.26, armHeight, s * 0.17]} rotation={[0, -inward * s * 0.55, 0]}>
-                <RBox args={[1.05, 0.07, 0.11]} radius={0.025} position={[inward * 0.52, 0, 0]}>
-                  <meshStandardMaterial color="#facc15" metalness={0.35} roughness={0.45} />
-                </RBox>
-                <mesh raycast={noRaycast}>
-                  <cylinderGeometry args={[0.07, 0.07, 0.1, 16]} />
-                  <Steel color="#334155" />
-                </mesh>
-                {/* bantalan karet di ujung lengan */}
-                <mesh position={[inward * 1.0, 0.055, 0]} raycast={noRaycast}>
-                  <cylinderGeometry args={[0.075, 0.085, 0.045, 18]} />
-                  <Rubber />
-                </mesh>
-              </group>
-            ))}
+            {/* kereta angkat + lengan berengsel (ikut naik-turun) */}
+            <group
+              ref={(g) => {
+                carriages.current[pi] = g;
+              }}
+              position={[0, armHeight, 0]}
+            >
+              <RBox args={[0.2, 0.34, 0.44]} radius={0.04} position={[inward * 0.2, 0.1, 0]}>
+                <meshStandardMaterial color="#facc15" metalness={0.35} roughness={0.45} />
+              </RBox>
+              {[-1, 1].map((s) => (
+                <group key={s} position={[inward * 0.26, 0, s * 0.17]} rotation={[0, -inward * s * 0.55, 0]}>
+                  <RBox args={[1.05, 0.07, 0.11]} radius={0.025} position={[inward * 0.52, 0, 0]}>
+                    <meshStandardMaterial color="#facc15" metalness={0.35} roughness={0.45} />
+                  </RBox>
+                  <mesh raycast={noRaycast}>
+                    <cylinderGeometry args={[0.07, 0.07, 0.1, 16]} />
+                    <Steel color="#334155" />
+                  </mesh>
+                  {/* bantalan karet di ujung lengan */}
+                  <mesh position={[inward * 1.0, 0.055, 0]} raycast={noRaycast}>
+                    <cylinderGeometry args={[0.075, 0.085, 0.045, 18]} />
+                    <Rubber />
+                  </mesh>
+                </group>
+              ))}
+            </group>
             {/* stiker peringatan */}
-            <RBox args={[0.2, 0.42, 0.012]} radius={0.004} position={[0, 1.5, 0.184]}>
+            <RBox args={[0.2, 0.3, 0.012]} radius={0.004} position={[0, 2.3, 0.184]}>
               <meshStandardMaterial color="#facc15" roughness={0.55} />
             </RBox>
           </group>
@@ -595,23 +569,50 @@ export function Lift({ position, armHeight = 0.4 }: { position: Vec3; /** tinggi
       <RBox args={[3.3, 0.16, 0.3]} radius={0.05} position={[0, 3.9, 0]}>
         <meshStandardMaterial color="#1d4ed8" metalness={0.45} roughness={0.4} />
       </RBox>
-      {/* unit hidrolik + kotak kendali di tiang kanan */}
-      <group position={[1.72, 0, 0]}>
-        <mesh position={[0, 1.45, 0]} raycast={noRaycast}>
-          <capsuleGeometry args={[0.085, 0.42, 4, 14]} />
-          <Steel color="#334155" />
-        </mesh>
-        <RBox args={[0.14, 0.26, 0.22]} radius={0.03} position={[0.02, 1.02, 0]}>
-          <meshStandardMaterial color="#e2e8f0" roughness={0.4} />
+      {/* unit hidrolik di sisi luar tiang kanan */}
+      <mesh position={[1.72, 1.55, 0]} raycast={noRaycast}>
+        <capsuleGeometry args={[0.085, 0.42, 4, 14]} />
+        <Steel color="#334155" />
+      </mesh>
+
+      {/* ---------- Panel kendali NAIK / TURUN di muka tiang kanan ---------- */}
+      <group position={[1.5, 1.22, 0.2]}>
+        <RBox args={[0.3, 0.62, 0.07]} radius={0.03} position={[0, 0, 0.02]}>
+          <meshStandardMaterial color="#e2e8f0" roughness={0.4} metalness={0.2} />
         </RBox>
-        <mesh position={[0.095, 1.07, 0]} rotation={[0, 0, Math.PI / 2]} raycast={noRaycast}>
-          <cylinderGeometry args={[0.03, 0.03, 0.02, 14]} />
-          <meshStandardMaterial color="#16a34a" emissive="#16a34a" emissiveIntensity={0.6} />
+        {(
+          [
+            ["up", 0.085, "#16a34a"],
+            ["down", -0.165, "#dc2626"],
+          ] as ["up" | "down", number, string][]
+        ).map(([dir, y, color]) => (
+          <mesh
+            key={dir}
+            name={`Lift_btn_${dir}`}
+            position={[0, y, 0.07 - (moving(dir) ? 0.012 : 0)]}
+            rotation={[Math.PI / 2, 0, 0]}
+            scale={hot === dir ? 1.08 : 1}
+            userData={{ isVRButton: true, isInteractableMesh: true, onClick: press(dir) }}
+            onClick={press(dir)}
+            onPointerOver={(e) => {
+              e.stopPropagation();
+              setHot(dir);
+            }}
+            onPointerOut={() => setHot((h) => (h === dir ? null : h))}
+          >
+            <cylinderGeometry args={[0.085, 0.092, 0.04, 28]} />
+            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={moving(dir) ? 0.9 : hot === dir ? 0.5 : 0.15} roughness={0.35} />
+          </mesh>
+        ))}
+        <mesh position={[0, -0.02, 0.093]} raycast={noRaycast}>
+          <planeGeometry args={[0.24, 0.6]} />
+          <meshBasicMaterial map={panel} transparent depthWrite={false} toneMapped={false} />
         </mesh>
-        <mesh position={[0.095, 0.97, 0]} rotation={[0, 0, Math.PI / 2]} raycast={noRaycast}>
-          <cylinderGeometry args={[0.03, 0.03, 0.02, 14]} />
-          <meshStandardMaterial color="#dc2626" roughness={0.4} />
-        </mesh>
+      </group>
+
+      {/* muatan di atas lengan */}
+      <group ref={load} position={[0, armHeight + loadOffset, 0]}>
+        {children}
       </group>
     </group>
   );

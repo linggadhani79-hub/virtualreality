@@ -26,7 +26,8 @@ dilanggar (tanpa database, aset ditanam, tanpa unggah/unduh, langsung pakai, des
 |---|---|
 | `src/App.tsx` | Aplikasi utama, `Player` (gerak, kamera), UI 2D, dok tombol |
 | `src/components/TestLabEnvironment.tsx` | Hanggar, aspal, marka, poster, langit, penempatan semua stasiun & zona |
-| `src/components/LabProps.tsx` | Peralatan buatan sendiri (charger, kerucut, pembatas, bengkel, lift, troli, lemari APD, APAR) dengan bentuk membulat |
+| `src/components/LabProps.tsx` | Peralatan buatan sendiri (kerucut, pembatas, bengkel, lift dengan tombol naik/turun, troli, lemari APD, APAR) dengan bentuk membulat |
+| `src/components/LabBuilding.tsx` | Tampak luar gedung (atap lengkung, jendela, kanopi), halaman, dan tanah (`public/lab/tanah.webp`, ubin dari aset taman disambung bercermin) |
 | `src/components/SampleEVCar.tsx` | Mobil, mode Komponen (sasis asli + titik sorot), panel tombol 3D |
 | `src/components/LabStations.tsx` | `ExhibitStand` (etalase, `low` = panggung rendah), `InfoSign`, `StaticModel`, `Scenery` (taman/pohon), `QuizStation` |
 | `src/components/ReadingCorner.tsx` | Meja buku (buku berdiri di penyangga saat dipilih) + layar slideshow modul ajar |
@@ -75,10 +76,15 @@ Satu objek harus bisa dipilih dengan mouse, laser Quest, dan tatapan VR HP. Sela
 4. Tata letak hanggar: X −14..14, Z −14..6, kolom tiap 4 m di Z = −12, −8, −4, 0, 4 (lebar bebas
    antar kolom 3,6 m — poster dinding samping jangan lebih lebar dari itu). Pemain mulai di (0,0,0)
    menghadap −Z; lintasan mobil di Z = −6.
-5. Zona: kiri depan = etalase komponen EV (baterai, motor listrik); kanan tengah = rangka & roda EV;
-   belakang kiri = **bengkel non-EV** (sasis tangga di lift, mesin bensin, V8, piston, rem) +
-   poster perbandingan di dinding belakang; belakang kanan = pengisian; depan kiri = kuis;
-   depan kanan = pojok baca; luar pintu = taman & pohon.
+5. Zona: kiri depan = komponen EV (baterai, motor listrik, inverter); kanan tengah = rangka & roda
+   EV (model `sasis`, sama dengan yang di dalam mobil); kanan depan = sepeda motor listrik + pojok
+   baca; belakang kiri = **bengkel non-EV** (sasis tangga di lift, mesin 4 silinder, V8, piston,
+   rem, rangka bermesin bensin `sasis-mesin`) + poster perbandingan; belakang kanan = pengisian
+   (charger DC, stasiun AC, konektor CCS2); depan kiri = kuis; luar pintu = halaman, taman, pohon.
+6. Mengganti isi sebuah model: **pakai nama berkas baru** (jangan menimpa nama lama). Service
+   worker lama masih menyajikan berkas bernama sama pada kunjungan pertama setelah deploy.
+7. `loadGlb` menyimpan satu objek per alamat; pakai `.clone()` bila model yang sama tampil di lebih
+   dari satu tempat (sudah dilakukan `ExhibitStand`, `StaticModel`, `Scenery`).
 
 ## Menguji
 
