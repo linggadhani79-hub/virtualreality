@@ -77,8 +77,11 @@ export function ExhibitStand({
   useEffect(() => {
     let cancelled = false;
     loadGlb(modelUrl(model))
-      .then((root) => {
+      .then((shared) => {
         if (cancelled) return;
+        // Salinan (geometri & tekstur tetap dipakai bersama): model yang sama boleh tampil di
+        // beberapa tempat, mis. sasis di dalam mobil dan di etalase.
+        const root = shared.clone();
         // Bungkus supaya rotasi tampilan tidak mengganggu penskalaan
         const holder = new THREE.Group();
         root.rotation.set(modelRotation[0], modelRotation[1], modelRotation[2]);
@@ -281,8 +284,9 @@ export function StaticModel({
   useEffect(() => {
     let cancelled = false;
     loadGlb(modelUrl(model))
-      .then((root) => {
+      .then((shared) => {
         if (cancelled) return;
+        const root = shared.clone();
         fitModel(root, size);
         disableRaycast(root);
         root.traverse((o) => {

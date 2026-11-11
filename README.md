@@ -26,12 +26,14 @@ Media ajar kendaraan listrik (EV) berbasis **WebXR**. Satu kode sumber, bisa dij
 
 - **Mobil listrik** di lintasan uji dengan panel tombol 3D: Komponen (bodi tembus pandang, sasis asli
   dengan titik sorot komponen yang bisa dipilih), Jalankan (roda ikut berputar), Putar, Reset.
-- **Zona EV**: etalase paket baterai traksi dan motor listrik (dinamo) di meja putar, serta
-  rangka & roda EV tanpa bodi di panggung rendah — masing-masing dengan papan keterangan.
-- **Bengkel non-EV (pembanding)**: sasis tangga di atas lift, mesin bensin 4 silinder, mesin V8,
-  piston, dan rem cakram, plus poster "Mobil Listrik vs Mobil Bensin" di dinding belakang.
-- **Peralatan**: lemari APD tegangan tinggi, bengkel dengan papan perkakas berisolasi, troli
-  diagnostik, pengisi daya DC, APAR; taman dan pepohonan di luar pintu.
+- **Zona EV**: etalase paket baterai traksi, motor listrik (dinamo), inverter, rangka & roda EV
+  tanpa bodi (sasis yang sama dengan di dalam mobil), dan sepeda motor listrik.
+- **Area pengisian**: charger DC cepat, stasiun AC, dan konektor CCS2.
+- **Bengkel non-EV (pembanding)**: sasis tangga di atas lift (tombol NAIK / TURUN), rangka bermesin
+  bensin, mesin 4 silinder, mesin V8, piston, dan rem cakram, plus poster "Mobil Listrik vs Mobil
+  Bensin" di dinding belakang.
+- **Peralatan & gedung**: lemari APD, bengkel perkakas berisolasi, troli diagnostik, APAR; gedung
+  beratap lengkung dengan halaman paving, taman, dan pepohonan.
 - **Tanya jawab**: kios kuis 10 soal pilihan ganda dengan penjelasan dan skor (tanpa internet).
 - **Pojok baca**: buku-buku modul ajar di meja; buku yang dipilih berdiri di penyangganya dan
   isinya tampil sebagai slideshow di layar besar.
