@@ -1,0 +1,14 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /workspaces/{workspaceId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /assets/{assetId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}

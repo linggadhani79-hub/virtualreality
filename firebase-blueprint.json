@@ -1,0 +1,26 @@
+{
+  "collections": [
+    {
+      "name": "workspaces",
+      "description": "Global workspace layout and item definitions.",
+      "documentId": "global",
+      "rules": "allow read, write: if true;",
+      "schema": {
+        "items": "any[]",
+        "updatedAt": "timestamp"
+      }
+    },
+    {
+      "name": "assets",
+      "description": "Chunked binary data for 3D assets.",
+      "documentId": "auto",
+      "rules": "allow read, write: if true;",
+      "schema": {
+        "assetId": "string",
+        "chunkIndex": "number",
+        "totalChunks": "number",
+        "data": "string"
+      }
+    }
+  ]
+}

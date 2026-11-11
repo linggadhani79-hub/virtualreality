@@ -1,0 +1,11 @@
+{
+  "name": "Smart Vocational untuk Electric Vehicle",
+  "description": "Interactive WebXR 360 VR Electric Vehicle Laboratory with Quest 2 controller support for Smart Vocational learning",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
