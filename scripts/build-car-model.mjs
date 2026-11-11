@@ -1,7 +1,14 @@
 // Cara pakai (sekali saja, di luar build aplikasi):
 //   npm i --no-save meshoptimizer sharp
-//   node scripts/build-car-model.mjs <model-asli.glb> public/models/contoh-mobil-listrik.glb 0.22 2048 25 0.71
-// Argumen: rasio penyederhanaan, ukuran tekstur, iterasi penghalusan bodi, tinggi garis kaca (0-1).
+//
+// Kualitas penuh (yang dipakai sekarang: mesh & tekstur asli, hanya roda dipisah + kompresi):
+//   node scripts/build-car-model.mjs <model-asli.glb> public/models/contoh-mobil-listrik.glb 1 0 0 -1
+// Versi ringan dengan bodi dihaluskan & tekstur cat dibersihkan:
+//   node scripts/build-car-model.mjs <model-asli.glb> public/models/contoh-mobil-listrik.glb 0.5 2048 57 0.71 0.0001
+//
+// Argumen: rasio penyederhanaan (1 = tidak disederhanakan), ukuran tekstur (0 = tekstur asli),
+// iterasi penghalusan bodi (0 = tidak dihaluskan), tinggi garis kaca 0-1 (-1 = tekstur tidak diubah),
+// batas galat penyederhanaan.
 // Mengasumsikan mobil memanjang di sumbu X, tinggi di sumbu Y, dan satu mesh bertekstur.
 // Menyiapkan model mobil untuk lab:
 //  1. sederhanakan mesh, 2. pisahkan 4 roda jadi node sendiri (agar bisa berputar),
@@ -17,7 +24,9 @@ const BELT = +(process.argv[7] ?? 0.71);
 await MeshoptEncoder.ready; await MeshoptSimplifier.ready;
 const io = new NodeIO().registerExtensions([...ALL_EXTENSIONS, EXTMeshoptCompression]).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
 const doc = await io.read(inp);
-await doc.transform(dedup(), weld(), simplify({ simplifier: MeshoptSimplifier, ratio: +ratio, error: 0.0004 }), prune());
+// rasio 1 = mesh tidak disederhanakan sama sekali
+if (+ratio < 1) await doc.transform(dedup(), weld(), simplify({ simplifier: MeshoptSimplifier, ratio: +ratio, error: +(process.argv[8] ?? 0.0004) }), prune());
+else await doc.transform(dedup());
 
 const root = doc.getRoot();
 const node = root.listNodes().find(n => n.getMesh());
@@ -73,8 +82,8 @@ const makePrim = (owner, center) => {
   return { p, tris: I.length / 3 };
 };
 
-// ---- haluskan bodi (roda & tepi lubang roda tidak digeser) ----
-{
+// ---- haluskan bodi (roda & tepi lubang roda tidak digeser); 0 iterasi = bodi tidak diubah ----
+if (ITER > 0) {
   const map = new Map(); const cid = new Uint32Array(n); let nc = 0;
   for (let i = 0; i < n; i++) { const k = `${Math.round(pos[i*3]*1e5)},${Math.round(pos[i*3+1]*1e5)},${Math.round(pos[i*3+2]*1e5)}`; let c = map.get(k); if (c === undefined) { c = nc++; map.set(k, c); } cid[i] = c; }
   const P = new Float64Array(nc * 3), W = new Float32Array(nc).fill(1);
@@ -109,8 +118,8 @@ wheels.forEach((w, i) => {
   node.addChild(wn);
   console.log(w.name, 'tris', tris);
 });
-// ---- bersihkan tekstur: cat bodi putih rata, kaca gelap; detail gelap (garis pintu, lampu, gril) tetap ----
-{
+// ---- bersihkan tekstur (dilewati bila garis kaca < 0: tekstur asli dipakai apa adanya) ----
+if (BELT >= 0) {
   const texObj = material.getBaseColorTexture();
   const src = await sharp(Buffer.from(texObj.getImage())).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const d = src.data, w = src.info.width, h = src.info.height;
@@ -154,5 +163,9 @@ wheels.forEach((w, i) => {
   // Peta normal & kekasaran hasil AI berisik: pakai nilai cat yang seragam
   material.setNormalTexture(null).setMetallicRoughnessTexture(null).setMetallicFactor(0.3).setRoughnessFactor(0.38);
 }
-await doc.transform(prune(), textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [+tex, +tex], quality: 90 }), meshopt({ encoder: MeshoptEncoder, level: 'high' }));
+// ukuran tekstur 0 = berkas tekstur asli tidak dikodekan ulang
+await doc.transform(prune());
+if (+tex > 0) await doc.transform(textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [+tex, +tex], quality: 96 }));
+// Kompresi Meshopt dengan kuantisasi sangat halus (posisi 16 bit ≈ 0,03 mm): tidak terlihat bedanya
+await doc.transform(meshopt({ encoder: MeshoptEncoder, level: 'medium', quantizePosition: 16, quantizeNormal: 12, quantizeTexcoord: 14 }));
 await io.write(out, doc);

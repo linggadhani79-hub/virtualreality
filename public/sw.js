@@ -1,8 +1,34 @@
-// Service worker ringan: menyimpan berkas aplikasi agar kunjungan berikutnya terbuka cepat
-// di Quest / HP, dan tetap bisa dibuka saat koneksi lambat.
-const CACHE = "evlab-v1";
+// Service worker: menyimpan SEMUA berkas aplikasi (kode, ikon, model 3D) saat pertama dibuka,
+// sehingga setelah itu aplikasi bisa dijalankan tanpa internet (offline).
+const BUILD_ID = "__BUILD_ID__";
+const CACHE = "evlab-" + BUILD_ID;
 
-self.addEventListener("install", () => self.skipWaiting());
+async function precache() {
+  const cache = await caches.open(CACHE);
+  const res = await fetch("/precache-manifest.json", { cache: "no-store" });
+  if (!res.ok) return;
+  const { files } = await res.json();
+  // Satu per satu supaya satu berkas gagal tidak membatalkan semuanya
+  let done = 0;
+  for (const url of files) {
+    try {
+      if (!(await cache.match(url))) {
+        const r = await fetch(url, { cache: "no-cache" });
+        if (r.ok) await cache.put(url, r);
+      }
+    } catch {}
+    done++;
+    if (done % 5 === 0 || done === files.length) {
+      const clients = await self.clients.matchAll({ includeUncontrolled: true });
+      clients.forEach((c) => c.postMessage({ type: "offline-progress", done, total: files.length }));
+    }
+  }
+}
+
+self.addEventListener("install", (event) => {
+  self.skipWaiting();
+  event.waitUntil(precache().catch(() => {}));
+});
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
@@ -20,21 +46,7 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/.well-known/")) return;
 
-  // Berkas ber-hash (tidak pernah berubah): ambil dari cache dulu
-  if (url.pathname.startsWith("/assets/") || url.pathname.startsWith("/icons/")) {
-    event.respondWith(
-      caches.open(CACHE).then(async (cache) => {
-        const hit = await cache.match(req);
-        if (hit) return hit;
-        const res = await fetch(req);
-        if (res.ok) cache.put(req, res.clone());
-        return res;
-      }),
-    );
-    return;
-  }
-
-  // Halaman: selalu coba versi terbaru, pakai cache hanya bila offline
+  // Halaman: coba versi terbaru dulu, pakai salinan tersimpan bila offline
   if (req.mode === "navigate") {
     event.respondWith(
       fetch(req)
@@ -42,7 +54,19 @@ self.addEventListener("fetch", (event) => {
           if (res.ok) caches.open(CACHE).then((cache) => cache.put("/", res.clone()));
           return res.clone();
         })
-        .catch(() => caches.match("/").then((hit) => hit || Response.error())),
+        .catch(() => caches.match("/", { cacheName: CACHE }).then((hit) => hit || Response.error())),
     );
+    return;
   }
+
+  // Berkas lain: salinan tersimpan dulu (cepat & offline), kalau belum ada ambil lalu simpan
+  event.respondWith(
+    caches.open(CACHE).then(async (cache) => {
+      const hit = await cache.match(req, { ignoreSearch: false });
+      if (hit) return hit;
+      const res = await fetch(req);
+      if (res.ok && res.status === 200) cache.put(req, res.clone());
+      return res;
+    }),
+  );
 });

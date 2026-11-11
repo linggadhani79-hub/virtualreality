@@ -22,6 +22,23 @@ Media ajar kendaraan listrik (EV) berbasis **WebXR**. Satu kode sumber, bisa dij
 - **Ringan**: panel admin dimuat terpisah, pencahayaan dibuat lokal (tanpa unduh HDR dari luar),
   berkas aplikasi di-cache (PWA) agar kunjungan berikutnya cepat.
 
+## Mode offline
+
+Semua berkas aplikasi — kode, ikon, lingkungan Ruang Uji, dan model mobil — ikut di dalam aplikasi
+dan disimpan di perangkat saat aplikasi **pertama kali dibuka** (perlu internet sekali, ±16 MB).
+Setelah itu aplikasi bisa dibuka dan dipakai **tanpa internet**, termasuk dari APK di Quest.
+
+Yang tetap butuh internet: map dan aset yang diunggah admin ke cloud (Firebase) pada kunjungan
+pertama, login Google, dan kuis Google Form. Bila cloud tidak terjangkau, aplikasi menunggu paling
+lama 4 detik lalu memakai data yang sudah tersimpan di perangkat.
+
+## Mode uji coba tanpa login
+
+Di [`src/lib/appConfig.ts`](src/lib/appConfig.ts), `TRIAL_NO_AUTH = true` membuat **Mode Admin** dan
+**Mode Mahasiswa** langsung terbuka tanpa kode akses atau login Google. Ubah menjadi `false` untuk
+mengembalikan kode akses mahasiswa dan login admin sebelum aplikasi dipakai umum. Penyimpanan ke
+cloud tetap mengikuti aturan keamanan Firebase.
+
 ## 1. Menjalankan di komputer / Google AI Studio
 
 ```bash

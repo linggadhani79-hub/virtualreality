@@ -1,5 +1,6 @@
 import { db, storage, auth } from "./firebase";
 import { doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
+import { CLOUD_TIMEOUT_MS } from "./appConfig";
 import {
   ref,
   uploadBytes,
@@ -319,10 +320,23 @@ export function subscribeToWorkspaceData(callback: (data: any) => void): () => v
   };
 }
 
+// Saat offline / koneksi lambat jangan menunggu cloud tanpa batas: lempar galat supaya
+// pemanggil memakai salinan yang tersimpan di perangkat.
+function cloudRead<T>(p: Promise<T>): Promise<T> {
+  p.catch(() => {}); // galat yang datang setelah kita berhenti menunggu tidak perlu dilaporkan
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return Promise.reject(new Error("offline"));
+  }
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("cloud timeout")), CLOUD_TIMEOUT_MS)),
+  ]);
+}
+
 export async function getWorkspaceData(): Promise<any> {
   if (!isFirestoreQuotaExceeded) {
     try {
-      const d = await getDoc(doc(db, "workspaces", "global"));
+      const d = await cloudRead(getDoc(doc(db, "workspaces", "global")));
       if (d.exists()) {
         const data = d.data().items;
         idbSet("workspace_local", data).catch(() => {});
@@ -372,7 +386,7 @@ export async function saveAssetLibraryData(data: any) {
 export async function getAssetLibraryData(): Promise<any> {
   if (!isFirestoreQuotaExceeded) {
     try {
-      const d = await getDoc(doc(db, "workspaces", "library"));
+      const d = await cloudRead(getDoc(doc(db, "workspaces", "library")));
       if (d.exists()) {
         const data = d.data().items;
         idbSet("workspace_library_local", data).catch(() => {});

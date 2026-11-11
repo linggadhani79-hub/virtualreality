@@ -17,9 +17,12 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-// PWA: cache berkas aplikasi (hanya di build produksi dan bukan di dalam iframe pratinjau AI Studio)
+// PWA: simpan semua berkas aplikasi untuk pemakaian offline (hanya di build produksi dan bukan di
+// dalam iframe pratinjau AI Studio)
 if (import.meta.env.PROD && "serviceWorker" in navigator && window.self === window.top) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
+    // Minta browser tidak menghapus simpanan offline saat ruang penyimpanan menipis
+    navigator.storage?.persist?.().catch(() => {});
   });
 }

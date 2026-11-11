@@ -7,10 +7,10 @@ import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.j
 /**
  * Stasiun contoh mobil listrik (BEV).
  *
- * - Model mobil: public/models/contoh-mobil-listrik.glb, disiapkan dengan
- *   scripts/build-car-model.mjs dari model asli 29 MB: mesh disederhanakan (±165 rb segitiga),
- *   bodi dihaluskan, tekstur cat dibersihkan, 4 roda dipisah agar bisa berputar,
- *   lalu dikompres (WebP 2K + Meshopt) menjadi ±1,9 MB tanpa decoder dari CDN.
+ * - Model mobil: public/models/contoh-mobil-listrik.glb — model asli dengan kualitas penuh
+ *   (±754 rb segitiga, tekstur 2K asli tidak diubah). Hanya 4 roda dipisah menjadi node sendiri
+ *   agar bisa berputar, lalu dikompres Meshopt (28 MB → ±13 MB). Lihat scripts/build-car-model.mjs.
+ *   Berkasnya ikut di dalam aplikasi dan disimpan service worker, jadi tersedia offline.
  * - Mode "Komponen": bodi menjadi tembus pandang dan komponen EV di dalamnya bisa dipilih.
  * - Tombol 3D interaktif (mouse, laser controller Quest, atau tatapan di VR HP):
  *   Komponen · Jalankan · Putar · Reset.
