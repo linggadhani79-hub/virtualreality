@@ -7,7 +7,12 @@ async function precache() {
   const cache = await caches.open(CACHE);
   const res = await fetch("/precache-manifest.json", { cache: "no-store" });
   if (!res.ok) return;
-  const { files } = await res.json();
+  let { files } = await res.json();
+  // Model 3D punya dua tingkat kualitas; simpan hanya yang dipakai perangkat ini
+  // (Quest / HP: "-lite", PC: "-hq"). Tingkat lain tetap diambil saat diminta.
+  const lite = /OculusBrowser|Quest|Pico|Android|iPhone|iPad|iPod/i.test(self.navigator.userAgent);
+  const skip = lite ? /-hq\.glb$/ : /-lite\.glb$/;
+  files = files.filter((f) => !skip.test(f));
   // Satu per satu supaya satu berkas gagal tidak membatalkan semuanya
   let done = 0;
   for (const url of files) {

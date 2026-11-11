@@ -29,6 +29,9 @@ import { WebXRControllerManager } from "./components/WebXRControllerManager";
 import { EVEntranceScreen } from "./components/EVEntranceScreen";
 import { GuardianBoundary } from "./components/GuardianBoundary";
 import { TRIAL_NO_AUTH, LOCAL_ONLY } from "./lib/appConfig";
+import { clampToWorld } from "./lib/worldBounds";
+import { qualityTier, setQualityTier } from "./lib/quality";
+import { ModuleEditor } from "./components/ModuleEditor";
 import { SampleEVCar } from "./components/SampleEVCar";
 import { TestLabEnvironment } from "./components/TestLabEnvironment";
 import { PhoneVRRenderer, PhoneVROverlay } from "./components/PhoneVR";
@@ -559,6 +562,9 @@ function Player({
       }
     }
 
+    // Dinding lingkungan lab menahan pemain (mode pengembang bebas)
+    if (viewMode !== "dev" && playerRef.current) clampToWorld(playerRef.current.position);
+
     if (isPresenting && playerRef.current) {
       // Di VR, rig pemain harus terlihat: di dalamnya ada tangan/controller, penanda batas ruang
       // dan penanda kaki (mode FPV 2D menyembunyikan rig ini).
@@ -624,6 +630,7 @@ function AdaptiveUI({
   onStartPhoneVR,
   sampleCarVisible,
   onToggleSampleCar,
+  onOpenModuleEditor,
 }: {
   viewMode: "tpp" | "fpp" | "dev";
   setViewMode: (mode: "tpp" | "fpp" | "dev") => void;
@@ -636,6 +643,7 @@ function AdaptiveUI({
   onStartPhoneVR: () => Promise<{ ok: boolean; reason?: string }>;
   sampleCarVisible: boolean;
   onToggleSampleCar: () => void;
+  onOpenModuleEditor: () => void;
 }) {
   const [xrError, setXrError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -728,7 +736,7 @@ function AdaptiveUI({
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
             <span>Keluar Map</span>
           </button>
-          {(isAdmin || !LOCAL_ONLY) && (
+          {!LOCAL_ONLY && (
 <button
             id="btn-nav-backup-download"
             onClick={onOpenBackupModal}
@@ -811,7 +819,7 @@ function AdaptiveUI({
                 </span>
               </button>
 
-              {(isAdmin || !LOCAL_ONLY) && (
+              {!LOCAL_ONLY && (
 <button
                 id="btn-dock-backup-download"
                 className="w-full flex items-center justify-between bg-gradient-to-r from-purple-950/80 to-cyan-950/80 hover:from-purple-900 hover:to-cyan-900 active:scale-95 text-xs font-bold py-2.5 px-3 rounded-xl transition-all border border-cyan-500/40 text-left text-white shadow-lg shadow-cyan-950/50 cursor-pointer group"
@@ -849,6 +857,37 @@ function AdaptiveUI({
                 </span>
               </button>
 
+              {isAdmin && (
+                <button
+                  id="btn-open-module-editor"
+                  className="w-full flex items-center justify-between bg-cyan-950/80 hover:bg-cyan-900 active:scale-95 text-xs font-bold py-2.5 px-3 rounded-xl transition-all border border-cyan-500/40 text-left text-white shadow-lg cursor-pointer"
+                  onClick={onOpenModuleEditor}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-base">📖</span>
+                    <span>Modul Ajar Digital</span>
+                  </div>
+                  <span className="text-[10px] bg-cyan-500/30 text-cyan-100 px-2 py-0.5 rounded font-mono font-bold border border-cyan-400/30">
+                    ISI
+                  </span>
+                </button>
+              )}
+
+              <button
+                id="btn-toggle-quality"
+                className="w-full flex items-center justify-between bg-neutral-800/80 hover:bg-neutral-700 active:scale-95 text-xs font-bold py-2.5 px-3 rounded-xl transition-all border border-white/10 text-left text-white cursor-pointer"
+                title="Tinggi: detail penuh. Ringan: lebih mulus di Quest / HP. Aplikasi dimuat ulang saat diganti."
+                onClick={() => setQualityTier(qualityTier === "hq" ? "lite" : "hq")}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="text-base">✨</span>
+                  <span>Kualitas Aset</span>
+                </div>
+                <span className="text-[10px] bg-white/15 text-white px-2 py-0.5 rounded font-mono font-bold">
+                  {qualityTier === "hq" ? "TINGGI" : "RINGAN"}
+                </span>
+              </button>
+
               <button
                 id="btn-toggle-sample-car"
                 className="w-full flex items-center justify-between bg-emerald-950/80 hover:bg-emerald-900 active:scale-95 text-xs font-bold py-2.5 px-3 rounded-xl transition-all border border-emerald-500/40 text-left text-white shadow-lg cursor-pointer"
@@ -876,7 +915,7 @@ function AdaptiveUI({
                 </span>
               </button>
 
-              {isAdmin && (
+              {isAdmin && !LOCAL_ONLY && (
                 <button
                   className={`w-full flex items-center justify-between ${isSaving ? 'bg-emerald-800 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 active:scale-95'} text-xs font-extrabold py-2.5 px-3 rounded-xl text-white transition-all shadow-md text-left mt-2`}
                   onClick={async () => {
@@ -1102,6 +1141,7 @@ export default function App() {
   const [uploadedModels, setUploadedModels] = useState<UploadedModelData[]>([]);
   // Contoh mobil listrik bawaan: otomatis tampil bila map masih kosong, bisa diatur manual lewat tombol
   const [sampleCarPref, setSampleCarPref] = useState<boolean | null>(null);
+  const [showModuleEditor, setShowModuleEditor] = useState(false);
   const sampleCarVisible = sampleCarPref ?? uploadedModels.length === 0;
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [threeScene, setThreeScene] = useState<THREE.Scene | null>(null);
@@ -2222,9 +2262,11 @@ export default function App() {
 
           {phoneVRActive && !isVRActive && <PhoneVROverlay onExit={handleExitPhoneVR} />}
 
+          {showModuleEditor && !isVRActive && <ModuleEditor onClose={() => setShowModuleEditor(false)} />}
+
           {!isVRActive && !phoneVRActive && (
             <>
-              {activeIsAdmin && (
+              {activeIsAdmin && !LOCAL_ONLY && (
                 <Suspense fallback={null}>
                 <ModelUploader
                   uploadedModels={uploadedModels}
@@ -2256,6 +2298,7 @@ export default function App() {
                 onStartPhoneVR={handleStartPhoneVR}
                 sampleCarVisible={sampleCarVisible}
                 onToggleSampleCar={() => setSampleCarPref(!sampleCarVisible)}
+                onOpenModuleEditor={() => setShowModuleEditor(true)}
               />
             </>
           )}

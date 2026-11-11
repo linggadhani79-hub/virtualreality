@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
+import { loadGlb, fitModel, wrapText, roundedRectShape } from "../lib/glb";
+import { modelUrl } from "../lib/quality";
 
 /**
  * Stasiun contoh mobil listrik (BEV).
@@ -16,8 +16,8 @@ import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.j
  *   Komponen · Jalankan · Putar · Reset.
  */
 
-const MODEL_URL = "/models/contoh-mobil-listrik.glb";
 const CAR_LENGTH = 4.5; // meter
+const CHASSIS_LENGTH = 4.3; // sasis sedikit lebih pendek dari bodi
 const DRIVE_RANGE = 3.2; // jarak maju-mundur dari titik tengah
 
 type PartDef = {
@@ -115,22 +115,6 @@ const WHEELS: [number, number, number][] = [
   [-0.82, 0.33, 1.4],
 ];
 
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-  const words = text.split(" ");
-  const lines: string[] = [];
-  let line = "";
-  for (const w of words) {
-    const test = line ? line + " " + w : w;
-    if (ctx.measureText(test).width > maxWidth && line) {
-      lines.push(line);
-      line = w;
-    } else {
-      line = test;
-    }
-  }
-  if (line) lines.push(line);
-  return lines;
-}
 
 function drawPanel(canvas: HTMLCanvasElement, part: PartDef | null) {
   const ctx = canvas.getContext("2d")!;
@@ -248,21 +232,6 @@ function makeLabelTexture(label: string, icon: IconName) {
   return t;
 }
 
-function roundedRectShape(w: number, h: number, r: number) {
-  const s = new THREE.Shape();
-  const x = -w / 2;
-  const y = -h / 2;
-  s.moveTo(x + r, y);
-  s.lineTo(x + w - r, y);
-  s.quadraticCurveTo(x + w, y, x + w, y + r);
-  s.lineTo(x + w, y + h - r);
-  s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  s.lineTo(x + r, y + h);
-  s.quadraticCurveTo(x, y + h, x, y + h - r);
-  s.lineTo(x, y + r);
-  s.quadraticCurveTo(x, y, x + r, y);
-  return s;
-}
 
 const BTN_W = 0.42;
 const BTN_H = 0.3;
@@ -426,80 +395,90 @@ export function SampleEVCar({
   const carRef = useRef<THREE.Group>(null);
   const wheelRefs = useRef<THREE.Mesh[]>([]);
   const modelWheels = useRef<{ node: THREE.Object3D; radius: number }[]>([]);
+  const bodyMaterials = useRef<THREE.MeshStandardMaterial[]>([]);
+  const [chassis, setChassis] = useState<THREE.Object3D | null>(null);
   const driveT = useRef(0);
   const lastX = useRef(0);
 
   // ---- Muat model mobil (gagal muat tidak merusak aplikasi: rangka komponen tetap tampil) ----
   useEffect(() => {
     let cancelled = false;
-    const loader = new GLTFLoader();
-    loader.setMeshoptDecoder(MeshoptDecoder);
-    loader.load(
-      MODEL_URL,
-      (gltf) => {
+    loadGlb(modelUrl("mobil"))
+      .then((root) => {
         if (cancelled) return;
-        const root = gltf.scene;
-        const box = new THREE.Box3().setFromObject(root);
-        const size = box.getSize(new THREE.Vector3());
-        const center = box.getCenter(new THREE.Vector3());
-        const scale = CAR_LENGTH / Math.max(size.x, size.z);
-        root.scale.setScalar(scale);
-        // Tengahkan dan letakkan roda tepat di lantai
-        root.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
+        const scale = fitModel(root, CAR_LENGTH);
+        const wheels: { node: THREE.Object3D; radius: number }[] = [];
+        let wheelMat: THREE.MeshStandardMaterial | null = null;
+        const bodyMats = new Set<THREE.MeshStandardMaterial>();
         root.traverse((o) => {
+          // Roda adalah node "wheel_*" (dipisah saat model disiapkan) supaya bisa berputar
+          // (pemuat glTF bisa menjadikan node roda langsung sebagai Mesh, jadi cukup cek namanya
+          // dan pastikan bukan anak dari node roda lain)
+          if (o.name.startsWith("wheel_") && !o.parent?.name.startsWith("wheel_")) {
+            wheels.push({ node: o, radius: ((o.userData.radius as number) || 0.147) * scale });
+          }
           const m = o as THREE.Mesh;
           if (!m.isMesh) return;
           m.raycast = noRaycast; // mesh padat: pemilihan memakai kotak proxy agar laser tetap ringan
-          m.frustumCulled = true;
           const mat = m.material as THREE.MeshStandardMaterial;
           if (mat.map) mat.map.anisotropy = 8;
-        });
-        // Roda dipisah sebagai node "wheel_*" saat model disiapkan, supaya bisa berputar
-        const wheels: { node: THREE.Object3D; radius: number }[] = [];
-        root.traverse((o) => {
-          if (o.name.startsWith("wheel_")) {
-            wheels.push({ node: o, radius: ((o.userData.radius as number) || 0.145) * scale });
+          const isWheel = o.name.startsWith("wheel_") || !!o.parent?.name.startsWith("wheel_");
+          if (isWheel) {
+            // Bahan roda sendiri & dua sisi: sisi dalam pelek tidak tampak bolong saat berputar,
+            // dan roda tetap utuh ketika bodi dibuat tembus pandang.
+            if (!wheelMat) {
+              wheelMat = mat.clone();
+              wheelMat.side = THREE.DoubleSide;
+            }
+            m.material = wheelMat;
+          } else {
+            bodyMats.add(mat);
           }
         });
         modelWheels.current = wheels;
+        bodyMaterials.current = [...bodyMats];
         setModel(root);
-      },
-      undefined,
-      (err) => console.warn("[SampleEVCar] Model contoh gagal dimuat:", err),
-    );
+      })
+      .catch((err) => console.warn("[SampleEVCar] Model mobil gagal dimuat:", err));
     return () => {
       cancelled = true;
     };
   }, []);
 
-  useEffect(
-    () => () => {
-      model?.traverse((o) => {
-        const m = o as THREE.Mesh;
-        if (!m.isMesh) return;
-        m.geometry.dispose();
-        const mat = m.material as THREE.MeshStandardMaterial;
-        mat.map?.dispose();
-        mat.normalMap?.dispose();
-        mat.metalnessMap?.dispose();
-        mat.dispose();
-      });
-    },
-    [model],
-  );
+  // ---- Sasis asli untuk mode Komponen (dimuat setelah mobil tampil, supaya pembukaan tetap cepat) ----
+  useEffect(() => {
+    if (!model) return;
+    let cancelled = false;
+    loadGlb(modelUrl("sasis"))
+      .then((root) => {
+        if (cancelled) return;
+        fitModel(root, CHASSIS_LENGTH);
+        root.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (!m.isMesh) return;
+          m.raycast = noRaycast;
+          const mat = m.material as THREE.MeshStandardMaterial;
+          if (mat.map) mat.map.anisotropy = 8;
+        });
+        setChassis(root);
+      })
+      .catch((err) => console.warn("[SampleEVCar] Model sasis gagal dimuat:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [model]);
 
   // ---- Bodi tembus pandang saat mode Komponen ----
   useEffect(() => {
-    model?.traverse((o) => {
-      const m = o as THREE.Mesh;
-      if (!m.isMesh) return;
-      const mat = m.material as THREE.MeshStandardMaterial;
+    for (const mat of bodyMaterials.current) {
       mat.transparent = xray;
-      mat.opacity = xray ? 0.16 : 1;
+      mat.opacity = xray ? 0.14 : 1;
       mat.depthWrite = !xray;
       mat.needsUpdate = true;
-    });
-  }, [model, xray]);
+    }
+    // Sasis punya rodanya sendiri: sembunyikan roda bodi supaya tidak bertumpuk
+    for (const w of modelWheels.current) w.node.visible = !(xray && chassis);
+  }, [model, chassis, xray]);
 
   // ---- Papan informasi ----
   const { canvas, texture } = useMemo(() => {
@@ -607,13 +586,18 @@ export function SampleEVCar({
         )}
 
         {/* Rangka & komponen: tampil saat mode Komponen, atau bila model belum/ gagal dimuat */}
+        {/* Sasis asli (model) di dalam bodi tembus pandang */}
+        {xray && chassis && <primitive object={chassis} />}
+
         {(xray || !model) && (
           <group rotation={[0, Math.PI / 2, 0]} scale={1.08}>
+            {!chassis && (
             <mesh position={[0, 0.2, 0]} raycast={noRaycast}>
               <boxGeometry args={[1.5, 0.05, 3.6]} />
               <meshStandardMaterial color="#334155" roughness={0.6} metalness={0.5} />
             </mesh>
-            {WHEELS.map((p, i) => (
+            )}
+            {!chassis && WHEELS.map((p, i) => (
               <mesh
                 key={i}
                 ref={(m) => {
@@ -639,8 +623,9 @@ export function SampleEVCar({
                   key={part.id}
                   name={`SampleEV_${part.id}`}
                   position={part.position}
-                  rotation={part.shape === "cylinderX" ? [0, 0, Math.PI / 2] : [0, 0, 0]}
-                  scale={active ? 1.06 : 1}
+                  rotation={!chassis && part.shape === "cylinderX" ? [0, 0, Math.PI / 2] : [0, 0, 0]}
+                  scale={active ? (chassis ? 1.5 : 1.06) : 1}
+                  renderOrder={chassis ? 20 : 0}
                   userData={{ isInteractableMesh: true, onClick: pick, partName: part.name }}
                   onClick={pick}
                   onPointerOver={(e) => {
@@ -649,7 +634,10 @@ export function SampleEVCar({
                   }}
                   onPointerOut={() => setHovered((h) => (h === part.id ? null : h))}
                 >
-                  {part.shape === "cylinderX" ? (
+                  {chassis ? (
+                    // Di atas sasis asli komponen ditandai titik sorot berwarna yang bisa dipilih
+                    <sphereGeometry args={[0.085, 20, 14]} />
+                  ) : part.shape === "cylinderX" ? (
                     <cylinderGeometry args={[part.size[0] / 2, part.size[1] / 2, part.size[2], 20]} />
                   ) : (
                     <boxGeometry args={part.size} />
@@ -657,9 +645,12 @@ export function SampleEVCar({
                   <meshStandardMaterial
                     color={part.color}
                     emissive={part.color}
-                    emissiveIntensity={active ? 0.9 : hot ? 0.45 : 0.15}
+                    emissiveIntensity={chassis ? (active ? 1.6 : hot ? 1.1 : 0.7) : active ? 0.9 : hot ? 0.45 : 0.15}
                     roughness={0.45}
                     metalness={0.25}
+                    depthTest={!chassis}
+                    transparent={!!chassis}
+                    opacity={chassis ? 0.95 : 1}
                   />
                 </mesh>
               );

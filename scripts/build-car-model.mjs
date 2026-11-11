@@ -1,15 +1,16 @@
-// Cara pakai (sekali saja, di luar build aplikasi):
+// Menyiapkan model mobil untuk lab. Jalankan di luar build aplikasi:
 //   npm i --no-save meshoptimizer sharp
 //
-// Kualitas penuh (yang dipakai sekarang: mesh & tekstur asli, hanya roda dipisah + kompresi):
-//   node scripts/build-car-model.mjs <model-asli.glb> public/models/contoh-mobil-listrik.glb 1 0 0 -1
-// Versi ringan dengan bodi dihaluskan & tekstur cat dibersihkan:
-//   node scripts/build-car-model.mjs <model-asli.glb> public/models/contoh-mobil-listrik.glb 0.5 2048 57 0.71 0.0001
+// Tingkat tinggi (mesh & tekstur asli, hanya roda dipisah + kompresi):
+//   node scripts/build-car-model.mjs <asli.glb> public/models/mobil-hq.glb 1 0 0 -1
+// Tingkat ringan untuk Quest / HP:
+//   node scripts/build-car-model.mjs <asli.glb> public/models/mobil-lite.glb 0.3 1024 0 -1 0.0003
 //
 // Argumen: rasio penyederhanaan (1 = tidak disederhanakan), ukuran tekstur (0 = tekstur asli),
 // iterasi penghalusan bodi (0 = tidak dihaluskan), tinggi garis kaca 0-1 (-1 = tekstur tidak diubah),
 // batas galat penyederhanaan.
-// Mengasumsikan mobil memanjang di sumbu X, tinggi di sumbu Y, dan satu mesh bertekstur.
+// Roda dikenali sebagai komponen mesh terpisah (bukan dipotong), jadi tidak bolong saat berputar.
+// Mengasumsikan mobil memanjang di sumbu X dan tinggi di sumbu Y.
 // Menyiapkan model mobil untuk lab:
 //  1. sederhanakan mesh, 2. pisahkan 4 roda jadi node sendiri (agar bisa berputar),
 //  3. haluskan bodi (Taubin) + normal halus, 4. kompres tekstur (WebP) & mesh (Meshopt).
@@ -51,21 +52,36 @@ let ymin = Infinity, zmax = 0;
 for (let i = 0; i < n; i++) { ymin = Math.min(ymin, pos[i*3+1]); zmax = Math.max(zmax, Math.abs(pos[i*3+2])); }
 const pct = (arr, p) => { const s = Float32Array.from(arr).sort(); return s[Math.min(s.length - 1, Math.floor(p * s.length))]; };
 
-// ---- cari pusat & jari-jari roda ----
+// ---- pisahkan roda berdasarkan bagian mesh yang terhubung (bukan dipotong) ----
+// Roda pada model ini adalah komponen mesh tersendiri; mengambilnya utuh menghindari roda
+// bolong / sisi dalam rusak yang terjadi bila dipotong dengan bentuk silinder.
 const wheels = [];
-for (const sx of [-1, 1]) {
-  const xs = []; for (let i = 0; i < n; i++) if (pos[i*3+1] < ymin + 0.02 && Math.sign(pos[i*3]) === sx) xs.push(pos[i*3]);
-  const cx = (pct(xs, 0.03) + pct(xs, 0.97)) / 2;
-  const tops = []; for (let i = 0; i < n; i++) if (Math.abs(pos[i*3] - cx) < 0.06 && Math.abs(pos[i*3+2]) > 0.7 * zmax && lum[i] < 0.3 && pos[i*3+1] < ymin + 0.45) tops.push(pos[i*3+1]);
-  const r = (pct(tops, 0.98) - ymin) / 2;
-  for (const sz of [-1, 1]) wheels.push({ cx, cy: ymin + r, r, sz, name: `wheel_${sx < 0 ? 'A' : 'B'}${sz < 0 ? 'L' : 'R'}` });
-  console.log('axle x', cx.toFixed(3), 'radius', r.toFixed(3));
-}
-
-// ---- klasifikasi segitiga: -1 bodi, 0..3 roda ----
-const inWheel = (i, w, k = 1.035) => Math.sign(pos[i*3+2]) === w.sz && Math.abs(pos[i*3+2]) > 0.45 * zmax && Math.hypot(pos[i*3] - w.cx, pos[i*3+1] - w.cy) < w.r * k;
 const triOwner = new Int8Array(idx.length / 3).fill(-1);
-for (let t = 0; t < idx.length; t += 3) for (let w = 0; w < 4; w++) if (inWheel(idx[t], wheels[w]) && inWheel(idx[t+1], wheels[w]) && inWheel(idx[t+2], wheels[w])) { triOwner[t/3] = w; break; }
+const vertInWheel = new Uint8Array(n);
+{
+  const map = new Map(); const cid = new Uint32Array(n); let nc = 0;
+  for (let i = 0; i < n; i++) { const k = `${Math.round(pos[i*3]*1e5)},${Math.round(pos[i*3+1]*1e5)},${Math.round(pos[i*3+2]*1e5)}`; let c = map.get(k); if (c === undefined) { c = nc++; map.set(k, c); } cid[i] = c; }
+  const par = new Uint32Array(nc).map((_, i) => i);
+  const find = (x) => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+  for (let t = 0; t < idx.length; t += 3) { const a = find(cid[idx[t]]), b = find(cid[idx[t+1]]); if (a !== b) par[a] = b; const b2 = find(b), c = find(cid[idx[t+2]]); if (b2 !== c) par[c] = b2; }
+  const comps = new Map();
+  for (let t = 0; t < idx.length; t += 3) { const r = find(cid[idx[t]]); let c = comps.get(r); if (!c) { c = { tris: 0, min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] }; comps.set(r, c); }
+    c.tris++; for (let k = 0; k < 3; k++) { const v = idx[t+k]; for (let d = 0; d < 3; d++) { c.min[d] = Math.min(c.min[d], pos[v*3+d]); c.max[d] = Math.max(c.max[d], pos[v*3+d]); } } }
+  const H = (() => { let mx = -Infinity; for (let i = 0; i < n; i++) mx = Math.max(mx, pos[i*3+1]); return mx - ymin; })();
+  const wheelOf = new Map();
+  for (const [root, c] of comps) {
+    const dx = c.max[0] - c.min[0], dy = c.max[1] - c.min[1], dz = c.max[2] - c.min[2];
+    // roda: menyentuh lantai, penampang samping hampir bulat, tipis ke arah lebar mobil
+    const isWheel = c.min[1] < ymin + 0.03 * H && Math.abs(dx - dy) < 0.15 * dy && dz < 0.7 * dy && dy < 0.7 * H && c.tris > 200;
+    if (!isWheel) continue;
+    const cx = (c.min[0] + c.max[0]) / 2, cy = (c.min[1] + c.max[1]) / 2, cz = (c.min[2] + c.max[2]) / 2;
+    wheelOf.set(root, wheels.length);
+    wheels.push({ cx, cy, r: dy / 2, name: `wheel_${cx < 0 ? 'A' : 'B'}${cz < 0 ? 'L' : 'R'}` });
+    console.log('wheel', wheels[wheels.length - 1].name, 'center', cx.toFixed(3), cy.toFixed(3), 'radius', (dy / 2).toFixed(3), 'tris', c.tris);
+  }
+  for (let t = 0; t < idx.length; t += 3) { const w = wheelOf.get(find(cid[idx[t]])); if (w !== undefined) { triOwner[t/3] = w; vertInWheel[idx[t]] = vertInWheel[idx[t+1]] = vertInWheel[idx[t+2]] = 1; } }
+}
+if (wheels.length !== 4) console.warn('PERINGATAN: ditemukan', wheels.length, 'roda (harapan 4)');
 
 const buffer = root.listBuffers()[0];
 const makePrim = (owner, center) => {
@@ -87,7 +103,7 @@ if (ITER > 0) {
   const map = new Map(); const cid = new Uint32Array(n); let nc = 0;
   for (let i = 0; i < n; i++) { const k = `${Math.round(pos[i*3]*1e5)},${Math.round(pos[i*3+1]*1e5)},${Math.round(pos[i*3+2]*1e5)}`; let c = map.get(k); if (c === undefined) { c = nc++; map.set(k, c); } cid[i] = c; }
   const P = new Float64Array(nc * 3), W = new Float32Array(nc).fill(1);
-  for (let i = 0; i < n; i++) { const c = cid[i]; P[c*3] = pos[i*3]; P[c*3+1] = pos[i*3+1]; P[c*3+2] = pos[i*3+2]; if (wheels.some(w => inWheel(i, w, 1.12))) W[c] = 0; }
+  for (let i = 0; i < n; i++) { const c = cid[i]; P[c*3] = pos[i*3]; P[c*3+1] = pos[i*3+1]; P[c*3+2] = pos[i*3+2]; if (vertInWheel[i]) W[c] = 0; }
   const nb = Array.from({ length: nc }, () => new Set());
   for (let t = 0; t < idx.length; t += 3) { const a = cid[idx[t]], b = cid[idx[t+1]], c = cid[idx[t+2]];
     if (a !== b) { nb[a].add(b); nb[b].add(a); } if (b !== c) { nb[b].add(c); nb[c].add(b); } if (a !== c) { nb[a].add(c); nb[c].add(a); } }

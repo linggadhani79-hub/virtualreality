@@ -22,6 +22,20 @@ Media ajar kendaraan listrik (EV) berbasis **WebXR**. Satu kode sumber, bisa dij
 - **Ringan**: panel admin dimuat terpisah, pencahayaan dibuat lokal (tanpa unduh HDR dari luar),
   berkas aplikasi di-cache (PWA) agar kunjungan berikutnya cepat.
 
+## Isi lab
+
+- **Mobil listrik** di lintasan uji dengan panel tombol 3D: Komponen (bodi tembus pandang, sasis asli
+  dengan titik sorot komponen yang bisa dipilih), Jalankan (roda ikut berputar), Putar, Reset.
+- **Etalase komponen**: paket baterai traksi dan unit penggerak listrik di atas meja putar, masing-masing
+  dengan papan keterangan.
+- **Tanya jawab**: kios kuis 10 soal pilihan ganda dengan penjelasan dan skor (tanpa internet).
+- **Pojok baca**: buku-buku modul ajar di meja; memilih buku membukanya sebagai slideshow di layar besar.
+- **Modul Ajar Digital (admin)**: tombol di panel kanan untuk menulis modul dan slide. Tersimpan di
+  perangkat; agar berlaku di semua perangkat, tekan *Salin JSON* dan simpan sebagai
+  `public/lab/modul.json`, lalu build ulang.
+- **Kualitas Aset**: *Tinggi* (bawaan di PC) atau *Ringan* (bawaan di Quest/HP agar mulus). Bisa
+  diganti lewat tombol di panel kanan.
+
 ## Mode lokal — tanpa database, bisa offline
 
 Secara bawaan aplikasi berjalan **tanpa database dan tanpa server** (seperti game VR offline):
@@ -31,7 +45,8 @@ Secara bawaan aplikasi berjalan **tanpa database dan tanpa server** (seperti gam
 - Semua berkas aplikasi — kode, lingkungan Ruang Uji, model mobil — ikut di dalam aplikasi dan
   disimpan di perangkat saat **pertama kali dibuka** (perlu internet sekali, ±16 MB). Setelah itu
   aplikasi bisa dipakai tanpa internet, termasuk dari APK di Quest.
-- Map yang disusun di Mode Admin dan aset yang diunggah tersimpan **di perangkat itu saja**.
+- Tidak ada fitur unggah/unduh aset di aplikasi; aset baru ditanam lewat `public/models` (lihat
+  `.claude/skills/ev-lab/SKILL.md`).
 - Agar map/aset tersedia di **semua** perangkat, masukkan ke aplikasi lewat folder
   [`public/lab/`](public/lab/README.txt) (`workspaces_global.json`, `workspaces_library.json`,
   `assets/<bufferId>`), lalu build ulang.
