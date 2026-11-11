@@ -28,6 +28,7 @@ import { VROptimizer } from "./components/VROptimizer";
 import { WebXRControllerManager } from "./components/WebXRControllerManager";
 import { EVEntranceScreen } from "./components/EVEntranceScreen";
 import { GuardianBoundary } from "./components/GuardianBoundary";
+import { TRIAL_NO_AUTH } from "./lib/appConfig";
 import { SampleEVCar } from "./components/SampleEVCar";
 import { TestLabEnvironment } from "./components/TestLabEnvironment";
 import { PhoneVRRenderer, PhoneVROverlay } from "./components/PhoneVR";
@@ -1114,7 +1115,9 @@ export default function App() {
     (UploadedModelData & { bufferId?: string })[]
   >([]);
   const [user, setUser] = useState<any>(null);
-  const isAdmin = user?.email === "ranggadino1@gmail.com";
+  // Admin cloud yang sebenarnya (login Google) — dipakai untuk sinkronisasi ke Firebase
+  const isCloudAdmin = user?.email === "ranggadino1@gmail.com";
+  const isAdmin = TRIAL_NO_AUTH || isCloudAdmin;
   const [authLoaded, setAuthLoaded] = useState(false);
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
   const [focusedQuizUrl, setFocusedQuizUrl] = useState<string | null>(null);
@@ -1136,7 +1139,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (isAdmin && workspaceLoaded) {
+    if (isCloudAdmin && workspaceLoaded) {
       const runSync = async () => {
         try {
           const {
@@ -1203,7 +1206,7 @@ export default function App() {
       };
       runSync();
     }
-  }, [isAdmin, workspaceLoaded]);
+  }, [isCloudAdmin, workspaceLoaded]);
 
   const [appState, setAppState] = useState<"select_mode" | "scanning" | "downloading" | "ready" | "playing">("select_mode");
   const [activeMode, setActiveMode] = useState<"admin" | "guest" | null>(null);
@@ -1219,6 +1222,11 @@ export default function App() {
   const activeIsAdmin = isAdmin && activeMode === "admin";
 
   const handleOpenStudentCodeModal = () => {
+    if (TRIAL_NO_AUTH) {
+      // Mode uji coba: mahasiswa langsung masuk tanpa kode akses
+      handleSelectGuest();
+      return;
+    }
     setShowStudentCodeModal(true);
     setStudentAccessCode("");
     setStudentCodeError("");
@@ -1270,15 +1278,18 @@ export default function App() {
   }, [intendedAdmin, isAdmin, user, appState]);
 
   const handleSelectGuest = async () => {
-    try {
-      const { auth } = await import("./lib/firebase");
-      const { signInAnonymously } = await import("firebase/auth");
-      if (!auth.currentUser) {
-        await signInAnonymously(auth);
+    // Login anonim dijalankan di latar belakang: saat offline tidak boleh menahan masuk ke lab
+    (async () => {
+      try {
+        const { auth } = await import("./lib/firebase");
+        const { signInAnonymously } = await import("firebase/auth");
+        if (!auth.currentUser) {
+          await signInAnonymously(auth);
+        }
+      } catch (e) {
+        console.warn("Guest login error:", e);
       }
-    } catch (e) {
-      console.warn("Guest login error:", e);
-    }
+    })();
     setActiveMode("guest");
     setAppState("scanning");
   };
