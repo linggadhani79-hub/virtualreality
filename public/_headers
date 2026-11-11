@@ -1,4 +1,4 @@
-# Cloudflare Pages: izin WebXR + cache aset agar pembacaan ringan
+# Cloudflare: izin WebXR + cache aset agar pembacaan ringan
 /*
   Permissions-Policy: xr-spatial-tracking=(self), accelerometer=(self), gyroscope=(self), magnetometer=(self), fullscreen=(self)
   X-Content-Type-Options: nosniff

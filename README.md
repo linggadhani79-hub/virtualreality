@@ -35,19 +35,23 @@ npm run dev
 Buka `http://localhost:3000`. Struktur proyek AI Studio (`server.ts`, `vite.config.ts`, `metadata.json`)
 tidak diubah, jadi tetap bisa diimpor dan dijalankan di AI Studio.
 
-## 2. Hosting di Cloudflare Pages
+## 2. Hosting di Cloudflare (Workers)
 
-1. Cloudflare Dashboard → **Workers & Pages → Create → Pages → Connect to Git** → pilih repo ini.
+1. Cloudflare Dashboard → **Workers & Pages → Create → Import a repository** → pilih repo ini
+   (branch `main`).
 2. Isi:
    - **Build command**: `npm run build:web`
-   - **Build output directory**: `dist`
-3. Deploy. Anda mendapat alamat seperti `https://nama-proyek.pages.dev`.
-4. Firebase Console → Authentication → Settings → **Authorized domains** → tambahkan domain
-   `nama-proyek.pages.dev` (agar login admin Google berfungsi).
+   - **Deploy command**: `npx wrangler deploy`
+3. Nama proyek di Cloudflare harus sama dengan `name` di [`wrangler.toml`](wrangler.toml)
+   (sekarang `virtualreality`). Bila berbeda, ubah `name` di berkas itu.
+4. Deploy. Anda mendapat alamat seperti `https://virtualreality.<akun>.workers.dev`.
+5. Firebase Console → Authentication → Settings → **Authorized domains** → tambahkan domain
+   tersebut (agar login admin Google berfungsi).
 
-Folder `functions/` otomatis menjadi endpoint `/api/proxy-asset` di Cloudflare (pengganti server Express).
-Kompresi Draco otomatis saat admin mengunggah model (`/api/optimize-model`) hanya ada di server Node
-(AI Studio / `npm start`); di Cloudflare model diunggah apa adanya.
+`worker/index.ts` menyediakan `/api/proxy-asset` di Cloudflare (pengganti server Express); berkas
+lain disajikan langsung dari folder `dist`. Kompresi Draco otomatis saat admin mengunggah model
+(`/api/optimize-model`) hanya ada di server Node (AI Studio / `npm start`); di Cloudflare model
+diunggah apa adanya.
 
 ## 3. Membuat APK untuk Meta Quest / HP Android
 
@@ -85,4 +89,5 @@ lalu ganti sidik jari di `assetlinks.json`.
 - `src/components/GuardianBoundary.tsx` — penanda batas ruang
 - `src/components/WebXRControllerManager.tsx` — tangan, laser, controller kiri/kanan
 - `src/components/PhoneVR.tsx`, `src/lib/phoneVR.ts` — mode VR HP
-- `android/` — proyek APK · `functions/` — Cloudflare Pages Functions · `public/` — manifest PWA, ikon
+- `scripts/build-car-model.mjs` — menyiapkan model mobil (haluskan bodi, bersihkan tekstur, pisahkan roda, kompres)
+- `android/` — proyek APK · `worker/` — Cloudflare Worker (`/api/proxy-asset`) · `public/` — manifest PWA, ikon

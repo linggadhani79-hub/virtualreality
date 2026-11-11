@@ -7,8 +7,10 @@ import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.j
 /**
  * Stasiun contoh mobil listrik (BEV).
  *
- * - Model mobil: public/models/contoh-mobil-listrik.glb (sudah dioptimasi dari 29 MB: ±165 rb segitiga,
- *   tekstur WebP 2K, kompresi Meshopt → ±2,4 MB, tanpa decoder dari CDN).
+ * - Model mobil: public/models/contoh-mobil-listrik.glb, disiapkan dengan
+ *   scripts/build-car-model.mjs dari model asli 29 MB: mesh disederhanakan (±165 rb segitiga),
+ *   bodi dihaluskan, tekstur cat dibersihkan, 4 roda dipisah agar bisa berputar,
+ *   lalu dikompres (WebP 2K + Meshopt) menjadi ±1,9 MB tanpa decoder dari CDN.
  * - Mode "Komponen": bodi menjadi tembus pandang dan komponen EV di dalamnya bisa dipilih.
  * - Tombol 3D interaktif (mouse, laser controller Quest, atau tatapan di VR HP):
  *   Komponen · Jalankan · Putar · Reset.
@@ -423,6 +425,7 @@ export function SampleEVCar({
   const panelRef = useRef<THREE.Mesh>(null);
   const carRef = useRef<THREE.Group>(null);
   const wheelRefs = useRef<THREE.Mesh[]>([]);
+  const modelWheels = useRef<{ node: THREE.Object3D; radius: number }[]>([]);
   const driveT = useRef(0);
   const lastX = useRef(0);
 
@@ -451,6 +454,14 @@ export function SampleEVCar({
           const mat = m.material as THREE.MeshStandardMaterial;
           if (mat.map) mat.map.anisotropy = 8;
         });
+        // Roda dipisah sebagai node "wheel_*" saat model disiapkan, supaya bisa berputar
+        const wheels: { node: THREE.Object3D; radius: number }[] = [];
+        root.traverse((o) => {
+          if (o.name.startsWith("wheel_")) {
+            wheels.push({ node: o, radius: ((o.userData.radius as number) || 0.145) * scale });
+          }
+        });
+        modelWheels.current = wheels;
         setModel(root);
       },
       undefined,
@@ -550,7 +561,11 @@ export function SampleEVCar({
     // Roda rangka berputar sesuai jarak tempuh
     const dx = car.position.x - lastX.current;
     lastX.current = car.position.x;
-    if (dx !== 0) for (const w of wheelRefs.current) if (w) w.rotation.x -= dx / 0.33;
+    if (dx !== 0) {
+      for (const w of wheelRefs.current) if (w) w.rotation.x -= dx / 0.33;
+      // Roda model: menggelinding sesuai jarak tempuh (sumbu roda = Z)
+      for (const w of modelWheels.current) w.node.rotation.z -= dx / w.radius;
+    }
   });
 
   return (

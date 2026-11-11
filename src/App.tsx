@@ -2144,7 +2144,8 @@ export default function App() {
               ))}
 
               {/* Clean Subtle Floor Grid aligned at Y = 0 */}
-              <Grid
+{!sampleCarVisible && (
+                            <Grid
                 position={[0, 0.001, 0]}
                 args={[120, 120]}
                 cellSize={1}
@@ -2157,6 +2158,7 @@ export default function App() {
                 fadeStrength={1.5}
                 infiniteGrid
               />
+              )}
 
               {/* Floor Plane Mesh */}
               <mesh
