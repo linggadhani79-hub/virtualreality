@@ -344,7 +344,7 @@ export function EVEntranceScreen({
                 <div className="w-16 h-16 rounded-full border-4 border-cyan-500/20 border-t-cyan-400 animate-spin" />
                 <Zap className="w-6 h-6 text-cyan-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
               </div>
-              <h3 className="text-2xl font-bold text-white tracking-tight">Mengunduh Ruang Lab EV</h3>
+              <h3 className="text-2xl font-bold text-white tracking-tight">Menyiapkan Ruang Lab EV</h3>
               <p className="text-neutral-400 text-sm mt-2 leading-relaxed">
                 Mohon tunggu, model 3D kendaraan listrik dan modul pembelajaran sedang disiapkan...
               </p>

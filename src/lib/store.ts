@@ -1,6 +1,7 @@
 import { db, storage, auth } from "./firebase";
 import { doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
-import { CLOUD_TIMEOUT_MS } from "./appConfig";
+import { CLOUD_TIMEOUT_MS, LOCAL_ONLY } from "./appConfig";
+import { clearLegacyCloudData } from "./local/bundle";
 import {
   ref,
   uploadBytes,
@@ -334,6 +335,7 @@ function cloudRead<T>(p: Promise<T>): Promise<T> {
 }
 
 export async function getWorkspaceData(): Promise<any> {
+  if (LOCAL_ONLY) await clearLegacyCloudData();
   if (!isFirestoreQuotaExceeded) {
     try {
       const d = await cloudRead(getDoc(doc(db, "workspaces", "global")));
@@ -384,6 +386,7 @@ export async function saveAssetLibraryData(data: any) {
 }
 
 export async function getAssetLibraryData(): Promise<any> {
+  if (LOCAL_ONLY) await clearLegacyCloudData();
   if (!isFirestoreQuotaExceeded) {
     try {
       const d = await cloudRead(getDoc(doc(db, "workspaces", "library")));
