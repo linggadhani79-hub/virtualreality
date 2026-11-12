@@ -19,6 +19,10 @@ export const phoneVR = {
   /** jumlah langkah terdeteksi & jumlah bacaan akselerometer (untuk indikator di layar) */
   steps: 0,
   motionEvents: 0,
+  /** laju jalan (m/dtk) hasil irama langkah; berlaku selama stepUntil belum lewat */
+  walkSpeed: 0,
+  /** laju pemain saat ini (m/dtk), diisi perender; dipakai peredup tepi pandangan */
+  speedNow: 0,
 };
 
 // ---- Deteksi langkah (pedometer sederhana) ----
@@ -29,6 +33,7 @@ export const phoneVR = {
 // Kekuatan hentakan sangat berbeda antar-HP dan cara memegang (di tangan lebih lemah daripada di
 // kacamata VR), jadi ambangnya menyesuaikan diri: sebagian dari guncangan rata-rata yang sedang
 // terjadi, dengan batas bawah kecil agar HP yang diam tidak dihitung.
+const STRIDE = 0.7; // meter per langkah
 let baseline = 9.81; // rata-rata lambat (gravitasi + bias sensor)
 let energy = 0; // rata-rata |guncangan|
 let above = false;
@@ -52,8 +57,15 @@ function onDeviceMotion(e: DeviceMotionEvent) {
     const gap = now - lastStepAt;
     lastStepAt = now;
     phoneVR.steps++;
-    // langkah pertama langsung menggerakkan pemain sebentar; langkah beruntun menyambungnya
-    phoneVR.stepUntil = now + (gap < 1600 ? 750 : 450);
+    // Laju mengikuti irama langkah nyata: irama (langkah/detik) x panjang langkah rata-rata,
+    // sehingga jarak di lab kira-kira sama dengan jarak yang ditempuh kaki. Dibatasi 0,5–1,5 m/dtk
+    // (jalan santai) dan diperhalus agar tidak berubah mendadak dari langkah ke langkah.
+    const rhythmic = gap < 1600;
+    const cadence = rhythmic ? 1000 / gap : 1.3;
+    const speed = Math.min(1.5, Math.max(0.5, cadence * STRIDE));
+    phoneVR.walkSpeed = rhythmic && phoneVR.walkSpeed > 0 ? phoneVR.walkSpeed * 0.6 + speed * 0.4 : speed * 0.8;
+    // gerak berlanjut sedikit lebih lama dari jeda antar-langkah, lalu berhenti bila langkah berhenti
+    phoneVR.stepUntil = now + (rhythmic ? Math.min(1100, gap * 1.35) : 650);
   } else if (above && bump < threshold * 0.4) {
     above = false;
   }
@@ -128,6 +140,8 @@ export async function startPhoneVR(): Promise<{ ok: boolean; reason?: string }> 
   phoneVR.stepUntil = 0;
   phoneVR.steps = 0;
   phoneVR.motionEvents = 0;
+  phoneVR.walkSpeed = 0;
+  phoneVR.speedNow = 0;
   above = false;
   energy = 0;
 

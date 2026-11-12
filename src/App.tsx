@@ -289,9 +289,13 @@ function Player({
     if (keys["KeyD"] || keys["ArrowRight"]) moveX += 1;
 
     // VR HP (Cardboard): tahan layar untuk berjalan ke arah pandangan
-    if (phoneVR.active && phoneVR.walking) moveZ -= 0.4; // pelan agar tidak pusing
-    // VR HP: langkah kaki pemakai (akselerometer) juga menggerakkan pemain maju
-    if (phoneVR.active && performance.now() < phoneVR.stepUntil) moveZ -= 0.55;
+    // (MAX_SPEED 4,5 m/dtk; di VR HP dipakai laju jalan kaki agar tidak pusing)
+    if (phoneVR.active) {
+      if (performance.now() >= phoneVR.stepUntil) phoneVR.walkSpeed = 0;
+      // langkah kaki pemakai (akselerometer): laju mengikuti irama langkah; tahan layar: 1 m/dtk
+      const walk = Math.max(phoneVR.walkSpeed, phoneVR.walking ? 1.0 : 0);
+      if (walk > 0) moveZ -= walk / 4.5;
+    }
 
     // Lompat (spasi / tombol di HP) — hanya di mode layar biasa
     const jump = jumpRef.current;
@@ -451,19 +455,23 @@ function Player({
       const normZ = isInputActive ? (rawMoveZ / (inputLen || 1)) : 0;
 
       const targetSpeed = isInputActive ? (inputStrength * 4.5) : 0;
+      // VR HP: mulai dan berhenti secara bertahap (± 0,4 detik) — perubahan laju mendadak adalah
+      // penyebab utama pusing di VR
+      const accelRate = phoneVR.active ? 3.5 : isInputActive ? 16 : 20;
       const targetVelX = normX * targetSpeed;
       const targetVelZ = normZ * targetSpeed;
 
       smoothVelocityRef.current.x = THREE.MathUtils.lerp(
         smoothVelocityRef.current.x,
         targetVelX,
-        Math.min(1, (isInputActive ? 16 : 20) * delta)
+        Math.min(1, accelRate * delta)
       );
       smoothVelocityRef.current.z = THREE.MathUtils.lerp(
         smoothVelocityRef.current.z,
         targetVelZ,
-        Math.min(1, (isInputActive ? 16 : 20) * delta)
+        Math.min(1, accelRate * delta)
       );
+      phoneVR.speedNow = phoneVR.active ? Math.hypot(smoothVelocityRef.current.x, smoothVelocityRef.current.z) : 0;
 
       const curSpeed = Math.sqrt(
         smoothVelocityRef.current.x * smoothVelocityRef.current.x +

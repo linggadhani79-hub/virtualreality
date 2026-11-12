@@ -201,6 +201,7 @@ export function PhoneVROverlay({ onExit }: { onExit: () => void }) {
 
   // Indikator langkah: memperlihatkan apakah sensor gerak HP bekerja dan langkah terhitung
   const stepLabel = useRef<HTMLSpanElement>(null);
+  const vignettes = useRef<(HTMLDivElement | null)[]>([]);
   useEffect(() => {
     const started = performance.now();
     const id = window.setInterval(() => {
@@ -209,9 +210,12 @@ export function PhoneVROverlay({ onExit }: { onExit: () => void }) {
       if (phoneVR.motionEvents === 0) {
         el.textContent = performance.now() - started > 3000 ? "Sensor langkah tidak aktif di HP ini · tahan layar untuk maju" : "Memeriksa sensor langkah…";
       } else {
-        el.textContent = `Langkah: ${phoneVR.steps}${performance.now() < phoneVR.stepUntil ? " · berjalan" : ""}`;
+        el.textContent = `Langkah: ${phoneVR.steps}${phoneVR.speedNow > 0.15 ? ` · ${phoneVR.speedNow.toFixed(1)} m/dtk` : ""}`;
       }
-    }, 250);
+      // Peredup tepi pandangan: makin cepat bergerak makin sempit, mengurangi rasa pusing
+      const v = Math.min(1, phoneVR.speedNow / 1.2);
+      for (const eye of vignettes.current) if (eye) eye.style.opacity = String(v * 0.85);
+    }, 120);
     return () => window.clearInterval(id);
   }, []);
 
@@ -240,6 +244,17 @@ export function PhoneVROverlay({ onExit }: { onExit: () => void }) {
       onPointerMove={stop}
       onContextMenu={(e) => e.preventDefault()}
     >
+      {/* Peredup tepi pandangan per mata (muncul hanya saat bergerak) */}
+      {[0, 1].map((i) => (
+        <div
+          key={i}
+          ref={(el) => {
+            vignettes.current[i] = el;
+          }}
+          className="absolute top-0 bottom-0 w-1/2 pointer-events-none transition-opacity duration-300"
+          style={{ left: i ? "50%" : 0, opacity: 0, background: "radial-gradient(ellipse at center, rgba(0,0,0,0) 38%, rgba(0,0,0,0.92) 78%)" }}
+        />
+      ))}
       {/* Lens divider */}
       <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/25 pointer-events-none" />
 
