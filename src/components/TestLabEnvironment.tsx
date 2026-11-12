@@ -7,7 +7,7 @@ import { Barrier, Cone, DiagnosticCart, Extinguisher, Lift, SafetyStation, Works
 import { LabBuilding } from "./LabBuilding";
 import { AssemblyGame } from "./AssemblyGame";
 import { DrivingTrack } from "./DrivingTrack";
-import { worldBounds } from "../lib/worldBounds";
+import { boxAt, worldBounds, type Box } from "../lib/worldBounds";
 
 /**
  * Lingkungan "Ruang Uji Kendaraan Listrik".
@@ -25,6 +25,75 @@ import { worldBounds } from "../lib/worldBounds";
 const HALL = { x0: -14, x1: 24, z0: -14, z1: 6, h: 7 };
 // Lintasan luar: persegi panjang bersudut bulat mengelilingi gedung (garis tengah jalan)
 const TRACK = { cx: 5, cz: -2, hx: 30, hz: 24, r: 9 };
+/**
+ * Benda yang tidak boleh ditembus pemain (tampak atas, meter). Perbarui bila tata letak berubah.
+ * Mobil di lintasan dalam dan mobil di lintasan luar bergerak, jadi tidak dimasukkan.
+ */
+const T = 0.3; // tebal tembok
+const stand = (x: number, z: number, size: number): Box => boxAt(x, z, (Math.max(0.75, size * 0.52) + 0.2) * 0.85);
+const SOLIDS: Box[] = [
+  // tembok: belakang, kiri, kanan, depan kiri & kanan pintu (bukaan X -5..5)
+  { minX: HALL.x0 - T, maxX: HALL.x1 + T, minZ: HALL.z0 - T, maxZ: HALL.z0 },
+  { minX: HALL.x0 - T, maxX: HALL.x0, minZ: HALL.z0, maxZ: HALL.z1 },
+  { minX: HALL.x1, maxX: HALL.x1 + T, minZ: HALL.z0, maxZ: HALL.z1 },
+  { minX: HALL.x0 - T, maxX: -5, minZ: HALL.z1, maxZ: HALL.z1 + T },
+  { minX: 5, maxX: HALL.x1 + T, minZ: HALL.z1, maxZ: HALL.z1 + T },
+  // etalase
+  stand(-6.4, -1.3, 1.9),
+  stand(-10.2, -1.3, 1.5),
+  stand(-12.5, 2.0, 1.3),
+  stand(6.6, 3.5, 2.1),
+  stand(9.3, -1.5, 3.0),
+  stand(-5.6, -12.4, 1.35),
+  stand(-3.3, -12.4, 1.3),
+  stand(-1.0, -12.4, 1.0),
+  stand(1.3, -12.4, 0.95),
+  stand(4.3, -11.9, 2.8),
+  stand(12.9, -9.7, 0.75),
+  // lift + sasis, charger, troli, bengkel, lemari APD, kios kuis, pojok baca, konsol mobil, pembatas
+  { minX: -11.4, maxX: -7.6, minZ: -11.9, maxZ: -10.1 },
+  boxAt(7.9, -13.5, 0.55),
+  boxAt(11.1, -13.0, 0.5),
+  boxAt(6.7, -9.5, 0.5, 0.4),
+  { minX: -14, maxX: -12.75, minZ: -3.95, maxZ: -0.2 },
+  { minX: HALL.x1 - 0.6, maxX: HALL.x1, minZ: 1.0, maxZ: 3.0 },
+  { minX: -10.8, maxX: -8.2, minZ: 4.8, maxZ: 5.6 },
+  { minX: 6.8, maxX: 12.2, minZ: 5.5, maxZ: 6 },
+  { minX: 8.0, maxX: 11.0, minZ: 2.2, maxZ: 3.05 },
+  boxAt(0, -3.1, 1.2, 0.3),
+  boxAt(-11.6, -6, 0.25, 1.2),
+  boxAt(11.6, -6, 0.25, 1.2),
+  // game rakit: panggung, tiang derek, troli & meja komponen, konsol
+  { minX: 16.2, maxX: 21.8, minZ: -7.0, maxZ: -4.2 },
+  boxAt(16.05, -7.35, 0.15),
+  boxAt(21.95, -7.35, 0.15),
+  boxAt(16.05, -3.85, 0.15),
+  boxAt(21.95, -3.85, 0.15),
+  boxAt(15.1, -2.6, 1.0, 0.65),
+  boxAt(17.7, -2.1, 0.45),
+  boxAt(20.2, -2.1, 0.45),
+  boxAt(22.7, -2.6, 0.45),
+  boxAt(19, -1.0, 0.8, 0.25),
+  // luar gedung: tiang kanopi, lampu taman, stasiun surya, batang pohon
+  boxAt(-5.6, 9.05, 0.13),
+  boxAt(5.6, 9.05, 0.13),
+  boxAt(-6.9, 13.5, 0.15),
+  boxAt(6.9, 13.5, 0.15),
+  { minX: 39.6, maxX: 43.0, minZ: -6.2, maxZ: 2.2 },
+  ...(
+    [
+      [-11.5, 13],
+      [14, 14],
+      [-19.5, -2],
+      [29.5, -14],
+      [5, 31],
+      [-32, -12],
+      [42, 16],
+      [-4, -33],
+    ] as [number, number][]
+  ).map(([x, z]) => boxAt(x, z, 0.4)),
+];
+
 const LANE_Z = -6;
 const LANE_HALF = 1.7;
 const LANE_LEN = 21;
@@ -376,9 +445,9 @@ export function TestLabEnvironment() {
   const compare = useCanvasTexture(1280, 900, drawComparePoster);
   const sky = useCanvasTexture(16, 256, drawSky);
 
-  // Dinding menahan pemain; keluar hanya lewat pintu depan
+  // Tembok dan aset menahan pemain dari sisi mana pun; keluar-masuk hanya lewat pintu depan
   useEffect(() => {
-    worldBounds.current = { minX: HALL.x0, maxX: HALL.x1, minZ: HALL.z0, maxZ: HALL.z1, door: { minX: -5, maxX: 5 } };
+    worldBounds.current = { boxes: SOLIDS, limit: { minX: -85, maxX: 95, minZ: -85, maxZ: 85 } };
     return () => {
       worldBounds.current = null;
     };
