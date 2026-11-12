@@ -6,6 +6,7 @@ import { ReadingCorner } from "./ReadingCorner";
 import { Barrier, Cone, DiagnosticCart, Extinguisher, Lift, SafetyStation, Workshop } from "./LabProps";
 import { LabBuilding } from "./LabBuilding";
 import { AssemblyGame } from "./AssemblyGame";
+import { ParkingArea, PARKING_SOLIDS } from "./ParkingArea";
 import { DrivingTrack } from "./DrivingTrack";
 import { boxAt, worldBounds, type Box } from "../lib/worldBounds";
 
@@ -32,6 +33,8 @@ const TRACK = { cx: 5, cz: -2, hx: 30, hz: 24, r: 9 };
 const T = 0.3; // tebal tembok
 const stand = (x: number, z: number, size: number): Box => boxAt(x, z, (Math.max(0.75, size * 0.52) + 0.2) * 0.85);
 const SOLIDS: Box[] = [
+  // area parkir & SPBU di luar lintasan (lihat ParkingArea.tsx)
+  ...PARKING_SOLIDS,
   // tembok: belakang, kiri, kanan, depan kiri & kanan pintu (bukaan X -5..5)
   { minX: HALL.x0 - T, maxX: HALL.x1 + T, minZ: HALL.z0 - T, maxZ: HALL.z0 },
   { minX: HALL.x0 - T, maxX: HALL.x0, minZ: HALL.z0, maxZ: HALL.z1 },
@@ -833,6 +836,8 @@ export function TestLabEnvironment() {
       </mesh>
       {/* lintasan aspal ala ujian SIM mengelilingi gedung + mobil yang berkeliling */}
       <DrivingTrack loop={TRACK} />
+      {/* area parkir, SPBU, dan perbandingan mobil bensin vs listrik di sisi barat */}
+      <ParkingArea hall={HALL} />
       <Scenery
         model="pohon"
         size={8.5}
