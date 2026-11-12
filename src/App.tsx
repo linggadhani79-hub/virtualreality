@@ -74,6 +74,9 @@ const store = createXRStore({
   },
 });
 
+/** Aksi pemain yang dipicu tombol layar (mis. tombol Lompat di HP). */
+const playerActions = { jump: false };
+
 // Pre-allocated reusable objects for Player movement and collision to eliminate GC stuttering
 const tempFloorRayOrigin = new THREE.Vector3();
 const tempFloorRayDir = new THREE.Vector3(0, -1, 0);
@@ -214,6 +217,8 @@ function Player({
 }) {
   const playerRef = useRef<THREE.Group>(null);
   const characterRef = useRef<THREE.Group>(null);
+  const jumpRef = useRef({ y: 0, vy: 0 });
+  const jumpGroupRef = useRef<THREE.Group>(null);
   const keys = useKeyboardKeys();
   const isMovingRef = useRef(false);
   const solidGroupsRef = useRef<THREE.Object3D[]>([]);
@@ -284,6 +289,22 @@ function Player({
 
     // VR HP (Cardboard): tahan layar untuk berjalan ke arah pandangan
     if (phoneVR.active && phoneVR.walking) moveZ -= 0.4; // pelan agar tidak pusing
+    // VR HP: langkah kaki pemakai (akselerometer) juga menggerakkan pemain maju
+    if (phoneVR.active && performance.now() < phoneVR.stepUntil) moveZ -= 0.55;
+
+    // Lompat (spasi / tombol di HP) — hanya di mode layar biasa
+    const jump = jumpRef.current;
+    if ((keys["Space"] || playerActions.jump) && jump.y === 0 && !phoneVR.active && !state.gl.xr.isPresenting) jump.vy = 4.4;
+    playerActions.jump = false;
+    if (jump.vy !== 0 || jump.y > 0) {
+      jump.vy -= 12 * delta;
+      jump.y += jump.vy * delta;
+      if (jump.y <= 0) {
+        jump.y = 0;
+        jump.vy = 0;
+      }
+    }
+    if (jumpGroupRef.current) jumpGroupRef.current.position.y = jump.y;
 
     // WebXR / Meta Quest 2 Controller Thumbstick & Button Inputs
     const session = state.gl.xr?.getSession();
@@ -549,7 +570,7 @@ function Player({
         // Place camera inside the player head
         camera.position.set(
           playerRef.current.position.x,
-          playerRef.current.position.y + 1.2,
+          playerRef.current.position.y + 1.2 + jumpRef.current.y,
           playerRef.current.position.z,
         );
         if (phoneVR.active && phoneVR.hasOrientation) {
@@ -604,8 +625,8 @@ function Player({
         <GuardianBoundary />
       </XROrigin>
       <UserFootprintMarker isNearWallRef={isNearWallRef} />
-      <group visible={!isPresenting && viewMode !== "fpp"}>
-        <HumanCharacter ref={characterRef} isMovingRef={isMovingRef} />
+      <group ref={jumpGroupRef} visible={!isPresenting && viewMode !== "fpp"}>
+        <HumanCharacter ref={characterRef} isMovingRef={isMovingRef} jumpRef={jumpRef} />
       </group>
     </group>
   );
@@ -786,8 +807,9 @@ function AdaptiveUI({
 
         {/* Right Edge: Sleek Side Menu Dock */}
         <div className="flex flex-col items-end gap-3 pointer-events-auto">
-          <div className="bg-neutral-950/80 backdrop-blur-xl text-white p-4 rounded-3xl shadow-2xl flex flex-col border border-white/10 w-52">
-            <div className="border-b border-white/10 pb-3 mb-3">
+          {/* Di HP panel ini menutupi layar, jadi diringkas menjadi tombol-tombol kecil terpisah */}
+          <div className={`bg-neutral-950/80 backdrop-blur-xl text-white p-4 rounded-3xl shadow-2xl flex flex-col border border-white/10 w-52 ${mobileMode ? "dock-compact" : ""}`}>
+            <div className="dock-head border-b border-white/10 pb-3 mb-3">
               <span className="text-[10px] uppercase font-bold tracking-widest text-indigo-400">
                 Status Kontrol
               </span>
@@ -801,7 +823,19 @@ function AdaptiveUI({
               </p>
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="dock-list flex flex-col gap-2">
+              {mobileMode && (
+                <button
+                  title="Lompat"
+                  className="w-full flex items-center justify-between bg-white/5 active:scale-95 text-xs font-semibold py-2 px-3 rounded-xl border border-white/5 text-left"
+                  onClick={() => {
+                    playerActions.jump = true;
+                  }}
+                >
+                  <span>Lompat</span>
+                  <span className="text-[10px] bg-indigo-500/30 text-indigo-300 px-2 py-0.5 rounded font-mono font-bold uppercase">LOMPAT</span>
+                </button>
+              )}
               <button
                 className="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 active:scale-95 text-xs font-semibold py-2 px-3 rounded-xl transition-all border border-white/5 text-left"
                 onClick={() => setViewMode(viewMode === "tpp" ? "dev" : viewMode === "dev" ? "fpp" : "tpp")}
@@ -839,7 +873,7 @@ function AdaptiveUI({
 )}
 
               <button
-                className="w-full flex items-center justify-between bg-indigo-950/80 hover:bg-indigo-900 active:scale-95 text-xs font-bold py-2.5 px-3 rounded-xl transition-all border border-indigo-500/50 text-left text-white shadow-lg shadow-indigo-950/50 cursor-pointer group"
+                className="w-full flex items-center justify-between bg-indigo-950/80 hover:bg-indigo-900 active:scale-95 text-xs font-bold py-2.5 px-3 rounded-xl transition-all border border-indigo-500/50 text-left text-white shadow-lg shadow-indigo-950/50 cursor-pointer group dock-hide-compact"
                 onClick={() => {
                   setShowQuestModal(true);
                   const st = updateQuestGamepadState();

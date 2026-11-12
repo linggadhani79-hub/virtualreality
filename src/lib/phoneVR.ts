@@ -14,7 +14,32 @@ export const phoneVR = {
   walking: false,
   /** set by a short tap; consumed by the gaze cursor as an immediate "select" */
   tapRequested: false,
+  /** performance.now() sampai kapan langkah kaki terakhir masih "mendorong" pemain maju */
+  stepUntil: 0,
 };
+
+// ---- Deteksi langkah (pedometer sederhana) ----
+// HP tidak tahu posisinya di ruangan, tetapi setiap langkah kaki membuat hentakan pada
+// akselerometer. Tiap hentakan dihitung sebagai satu langkah maju ke arah pandangan, sehingga
+// pemakai yang berjalan (atau jalan di tempat) ikut berjalan di dalam lab.
+let gravity = 9.81;
+let lastStepAt = 0;
+let stepStreak = 0;
+function onDeviceMotion(e: DeviceMotionEvent) {
+  const a = e.accelerationIncludingGravity;
+  if (!a || a.x == null || a.y == null || a.z == null) return;
+  const mag = Math.hypot(a.x, a.y, a.z);
+  gravity += (mag - gravity) * 0.05; // rata-rata lambat = gravitasi
+  const bump = mag - gravity;
+  const now = performance.now();
+  if (bump > 1.6 && now - lastStepAt > 280) {
+    // dua hentakan berdekatan baru dianggap berjalan, supaya menoleh / menggeser HP tidak dihitung
+    stepStreak = now - lastStepAt < 1100 ? stepStreak + 1 : 1;
+    lastStepAt = now;
+    if (stepStreak >= 2) phoneVR.stepUntil = now + 650;
+  }
+}
+let motionListening = false;
 
 const zee = new THREE.Vector3(0, 0, 1);
 const euler = new THREE.Euler();
@@ -70,6 +95,20 @@ export async function startPhoneVR(): Promise<{ ok: boolean; reason?: string }> 
     }
   }
 
+  // Akselerometer untuk deteksi langkah (iOS meminta izin terpisah; ditolak pun VR tetap jalan)
+  const DME = (window as any).DeviceMotionEvent;
+  if (DME) {
+    try {
+      const ok = typeof DME.requestPermission === "function" ? (await DME.requestPermission()) === "granted" : true;
+      if (ok && !motionListening) {
+        window.addEventListener("devicemotion", onDeviceMotion, true);
+        motionListening = true;
+      }
+    } catch {}
+  }
+  phoneVR.stepUntil = 0;
+  stepStreak = 0;
+
   headingOffset = null;
   phoneVR.hasOrientation = false;
   phoneVR.walking = false;
@@ -113,6 +152,11 @@ export function stopPhoneVR() {
     window.removeEventListener("deviceorientation", onDeviceOrientation, true);
     listening = false;
   }
+  if (motionListening) {
+    window.removeEventListener("devicemotion", onDeviceMotion, true);
+    motionListening = false;
+  }
+  phoneVR.stepUntil = 0;
   try {
     (screen.orientation as any)?.unlock?.();
   } catch {}
