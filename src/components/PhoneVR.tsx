@@ -199,6 +199,22 @@ export function PhoneVROverlay({ onExit }: { onExit: () => void }) {
 
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
+  // Indikator langkah: memperlihatkan apakah sensor gerak HP bekerja dan langkah terhitung
+  const stepLabel = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const started = performance.now();
+    const id = window.setInterval(() => {
+      const el = stepLabel.current;
+      if (!el) return;
+      if (phoneVR.motionEvents === 0) {
+        el.textContent = performance.now() - started > 3000 ? "Sensor langkah tidak aktif di HP ini · tahan layar untuk maju" : "Memeriksa sensor langkah…";
+      } else {
+        el.textContent = `Langkah: ${phoneVR.steps}${performance.now() < phoneVR.stepUntil ? " · berjalan" : ""}`;
+      }
+    }, 250);
+    return () => window.clearInterval(id);
+  }, []);
+
   return (
     <div
       className="fixed inset-0 z-[9500] pointer-events-auto touch-none select-none"
@@ -250,6 +266,9 @@ export function PhoneVROverlay({ onExit }: { onExit: () => void }) {
 
       <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[9px] text-white/50 bg-black/40 px-3 py-1 rounded-full pointer-events-none whitespace-nowrap">
         Tatap objek = pilih · Ketuk = pilih cepat · Berjalan / jalan di tempat = maju · Tahan layar = maju
+      </div>
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-bold text-emerald-300 bg-black/50 px-3 py-1 rounded-full pointer-events-none whitespace-nowrap">
+        <span ref={stepLabel}>Memeriksa sensor langkah…</span>
       </div>
     </div>
   );
