@@ -76,6 +76,8 @@ Satu objek harus bisa dipilih dengan mouse, laser Quest, dan tatapan VR HP. Sela
    Di VR tiap benda digambar dua kali: dari titik mulai sekarang ±500 rb segitiga per mata (lite).
    Model mobil memakai `scripts/build-car-model.mjs` (roda = komponen mesh terpisah; jangan
    dipotong dengan silinder), lalu `scripts/darken-car-glass.mjs`.
+   Model etalase juga butuh versi **`-far`** (±3–10 rb segitiga, tekstur 512, galat 0.03) untuk
+   tingkat ringan: dipakai saat pemain lebih jauh dari ±9 m (`LodPair` di `LabStations.tsx`).
 3. Muat dengan `loadGlb(modelUrl("nama"))` + `fitModel(root, meter)`; tempatkan lewat
    `ExhibitStand` atau komponen baru di `TestLabEnvironment.tsx`.
 4. Tata letak hanggar: X −14..24 (X 14..24 = sayap game rakit), Z −14..6, kolom tiap 4 m di Z = −12, −8, −4, 0, 4 (lebar bebas
@@ -124,4 +126,3 @@ Satu objek harus bisa dipilih dengan mouse, laser Quest, dan tatapan VR HP. Sela
 - Modul buatan admin tersimpan di perangkat itu; agar berlaku di semua perangkat, simpan JSON-nya
   sebagai `public/lab/modul.json` lalu build ulang.
 - Skor kuis tidak disimpan/dikirim ke mana pun.
-- `android/app-config.properties` harus berisi alamat hosting asli sebelum APK dipakai.

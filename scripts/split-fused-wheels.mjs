@@ -70,9 +70,30 @@ const owner = new Int8Array(idx.length / 3).fill(-1);
 const triIn = (t, w) => {
   const a = idx[t], b = idx[t + 1], c = idx[t + 2];
   const x = (pos[a * 3] + pos[b * 3] + pos[c * 3]) / 3, y = (pos[a * 3 + 1] + pos[b * 3 + 1] + pos[c * 3 + 1]) / 3, z = (pos[a * 3 + 2] + pos[b * 3 + 2] + pos[c * 3 + 2]) / 3;
-  return Math.sign(z) === w.sz && Math.abs(z) > zin && Math.hypot(x - w.cx, y - cy) < r * 1.01;
+  if (Math.sign(z) !== w.sz || Math.abs(z) <= zin) return false;
+  const rad = Math.hypot(x - w.cx, y - (w.cy ?? cy)) / (w.r ?? r);
+  // Di sisi dalam roda, lingkar luarnya adalah lapisan spatbor yang ikut terpotong: bila ikut roda
+  // ia menjadi serpihan bergerigi yang berputar. Bagian itu dibiarkan diam di bodi.
+  const inner = Math.abs(z) < zin + (zmax - zin) * 0.3;
+  return rad < (inner ? 0.9 : 1.01);
 };
-for (let t = 0; t < idx.length; t += 3) for (let w = 0; w < 4; w++) if (triIn(t, wheels[w])) { owner[t / 3] = w; break; }
+const assign = () => { owner.fill(-1); for (let t = 0; t < idx.length; t += 3) for (let w = 0; w < 4; w++) if (triIn(t, wheels[w])) { owner[t / 3] = w; break; } };
+assign();
+// Titik putar tiap roda = tengah lingkar bannya sendiri (bukan tebakan poros bersama); poros yang
+// meleset beberapa milimeter saja membuat roda tampak oleng saat berputar. Ban diukur dari titik
+// terluar (|z| besar) supaya lengkung spatbor yang ikut terpotong tidak menggeser hasilnya.
+for (let pass = 0; pass < 2; pass++) {
+  wheels.forEach((w, wi) => {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (let t = 0; t < idx.length; t += 3) {
+      if (owner[t / 3] !== wi) continue;
+      for (let k = 0; k < 3; k++) { const v = idx[t + k]; if (Math.abs(pos[v * 3 + 2]) < zmax * 0.9) continue; x0 = Math.min(x0, pos[v * 3]); x1 = Math.max(x1, pos[v * 3]); y0 = Math.min(y0, pos[v * 3 + 1]); y1 = Math.max(y1, pos[v * 3 + 1]); }
+    }
+    if (x1 > x0) { w.cx = (x0 + x1) / 2; w.cy = (y0 + y1) / 2; w.r = Math.max(x1 - x0, y1 - y0) / 2; }
+  });
+  assign();
+}
+wheels.forEach((w) => console.log(w.name, 'pusat', w.cx.toFixed(4), (w.cy ?? cy).toFixed(4), 'jari-jari', (w.r ?? r).toFixed(4)));
 
 const buffer = root.listBuffers()[0];
 const makePrim = (who, center) => {
@@ -94,11 +115,11 @@ const makePrim = (who, center) => {
 };
 
 const body = makePrim(-1, [0, 0, 0]);
-const wheelPrims = wheels.map((w) => makePrim(wheels.indexOf(w), [w.cx, cy, 0]));
+const wheelPrims = wheels.map((w) => makePrim(wheels.indexOf(w), [w.cx, w.cy ?? cy, 0]));
 mesh.removePrimitive(prim); prim.dispose(); mesh.addPrimitive(body.p); mesh.setName('body'); node.setName('body');
 console.log('bodi', body.tris, 'segitiga');
 wheels.forEach((w, i) => {
-  node.addChild(doc.createNode(w.name).setMesh(doc.createMesh(w.name).addPrimitive(wheelPrims[i].p)).setTranslation([w.cx, cy, 0]).setExtras({ radius: r }));
+  node.addChild(doc.createNode(w.name).setMesh(doc.createMesh(w.name).addPrimitive(wheelPrims[i].p)).setTranslation([w.cx, w.cy ?? cy, 0]).setExtras({ radius: w.r ?? r, inner: zin + (zmax - zin) * 0.12 }));
   console.log(w.name, wheelPrims[i].tris, 'segitiga');
 });
 

@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { disableRaycast, fitModel, loadGlb, roundedRectShape, wrapText } from "../lib/glb";
-import { modelUrl } from "../lib/quality";
+import { modelUrl, qualityTier } from "../lib/quality";
 import { playVRClickSound } from "../lib/vrAudio";
 
 /**
@@ -31,6 +31,45 @@ function useCanvasTexture(width: number, height: number) {
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
   (ctx as any).roundRect?.(x, y, w, h, r) ?? ctx.rect(x, y, w, h);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Model jauh / dekat                                                 */
+/* ------------------------------------------------------------------ */
+
+// Tingkat ringan (Quest / HP): tiap model etalase punya versi "-far" (beberapa ribu segitiga) yang
+// dipakai saat pemain jauh; versi lengkap baru digambar ketika didekati. Di VR tiap benda digambar
+// dua kali, jadi ini memangkas sebagian besar beban dari titik mulai tanpa mengosongkan lab.
+const USE_FAR = qualityTier === "lite";
+const farUrl = (name: string) => `/models/${name}-far.glb`;
+const LOD_NEAR = 7.5; // meter: lebih dekat dari ini pakai model lengkap
+const LOD_FAR = 9; // lebih jauh dari ini pakai model jauh (di antaranya: tetap, agar tidak berkedip)
+const _camPos = new THREE.Vector3();
+const _objPos = new THREE.Vector3();
+
+function LodPair({ near, far }: { near: THREE.Object3D | null; far: THREE.Object3D | null }) {
+  const group = useRef<THREE.Group>(null);
+  const showNear = useRef(false);
+  useFrame((state) => {
+    if (!group.current) return;
+    if (!far || !near) {
+      if (near) near.visible = true;
+      if (far) far.visible = true;
+      return;
+    }
+    state.camera.getWorldPosition(_camPos);
+    group.current.getWorldPosition(_objPos);
+    const d = Math.hypot(_camPos.x - _objPos.x, _camPos.z - _objPos.z);
+    if (showNear.current ? d > LOD_FAR : d < LOD_NEAR) showNear.current = !showNear.current;
+    near.visible = showNear.current;
+    far.visible = !showNear.current;
+  });
+  return (
+    <group ref={group}>
+      {near && <primitive object={near} />}
+      {far && <primitive object={far} />}
+    </group>
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -74,10 +113,12 @@ export function ExhibitStand({
   const [spinning, setSpinning] = useState(true);
   const [hot, setHot] = useState(false);
   const turntable = useRef<THREE.Group>(null);
+  const [far, setFar] = useState<THREE.Object3D | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    loadGlb(modelUrl(model))
+    const load = (url: string, done: (o: THREE.Object3D) => void) =>
+    loadGlb(url)
       .then((shared) => {
         if (cancelled) return;
         // Salinan (geometri & tekstur tetap dipakai bersama): model yang sama boleh tampil di
@@ -100,9 +141,11 @@ export function ExhibitStand({
             mat.roughness = 0.38;
           }
         });
-        setObject(holder);
+        done(holder);
       })
-      .catch((err) => console.warn(`[ExhibitStand] Model ${model} gagal dimuat:`, err));
+      .catch((err) => console.warn(`[ExhibitStand] Model ${url} gagal dimuat:`, err));
+    load(modelUrl(model), setObject);
+    if (USE_FAR) load(farUrl(model), setFar);
     return () => {
       cancelled = true;
     };
@@ -146,7 +189,7 @@ export function ExhibitStand({
       {/* Model di meja putar */}
       <group ref={turntable} position={[0, top, 0]}>
         <group rotation={[tilt, 0, 0]} position={[0, tilt ? Math.sin(Math.abs(tilt)) * size * 0.36 : 0, 0]}>
-          {object && <primitive object={object} />}
+          <LodPair near={object} far={far} />
         </group>
       </group>
 
@@ -275,16 +318,21 @@ export function StaticModel({
   size,
   position,
   rotation = 0,
+  lod = true,
 }: {
   model: string;
   size: number;
   position: [number, number, number];
   rotation?: number;
+  /** false bila model tidak punya versi "-far" */
+  lod?: boolean;
 }) {
   const [object, setObject] = useState<THREE.Object3D | null>(null);
+  const [far, setFar] = useState<THREE.Object3D | null>(null);
   useEffect(() => {
     let cancelled = false;
-    loadGlb(modelUrl(model))
+    const load = (url: string, done: (o: THREE.Object3D) => void) =>
+    loadGlb(url)
       .then((shared) => {
         if (cancelled) return;
         const root = shared.clone();
@@ -294,16 +342,18 @@ export function StaticModel({
           const m = o as THREE.Mesh;
           if (m.isMesh && (m.material as THREE.MeshStandardMaterial).map) (m.material as THREE.MeshStandardMaterial).map!.anisotropy = 8;
         });
-        setObject(root);
+        done(root);
       })
-      .catch((err) => console.warn(`[StaticModel] Model ${model} gagal dimuat:`, err));
+      .catch((err) => console.warn(`[StaticModel] Model ${url} gagal dimuat:`, err));
+    load(modelUrl(model), setObject);
+    if (USE_FAR && lod) load(farUrl(model), setFar);
     return () => {
       cancelled = true;
     };
   }, [model, size]);
   return (
     <group position={position} rotation={[0, rotation, 0]}>
-      {object && <primitive object={object} />}
+      <LodPair near={object} far={lod ? far : null} />
     </group>
   );
 }
