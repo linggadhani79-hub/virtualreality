@@ -16,27 +16,46 @@ export const phoneVR = {
   tapRequested: false,
   /** performance.now() sampai kapan langkah kaki terakhir masih "mendorong" pemain maju */
   stepUntil: 0,
+  /** jumlah langkah terdeteksi & jumlah bacaan akselerometer (untuk indikator di layar) */
+  steps: 0,
+  motionEvents: 0,
 };
 
 // ---- Deteksi langkah (pedometer sederhana) ----
 // HP tidak tahu posisinya di ruangan, tetapi setiap langkah kaki membuat hentakan pada
 // akselerometer. Tiap hentakan dihitung sebagai satu langkah maju ke arah pandangan, sehingga
 // pemakai yang berjalan (atau jalan di tempat) ikut berjalan di dalam lab.
-let gravity = 9.81;
+//
+// Kekuatan hentakan sangat berbeda antar-HP dan cara memegang (di tangan lebih lemah daripada di
+// kacamata VR), jadi ambangnya menyesuaikan diri: sebagian dari guncangan rata-rata yang sedang
+// terjadi, dengan batas bawah kecil agar HP yang diam tidak dihitung.
+let baseline = 9.81; // rata-rata lambat (gravitasi + bias sensor)
+let energy = 0; // rata-rata |guncangan|
+let above = false;
 let lastStepAt = 0;
-let stepStreak = 0;
 function onDeviceMotion(e: DeviceMotionEvent) {
-  const a = e.accelerationIncludingGravity;
-  if (!a || a.x == null || a.y == null || a.z == null) return;
-  const mag = Math.hypot(a.x, a.y, a.z);
-  gravity += (mag - gravity) * 0.05; // rata-rata lambat = gravitasi
-  const bump = mag - gravity;
+  // Sebagian HP hanya mengisi salah satu dari dua bacaan ini
+  const g = e.accelerationIncludingGravity;
+  const a = e.acceleration;
+  const src = g && g.x != null && g.y != null && g.z != null ? g : a && a.x != null && a.y != null && a.z != null ? a : null;
+  if (!src) return;
+  phoneVR.motionEvents++;
+  const mag = Math.hypot(src.x!, src.y!, src.z!);
+  baseline += (mag - baseline) * 0.04;
+  const bump = mag - baseline;
+  energy += (Math.abs(bump) - energy) * 0.05;
+  const threshold = Math.max(0.55, energy * 1.25);
   const now = performance.now();
-  if (bump > 1.6 && now - lastStepAt > 280) {
-    // dua hentakan berdekatan baru dianggap berjalan, supaya menoleh / menggeser HP tidak dihitung
-    stepStreak = now - lastStepAt < 1500 ? stepStreak + 1 : 1;
+  // satu langkah = guncangan naik melewati ambang (dihitung sekali per puncak)
+  if (!above && bump > threshold && now - lastStepAt > 250) {
+    above = true;
+    const gap = now - lastStepAt;
     lastStepAt = now;
-    if (stepStreak >= 2) phoneVR.stepUntil = now + 650;
+    phoneVR.steps++;
+    // langkah pertama langsung menggerakkan pemain sebentar; langkah beruntun menyambungnya
+    phoneVR.stepUntil = now + (gap < 1600 ? 750 : 450);
+  } else if (above && bump < threshold * 0.4) {
+    above = false;
   }
 }
 let motionListening = false;
@@ -107,7 +126,10 @@ export async function startPhoneVR(): Promise<{ ok: boolean; reason?: string }> 
     } catch {}
   }
   phoneVR.stepUntil = 0;
-  stepStreak = 0;
+  phoneVR.steps = 0;
+  phoneVR.motionEvents = 0;
+  above = false;
+  energy = 0;
 
   headingOffset = null;
   phoneVR.hasOrientation = false;
