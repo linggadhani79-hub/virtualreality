@@ -897,9 +897,8 @@ function AdaptiveUI({
 
         {/* Right Edge: Sleek Side Menu Dock (layar lebar / kontrol keyboard) */}
         <div className={`flex-col items-end gap-3 pointer-events-auto ${mobileMode ? "hidden" : "flex"}`}>
-          {/* Di HP panel ini menutupi layar, jadi diringkas menjadi tombol-tombol kecil terpisah */}
-          <div className={`bg-neutral-950/80 backdrop-blur-xl text-white p-4 rounded-3xl shadow-2xl flex flex-col border border-white/10 w-52 ${mobileMode ? "dock-compact" : ""}`}>
-            <div className="dock-head border-b border-white/10 pb-3 mb-3">
+          <div className="bg-neutral-950/80 backdrop-blur-xl text-white p-4 rounded-3xl shadow-2xl flex flex-col border border-white/10 w-52">
+            <div className="border-b border-white/10 pb-3 mb-3">
               <span className="text-[10px] uppercase font-bold tracking-widest text-indigo-400">
                 Status Kontrol
               </span>
@@ -913,19 +912,7 @@ function AdaptiveUI({
               </p>
             </div>
 
-            <div className="dock-list flex flex-col gap-2">
-              {mobileMode && (
-                <button
-                  title="Lompat"
-                  className="w-full flex items-center justify-between bg-white/5 active:scale-95 text-xs font-semibold py-2 px-3 rounded-xl border border-white/5 text-left"
-                  onClick={() => {
-                    playerActions.jump = true;
-                  }}
-                >
-                  <span>Lompat</span>
-                  <span className="text-[10px] bg-indigo-500/30 text-indigo-300 px-2 py-0.5 rounded font-mono font-bold uppercase">LOMPAT</span>
-                </button>
-              )}
+            <div className="flex flex-col gap-2">
               <button
                 className="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 active:scale-95 text-xs font-semibold py-2 px-3 rounded-xl transition-all border border-white/5 text-left"
                 onClick={() => setViewMode(viewMode === "tpp" ? "dev" : viewMode === "dev" ? "fpp" : "tpp")}
@@ -963,7 +950,7 @@ function AdaptiveUI({
 )}
 
               <button
-                className="w-full flex items-center justify-between bg-indigo-950/80 hover:bg-indigo-900 active:scale-95 text-xs font-bold py-2.5 px-3 rounded-xl transition-all border border-indigo-500/50 text-left text-white shadow-lg shadow-indigo-950/50 cursor-pointer group dock-hide-compact"
+                className="w-full flex items-center justify-between bg-indigo-950/80 hover:bg-indigo-900 active:scale-95 text-xs font-bold py-2.5 px-3 rounded-xl transition-all border border-indigo-500/50 text-left text-white shadow-lg shadow-indigo-950/50 cursor-pointer group"
                 onClick={() => {
                   setShowQuestModal(true);
                   const st = updateQuestGamepadState();
