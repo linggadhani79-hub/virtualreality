@@ -21,7 +21,7 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
       {/* garis aksen */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-400 to-indigo-500" />
 
-      <div className="min-h-full max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12 flex flex-col">
+      <div className="min-h-full max-w-5xl mx-auto px-5 sm:px-8 py-5 sm:py-12 [@media(max-height:520px)]:py-4 flex flex-col">
         <div className="flex items-center gap-3">
           <span className="w-11 h-11 rounded-2xl bg-cyan-400/15 border border-cyan-300/40 flex items-center justify-center">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="#22d3ee" aria-hidden="true">
@@ -31,20 +31,21 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
           <span className="text-[11px] sm:text-xs font-bold tracking-[0.25em] text-cyan-300 uppercase">Smart Vocational</span>
         </div>
 
-        <div className="flex-1 flex flex-col justify-center py-8 sm:py-12">
-          <h1 className="text-4xl sm:text-6xl font-black leading-[1.05] tracking-tight">
+        <div className="flex-1 flex flex-col justify-center py-5 sm:py-12 [@media(max-height:520px)]:py-3">
+          <h1 className="text-3xl sm:text-6xl [@media(max-height:520px)]:text-3xl font-black leading-[1.05] tracking-tight">
             Lab Virtual
             <span className="block text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-emerald-300">Kendaraan Listrik</span>
           </h1>
-          <p className="mt-4 max-w-xl text-sm sm:text-base text-slate-300 leading-relaxed">
-            Pelajari komponen mobil listrik, rakit sendiri mobilnya, dan bandingkan dengan mesin bensin. Bisa dipakai di Meta Quest, HP dengan kacamata VR, maupun layar biasa.
+          <p className="mt-3 max-w-xl text-[13px] sm:text-base text-slate-300 leading-snug sm:leading-relaxed">
+            Pelajari komponen mobil listrik, rakit sendiri mobilnya, dan bandingkan dengan mesin bensin.
+            <span className="hidden sm:inline"> Bisa dipakai di Meta Quest, HP dengan kacamata VR, maupun layar biasa.</span>
           </p>
 
-          <div className="mt-7 flex flex-wrap items-center gap-3">
+          <div className="mt-5 sm:mt-7 flex flex-wrap items-center gap-2.5 sm:gap-3">
             <button
               id="btn-home-start"
               onClick={onStart}
-              className="group inline-flex items-center gap-3 bg-cyan-400 hover:bg-cyan-300 active:scale-95 text-slate-950 font-extrabold text-base sm:text-lg px-7 py-4 rounded-2xl shadow-xl shadow-cyan-500/25 transition-all cursor-pointer"
+              className="group inline-flex items-center gap-3 bg-cyan-400 hover:bg-cyan-300 active:scale-95 text-slate-950 font-extrabold text-base sm:text-lg px-6 sm:px-7 py-3 sm:py-4 rounded-2xl shadow-xl shadow-cyan-500/25 transition-all cursor-pointer"
             >
               Masuk Lab
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="transition-transform group-hover:translate-x-1" aria-hidden="true">
@@ -54,7 +55,7 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
             <button
               id="btn-home-privacy"
               onClick={() => setPrivacy(true)}
-              className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 active:scale-95 border border-white/15 text-slate-200 font-bold text-sm px-5 py-4 rounded-2xl transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 active:scale-95 border border-white/15 text-slate-200 font-bold text-[13px] sm:text-sm px-4 sm:px-5 py-3 sm:py-4 rounded-2xl transition-all cursor-pointer"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6l8-3z" />
@@ -63,24 +64,25 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
               Kebijakan Privasi
             </button>
           </div>
-          <p className="mt-3 text-xs text-slate-400">Tanpa login · tanpa internet setelah dibuka pertama kali</p>
+          <p className="mt-2.5 text-[11px] sm:text-xs text-slate-400">Tanpa login · tanpa internet setelah dibuka pertama kali</p>
 
-          <div className="mt-9 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* HP mendatar (layar pendek): kartu fitur disembunyikan agar tidak perlu menggulir */}
+          <div className="mt-5 sm:mt-9 grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 [@media(max-height:520px)]:hidden">
             {FEATURES.map((f) => (
-              <div key={f.title} className="rounded-2xl bg-white/[0.04] border border-white/10 p-4">
-                <span className="w-9 h-9 rounded-xl bg-emerald-400/15 border border-emerald-300/30 flex items-center justify-center mb-3">
+              <div key={f.title} className="rounded-2xl bg-white/[0.04] border border-white/10 p-2.5 sm:p-4 flex sm:block items-center gap-2.5">
+                <span className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-xl bg-emerald-400/15 border border-emerald-300/30 flex items-center justify-center sm:mb-3">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="#6ee7b7" aria-hidden="true">
                     <path d={f.path} />
                   </svg>
                 </span>
-                <p className="font-extrabold text-sm">{f.title}</p>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">{f.desc}</p>
+                <p className="font-extrabold text-xs sm:text-sm leading-tight">{f.title}</p>
+                <p className="hidden sm:block text-xs text-slate-400 mt-1 leading-relaxed">{f.desc}</p>
               </div>
             ))}
           </div>
         </div>
 
-        <p className="text-[11px] text-slate-500">Smart Vocational untuk Electric Vehicle · media ajar kendaraan listrik</p>
+        <p className="hidden sm:block [@media(max-height:520px)]:hidden text-[11px] text-slate-500">Smart Vocational untuk Electric Vehicle · media ajar kendaraan listrik</p>
       </div>
 
       {privacy && (
