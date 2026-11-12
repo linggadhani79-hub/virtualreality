@@ -21,6 +21,13 @@ async function manifestFiles() {
 
 // "Kerangka" aplikasi: halaman + kode + gaya (± 2–3 MB). Hanya ini yang ditunggu saat memasang,
 // supaya versi baru langsung aktif walau internet lambat.
+// Hosting mengalihkan sebagian alamat (mis. /privasi.html → /privasi). Jawaban hasil pengalihan
+// tidak boleh dipakai untuk navigasi, jadi disalin menjadi jawaban biasa sebelum disimpan.
+async function clean(res) {
+  if (!res.redirected) return res;
+  return new Response(await res.blob(), { status: res.status, statusText: res.statusText, headers: res.headers });
+}
+
 const isShell = (f) => f === "/" || f.startsWith("/assets/");
 
 async function store(files, report) {
@@ -31,7 +38,7 @@ async function store(files, report) {
     try {
       if (!(await cache.match(url))) {
         const r = await fetch(url, { cache: "no-cache" });
-        if (r.ok) await cache.put(url, r);
+        if (r.ok) await cache.put(url, await clean(r));
       }
     } catch {}
     done++;
@@ -82,8 +89,10 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/.well-known/")) return;
 
-  // Halaman: coba versi terbaru dulu, pakai salinan tersimpan bila offline
-  if (req.mode === "navigate") {
+  // Halaman utama: coba versi terbaru dulu, pakai salinan tersimpan bila offline.
+  // Hanya untuk "/": navigasi lain (mis. dialog Kebijakan Privasi membuka /privasi.html di iframe)
+  // dulu ikut disimpan sebagai "/" dan menimpa salinan offline aplikasi.
+  if (req.mode === "navigate" && url.pathname === "/") {
     event.respondWith(
       fetch(req)
         .then((res) => {
@@ -102,7 +111,7 @@ self.addEventListener("fetch", (event) => {
       if (hit) return hit;
       try {
         const res = await fetch(req);
-        if (res.ok && res.status === 200) cache.put(req, res.clone());
+        if (res.ok && res.status === 200) cache.put(req, await clean(res.clone()));
         return res;
       } catch {
         // Offline dan berkas memang tidak ada di aplikasi (mis. data /lab opsional)
