@@ -27,6 +27,7 @@ import { AuthButton } from "./components/AuthButton";
 import { VROptimizer } from "./components/VROptimizer";
 import { WebXRControllerManager } from "./components/WebXRControllerManager";
 import { EVEntranceScreen } from "./components/EVEntranceScreen";
+import { HomeScreen } from "./components/HomeScreen";
 import { GuardianBoundary } from "./components/GuardianBoundary";
 import { TRIAL_NO_AUTH, LOCAL_ONLY } from "./lib/appConfig";
 import { clampToWorld } from "./lib/worldBounds";
@@ -1367,13 +1368,11 @@ export default function App() {
   }, [isCloudAdmin, workspaceLoaded]);
 
   const [appState, setAppState] = useState<"select_mode" | "scanning" | "downloading" | "ready" | "playing">(
-    // Mode lokal: aplikasi langsung masuk lab (admin bawaan) tanpa layar pilih mode / unduh.
-    // "Keluar Map" tetap membuka layar pilih mode bila ingin berganti ke Mode Mahasiswa.
-    LOCAL_ONLY && TRIAL_NO_AUTH ? "downloading" : "select_mode",
+    // Mode lokal: dibuka di beranda (HomeScreen); tombol "Masuk Lab" langsung masuk tanpa memilih
+    // mode maupun layar unduh. Tombol keluar di lab kembali ke beranda.
+    "select_mode",
   );
-  const [activeMode, setActiveMode] = useState<"admin" | "guest" | null>(
-    LOCAL_ONLY && TRIAL_NO_AUTH ? "admin" : null,
-  );
+  const [activeMode, setActiveMode] = useState<"admin" | "guest" | null>(null);
   const [pendingModels, setPendingModels] = useState<Set<string>>(new Set());
   const [isScanning, setIsScanning] = useState(false);
   const [scanTotalSize, setScanTotalSize] = useState<number>(0);
@@ -2449,7 +2448,16 @@ export default function App() {
         </div>
       )}
 
-      {appState !== "playing" && !(LOCAL_ONLY && appState === "downloading") && (
+      {LOCAL_ONLY && appState === "select_mode" && (
+        <HomeScreen
+          onStart={() => {
+            setActiveMode("admin");
+            setAppState("downloading");
+          }}
+        />
+      )}
+
+      {!LOCAL_ONLY && appState !== "playing" && (
         <EVEntranceScreen
           appState={appState}
           setAppState={setAppState}

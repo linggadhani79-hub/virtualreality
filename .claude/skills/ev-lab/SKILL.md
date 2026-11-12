@@ -27,6 +27,7 @@ dilanggar (tanpa database, aset ditanam, tanpa unggah/unduh, langsung pakai, des
 | `src/App.tsx` | Aplikasi utama, `Player` (gerak, kamera), UI 2D, dok tombol |
 | `src/components/TestLabEnvironment.tsx` | Hanggar, aspal, marka, poster, langit, penempatan semua stasiun & zona |
 | `src/components/LabProps.tsx` | Peralatan buatan sendiri (kerucut, pembatas, bengkel, lift dengan tombol naik/turun, troli, lemari APD, APAR) dengan bentuk membulat |
+| `src/components/HomeScreen.tsx`, `public/privasi.html` | Beranda (tombol Masuk Lab) dan teks Kebijakan Privasi (satu sumber, ditampilkan lewat iframe) |
 | `src/components/AssemblyGame.tsx` | Game "Rakit Mobil Listrik" (urutan komponen, layar skor, tombol PETUNJUK / ULANGI) |
 | `src/components/DrivingTrack.tsx` | Lintasan aspal luar ala ujian SIM + mobil yang berkeliling dan mampir mengisi daya |
 | `src/components/HumanCharacter.tsx` | Avatar teknisi (mode orang ketiga), animasi jalan & lompat |
@@ -94,6 +95,7 @@ Satu objek harus bisa dipilih dengan mouse, laser Quest, dan tatapan VR HP. Sela
 ## Menguji
 
 - `npm run lint` dan `npm run build` wajib lolos.
+- Aplikasi dibuka di beranda: klik `#btn-home-start` dulu sebelum menunggu `window.__evlab`.
 - Uji tampilan dengan Playwright (Chromium sudah terpasang; pakai
   `--use-gl=swiftshader --enable-unsafe-swiftshader`). Saat `npm run dev`, `window.__evlab`
   berisi `{ scene, gl, camera }`: cari objek dengan `scene.traverse` dan panggil
