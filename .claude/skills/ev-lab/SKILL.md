@@ -41,7 +41,7 @@ dilanggar (tanpa database, aset ditanam, tanpa unggah/unduh, langsung pakai, des
 | `src/components/PhoneVR.tsx`, `src/lib/phoneVR.ts` | VR HP (layar ganda, giroskop, tatapan) |
 | `src/lib/glb.ts` | `loadGlb` (cache + Meshopt), `fitModel`, bantuan kanvas |
 | `src/lib/quality.ts` | Tingkat kualitas `hq`/`lite`, `modelUrl(nama)` |
-| `src/lib/worldBounds.ts` | Dinding yang menahan pemain |
+| `src/lib/worldBounds.ts` | Tabrakan pemain: daftar kotak (tembok + aset) yang tidak bisa ditembus. Daftarnya `SOLIDS` di `TestLabEnvironment.tsx` — **tambahkan kotak baru setiap menaruh benda baru** |
 | `scripts/build-car-model.mjs` | Mengolah model mobil (pisah roda per komponen mesh, kompres) |
 | `scripts/split-fused-wheels.mjs` | Memotong roda dari mobil yang rodanya menyatu dengan bodi (dipakai `mobil-konsep`) |
 | `scripts/darken-car-glass.mjs` | Menggelapkan kaca mobil pada tekstur (dijalankan pada `mobil-*.glb`) |
@@ -120,7 +120,6 @@ Satu objek harus bisa dipilih dengan mouse, laser Quest, dan tatapan VR HP. Sela
   hanya menunggu kerangka aplikasi (`/` dan `/assets/*`); model disimpan setelah halaman mengirim
   pesan `precache`. Jangan mengembalikan unduhan model ke tahap `install`: di internet lambat versi
   baru jadi tidak kunjung aktif dan perangkat terus menampilkan versi lama.
-- Tabrakan dengan peralatan (hanya dinding hanggar yang menahan pemain).
 - Slide modul hanya teks (belum gambar/video).
 - Modul buatan admin tersimpan di perangkat itu; agar berlaku di semua perangkat, simpan JSON-nya
   sebagai `public/lab/modul.json` lalu build ulang.

@@ -23,9 +23,9 @@ const io = new NodeIO().registerExtensions([...ALL_EXTENSIONS, EXTMeshoptCompres
 const doc = await io.read(inp);
 const root = doc.getRoot();
 const total = root.listMeshes().flatMap((m) => m.listPrimitives()).reduce((s, p) => s + p.getIndices().getCount() / 3, 0);
+// Roda dipotong pada resolusi penuh dulu (tepi potongan halus), baru semuanya disederhanakan
+// dengan tepi dikunci supaya garis potong tidak bergerigi.
 await doc.transform(dedup(), weld());
-if (+trisArg < total) await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio: +trisArg / total, error: 0.002 }));
-await doc.transform(prune());
 
 const node = root.listNodes().find((n) => n.getMesh());
 const mesh = node.getMesh();
@@ -66,7 +66,13 @@ const wheels = [];
 for (const cx of centers) for (const sz of [-1, 1]) wheels.push({ cx, sz, name: `wheel_${cx < 0 ? 'A' : 'B'}${sz < 0 ? 'L' : 'R'}` });
 const inWheel = (i, w) => Math.sign(pos[i * 3 + 2]) === w.sz && Math.abs(pos[i * 3 + 2]) > zin && Math.hypot(pos[i * 3] - w.cx, pos[i * 3 + 1] - cy) < r * 1.015;
 const owner = new Int8Array(idx.length / 3).fill(-1);
-for (let t = 0; t < idx.length; t += 3) for (let w = 0; w < 4; w++) if (inWheel(idx[t], wheels[w]) && inWheel(idx[t + 1], wheels[w]) && inWheel(idx[t + 2], wheels[w])) { owner[t / 3] = w; break; }
+// segitiga ikut roda bila titik tengahnya di dalam silinder roda
+const triIn = (t, w) => {
+  const a = idx[t], b = idx[t + 1], c = idx[t + 2];
+  const x = (pos[a * 3] + pos[b * 3] + pos[c * 3]) / 3, y = (pos[a * 3 + 1] + pos[b * 3 + 1] + pos[c * 3 + 1]) / 3, z = (pos[a * 3 + 2] + pos[b * 3 + 2] + pos[c * 3 + 2]) / 3;
+  return Math.sign(z) === w.sz && Math.abs(z) > zin && Math.hypot(x - w.cx, y - cy) < r * 1.01;
+};
+for (let t = 0; t < idx.length; t += 3) for (let w = 0; w < 4; w++) if (triIn(t, wheels[w])) { owner[t / 3] = w; break; }
 
 const buffer = root.listBuffers()[0];
 const makePrim = (who, center) => {
@@ -97,6 +103,7 @@ wheels.forEach((w, i) => {
 });
 
 await doc.transform(prune());
+if (+trisArg < total) await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio: +trisArg / total, error: 0.002, lockBorder: true }));
 await doc.transform(textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [+texArg, +texArg], quality: 90 }));
 await doc.transform(meshopt({ encoder: MeshoptEncoder, level: 'medium', quantizePosition: 16, quantizeNormal: 12, quantizeTexcoord: 14 }));
 await io.write(out, doc);

@@ -1,36 +1,52 @@
 import type * as THREE from "three";
 
 /**
- * Batas dunia sederhana untuk pemain: persegi panjang (dinding) dengan satu bukaan pintu.
- * Diisi oleh lingkungan yang sedang tampil; null = tanpa batas.
+ * Tabrakan sederhana untuk pemain: daftar kotak (tembok, etalase, peralatan) yang tidak boleh
+ * ditembus, dari sisi mana pun. Diisi oleh lingkungan yang sedang tampil; null = bebas.
+ *
+ * Pemain dianggap lingkaran berjari-jari RADIUS. Bila langkah baru masuk ke sebuah kotak, gerakan
+ * pada salah satu sumbu dibatalkan sehingga pemain "meluncur" di sepanjang permukaannya.
  */
-export const worldBounds: {
-  current: null | {
-    minX: number;
-    maxX: number;
-    minZ: number;
-    maxZ: number;
-    /** bukaan pintu pada dinding maxZ */
-    door?: { minX: number; maxX: number };
-  };
-} = { current: null };
+export type Box = { minX: number; maxX: number; minZ: number; maxZ: number };
 
-const MARGIN = 0.45;
+export const worldBounds: { current: null | { boxes: Box[]; limit: Box } } = { current: null };
 
-/** Menahan posisi pemain di dalam dinding (boleh keluar lewat pintu). */
+/** Kotak dari titik tengah + setengah ukuran. */
+export const boxAt = (x: number, z: number, hx: number, hz = hx): Box => ({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
+
+const RADIUS = 0.35;
+let lastX = 0;
+let lastZ = 0;
+let hasLast = false;
+
+function blocked(boxes: Box[], x: number, z: number) {
+  for (let i = 0; i < boxes.length; i++) {
+    const b = boxes[i];
+    if (x > b.minX - RADIUS && x < b.maxX + RADIUS && z > b.minZ - RADIUS && z < b.maxZ + RADIUS) return true;
+  }
+  return false;
+}
+
+/** Menahan posisi pemain agar tidak menembus tembok / aset. Dipanggil tiap frame. */
 export function clampToWorld(pos: THREE.Vector3) {
-  const b = worldBounds.current;
-  if (!b) return;
-  const inDoorway = !!b.door && pos.x > b.door.minX + MARGIN && pos.x < b.door.maxX - MARGIN;
-  const outside = pos.z > b.maxZ - MARGIN;
-  if (outside && inDoorway) {
-    // di ambang / luar pintu: hanya batasi agar tidak menembus kusen
-    if (pos.z < b.maxZ + MARGIN) {
-      pos.x = Math.min(b.door!.maxX - MARGIN, Math.max(b.door!.minX + MARGIN, pos.x));
-    }
+  const w = worldBounds.current;
+  if (!w) {
+    hasLast = false;
     return;
   }
-  if (pos.z > b.maxZ + MARGIN) return; // sudah di luar gedung
-  pos.x = Math.min(b.maxX - MARGIN, Math.max(b.minX + MARGIN, pos.x));
-  pos.z = Math.min(b.maxZ - MARGIN, Math.max(b.minZ + MARGIN, pos.z));
+  pos.x = Math.min(w.limit.maxX, Math.max(w.limit.minX, pos.x));
+  pos.z = Math.min(w.limit.maxZ, Math.max(w.limit.minZ, pos.z));
+  // lompatan jauh (pindah tempat / mulai ulang) tidak dianggap berjalan
+  if (!hasLast || Math.hypot(pos.x - lastX, pos.z - lastZ) > 2) {
+    hasLast = true;
+  } else if (blocked(w.boxes, pos.x, pos.z) && !blocked(w.boxes, lastX, lastZ)) {
+    if (!blocked(w.boxes, pos.x, lastZ)) pos.z = lastZ;
+    else if (!blocked(w.boxes, lastX, pos.z)) pos.x = lastX;
+    else {
+      pos.x = lastX;
+      pos.z = lastZ;
+    }
+  }
+  lastX = pos.x;
+  lastZ = pos.z;
 }

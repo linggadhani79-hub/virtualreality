@@ -317,24 +317,35 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
     return { canvas, texture };
   }, []);
   useEffect(() => () => status.texture.dispose(), [status]);
-  const drawStatus = (pct: number) => {
+  /** Papan di atas mobil: isi baterai + apa yang sedang terjadi pada energinya. */
+  const drawStatus = (pct: number, mode: "drive" | "regen" | "charge" | "stop", kmh: number) => {
     const ctx = status.canvas.getContext("2d")!;
+    const color = mode === "regen" ? "#22d3ee" : mode === "charge" ? "#4ade80" : mode === "stop" ? "#94a3b8" : "#fbbf24";
     ctx.clearRect(0, 0, 512, 160);
     ctx.fillStyle = "rgba(11,18,32,0.92)";
     ctx.beginPath();
     (ctx as any).roundRect?.(4, 4, 504, 152, 30) ?? ctx.rect(4, 4, 504, 152);
     ctx.fill();
-    ctx.strokeStyle = "#22c55e";
+    ctx.strokeStyle = color;
     ctx.lineWidth = 6;
     ctx.stroke();
-    ctx.fillStyle = "#4ade80";
-    ctx.font = "900 44px system-ui, sans-serif";
     ctx.textBaseline = "top";
-    ctx.fillText(`MENGISI DAYA  ${pct}%`, 30, 24);
+    ctx.textAlign = "left";
+    ctx.fillStyle = color;
+    ctx.font = "900 36px system-ui, sans-serif";
+    const label =
+      mode === "regen" ? "REM REGENERATIF \u25B2 baterai terisi" : mode === "charge" ? "MENGISI DAYA di stasiun" : mode === "stop" ? "BERHENTI" : "MELAJU \u25BC memakai daya";
+    ctx.fillText(label, 26, 20, 460);
     ctx.fillStyle = "#1e293b";
-    ctx.fillRect(30, 92, 452, 36);
-    ctx.fillStyle = "#22c55e";
-    ctx.fillRect(30, 92, 4.52 * pct, 36);
+    ctx.fillRect(26, 78, 330, 30);
+    ctx.fillStyle = pct < 25 ? "#f87171" : color;
+    ctx.fillRect(26, 78, 3.3 * pct, 30);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "900 40px system-ui, sans-serif";
+    ctx.fillText(`${pct}%`, 372, 70);
+    ctx.fillStyle = "#cbd5e1";
+    ctx.font = "600 24px system-ui, sans-serif";
+    ctx.fillText(`Baterai  ·  ${kmh} km/jam`, 26, 118);
     status.texture.needsUpdate = true;
   };
 
@@ -342,7 +353,8 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
   const carRef = useRef<THREE.Group>(null);
   const statusRef = useRef<THREE.Mesh>(null);
   const cableRef = useRef<THREE.Mesh>(null);
-  const sim = useRef({ s: sRight + side - 4, v: 0, lap: 0, wait: 0, stopped: "" as "" | "zebra" | "charge", lastPct: -1, didZebra: false, didCharge: false });
+  const brakeRef = useRef<THREE.Group>(null);
+  const sim = useRef({ s: sRight + side - 4, v: 0, lap: 0, wait: 0, stopped: "" as "" | "zebra" | "charge", lastPct: -1, didZebra: false, didCharge: false, soc: 62, mode: "", lastKmh: -1 });
   const _p = useRef(new THREE.Vector3());
   const _t = useRef(new THREE.Vector3());
   const _n = useRef(new THREE.Vector3());
@@ -367,16 +379,14 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
       stopKind = "charge";
     }
 
+    let mode: "drive" | "regen" | "charge" | "stop" = m.stopped === "charge" ? "charge" : "stop";
     if (m.wait > 0) {
       m.wait -= delta;
       m.v = 0;
+      // di stasiun baterai terisi; mobil baru berangkat setelah penuh
       if (m.stopped === "charge") {
-        const total = 9;
-        const pct = Math.min(100, Math.round(35 + (1 - m.wait / total) * 65));
-        if (pct !== m.lastPct) {
-          m.lastPct = pct;
-          drawStatus(pct);
-        }
+        m.soc = Math.min(100, m.soc + 9 * delta);
+        if (m.soc < 100) m.wait = Math.max(m.wait, 0.5);
       }
       if (m.wait <= 0) m.stopped = "";
     } else {
@@ -391,7 +401,13 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
           else m.didZebra = true;
         }
       }
+      const braking = target < m.v - 0.05;
       m.v += Math.sign(target - m.v) * Math.min(Math.abs(target - m.v), ACCEL * delta);
+      // Energi: melaju memakai daya; saat mengerem motor menjadi generator dan mengisi baterai.
+      // (Angka diperbesar agar perubahan terlihat dalam satu putaran lintasan.)
+      if (braking && m.v > 0.3) m.soc = Math.min(100, m.soc + 1.6 * delta);
+      else m.soc = Math.max(8, m.soc - 0.42 * (m.v / CRUISE) * delta);
+      mode = braking && m.v > 0.3 ? "regen" : m.v > 0.2 ? "drive" : "stop";
       const before = Math.floor(m.s / L);
       const ds = Math.max(m.v, stopAt >= 0 ? 0.25 : 0) * delta;
       m.s += ds;
@@ -421,10 +437,19 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
       if (d < 1.6) g.position.y += Math.cos((d / 1.6) * (Math.PI / 2)) * 0.07;
     }
     const isCharging = m.stopped === "charge";
+    const pct = Math.round(m.soc);
+    const kmh = Math.round(m.v * 3.6);
+    if (pct !== m.lastPct || mode !== m.mode || Math.abs(kmh - m.lastKmh) >= 2) {
+      m.lastPct = pct;
+      m.mode = mode;
+      m.lastKmh = kmh;
+      drawStatus(pct, mode, kmh);
+    }
     if (statusRef.current) {
-      statusRef.current.visible = isCharging;
+      statusRef.current.position.set(g.position.x, 2.75, g.position.z);
       statusRef.current.quaternion.copy(state.camera.quaternion);
     }
+    if (brakeRef.current) brakeRef.current.visible = mode === "regen" || mode === "stop" || mode === "charge";
     if (cableRef.current) cableRef.current.visible = isCharging;
   });
 
@@ -458,6 +483,7 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
       </group>
       <RoadSign position={[zebra.p.x + 5.2, 0, zebra.p.z + ROAD_W / 2 + 0.8]} facing={Math.PI / 2} lines={["STOP"]} bg="#dc2626" />
 
+      <RoadSign position={[cones[0].p.x - ROAD_W / 2 - 0.8, 0, cones[0].p.z + 13]} facing={0} lines={["REM REGENERATIF", "Mengerem = mengisi baterai"]} bg="#0e7490" />
       {/* ----- 2. Zig-zag ----- */}
       {cones.map((c, i) => (
         <group key={i} position={[c.p.x, 0.012, c.p.z]}>
@@ -506,13 +532,24 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
       <mesh ref={cableRef} geometry={cable} visible={false} raycast={noRaycast}>
         <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.8} roughness={0.5} />
       </mesh>
-      <mesh ref={statusRef} position={[bay.p.x, 2.6, bay.p.z]} visible={false} raycast={noRaycast}>
-        <planeGeometry args={[2.6, 0.81]} />
+      <mesh ref={statusRef} raycast={noRaycast} renderOrder={20}>
+        <planeGeometry args={[3.0, 0.94]} />
         <meshBasicMaterial map={status.texture} transparent toneMapped={false} depthWrite={false} />
       </mesh>
 
       {/* ----- Mobil listrik yang berkeliling ----- */}
-      <group ref={carRef}>{car && <primitive object={car} />}</group>
+      <group ref={carRef}>
+        {car && <primitive object={car} />}
+        {/* lampu rem (bagian belakang mobil = +X): menyala saat mengerem / berhenti */}
+        <group ref={brakeRef} visible={false}>
+          {[-0.62, 0.62].map((z) => (
+            <mesh key={z} position={[2.17, 0.93, z]} scale={[0.25, 0.4, 1]} raycast={noRaycast}>
+              <sphereGeometry args={[0.16, 14, 10]} />
+              <meshBasicMaterial color="#ff2a2a" toneMapped={false} />
+            </mesh>
+          ))}
+        </group>
+      </group>
     </group>
   );
 }
