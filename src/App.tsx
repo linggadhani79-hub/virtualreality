@@ -1228,6 +1228,22 @@ function AdaptiveUI({
   );
 }
 
+// Penanda "sedang di dalam lab" per tab: bertahan saat halaman dimuat ulang, hilang saat tab ditutup.
+const IN_LAB_KEY = "evlab_in_lab";
+function wasInLab(): boolean {
+  try {
+    return sessionStorage.getItem(IN_LAB_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function markInLab(on: boolean) {
+  try {
+    if (on) sessionStorage.setItem(IN_LAB_KEY, "1");
+    else sessionStorage.removeItem(IN_LAB_KEY);
+  } catch {}
+}
+
 export default function App() {
   const [viewMode, setViewMode] = useState<"tpp" | "fpp" | "dev">("fpp");
   const [mobileMode, setMobileMode] = useState(isMobile);
@@ -1378,9 +1394,11 @@ export default function App() {
   const [appState, setAppState] = useState<"select_mode" | "scanning" | "downloading" | "ready" | "playing">(
     // Mode lokal: dibuka di beranda (HomeScreen); tombol "Masuk Lab" langsung masuk tanpa memilih
     // mode maupun layar unduh. Tombol keluar di lab kembali ke beranda.
-    "select_mode",
+    // Bila halaman termuat ulang saat pengguna sudah di dalam lab (pembaruan versi, atau browser HP
+    // memuat ulang tab karena memori), langsung kembali ke lab — bukan ke beranda.
+    LOCAL_ONLY && wasInLab() ? "downloading" : "select_mode",
   );
-  const [activeMode, setActiveMode] = useState<"admin" | "guest" | null>(null);
+  const [activeMode, setActiveMode] = useState<"admin" | "guest" | null>(LOCAL_ONLY && wasInLab() ? "admin" : null);
   const [pendingModels, setPendingModels] = useState<Set<string>>(new Set());
   const [isScanning, setIsScanning] = useState(false);
   const [scanTotalSize, setScanTotalSize] = useState<number>(0);
@@ -2415,6 +2433,7 @@ export default function App() {
                 isAdmin={activeIsAdmin}
                 activeMode={activeMode}
                 onExitMap={() => {
+                  markInLab(false);
                   setActiveMode(null);
                   setAppState("select_mode");
                 }}
@@ -2459,6 +2478,7 @@ export default function App() {
       {LOCAL_ONLY && appState === "select_mode" && (
         <HomeScreen
           onStart={() => {
+            markInLab(true);
             setActiveMode("admin");
             setAppState("downloading");
           }}

@@ -32,6 +32,11 @@ if (import.meta.env.PROD && "serviceWorker" in navigator && window.self === wind
     sw.addEventListener("controllerchange", () => {
       // hanya sesaat setelah dibuka: jangan memotong pemakaian (mis. sedang di dalam VR)
       if (!hadController || reloaded || performance.now() > 90_000) return;
+      // Sudah masuk lab: jangan memuat ulang di tengah pemakaian (aset sedang dimuat, pengguna
+      // sedang melihat-lihat). Versi baru dipakai pada pembukaan berikutnya.
+      try {
+        if (sessionStorage.getItem("evlab_in_lab") === "1") return;
+      } catch {}
       reloaded = true;
       window.location.reload();
     });
