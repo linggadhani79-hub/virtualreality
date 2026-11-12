@@ -34,7 +34,7 @@ function onDeviceMotion(e: DeviceMotionEvent) {
   const now = performance.now();
   if (bump > 1.6 && now - lastStepAt > 280) {
     // dua hentakan berdekatan baru dianggap berjalan, supaya menoleh / menggeser HP tidak dihitung
-    stepStreak = now - lastStepAt < 1100 ? stepStreak + 1 : 1;
+    stepStreak = now - lastStepAt < 1500 ? stepStreak + 1 : 1;
     lastStepAt = now;
     if (stepStreak >= 2) phoneVR.stepUntil = now + 650;
   }
@@ -173,3 +173,6 @@ export function stopPhoneVR() {
 export function recenterPhoneVR() {
   headingOffset = null;
 }
+
+// Hanya saat pengembangan: memudahkan pengujian otomatis
+if (import.meta.env.DEV && typeof window !== "undefined") (window as any).__phoneVR = phoneVR;
