@@ -48,6 +48,8 @@ Media ajar kendaraan listrik (EV) berbasis **WebXR**. Satu kode sumber, bisa dij
 - **Modul Ajar Digital (admin)**: tombol di panel kanan untuk menulis modul dan slide. Tersimpan di
   perangkat; agar berlaku di semua perangkat, tekan *Salin JSON* dan simpan sebagai
   `public/lab/modul.json`, lalu build ulang.
+- **Area parkir & SPBU** (di luar, sisi barat): mobil bensin dan mobil listrik berjalan bersama dengan
+  meteran jarak, biaya, dan emisi; papan "Boros mana?" membandingkannya langsung; SPBU dan petak parkir.
 - **Kualitas Aset**: *Tinggi* (bawaan di PC) atau *Ringan* (bawaan di Quest/HP agar mulus). Bisa
   diganti lewat tombol di panel kanan.
 
