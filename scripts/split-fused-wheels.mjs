@@ -5,6 +5,7 @@
 //   npm i --no-save meshoptimizer sharp
 //   node scripts/split-fused-wheels.mjs <asli.glb> public/models/<nama>-hq.glb   200000 2048
 //   node scripts/split-fused-wheels.mjs <asli.glb> public/models/<nama>-lite.glb  50000 1024
+//   (mobil klasik berspatbor rapat) ... 60000 1024 0.078 0.36 tetap 0.8
 //
 // Argumen: jumlah segitiga sasaran, ukuran tekstur, lalu (opsional) jari-jari roda dan lebar roda
 // sebagai pecahan panjang / lebar mobil bila tebakan otomatis meleset.
@@ -16,7 +17,12 @@ import { weld, simplify, dedup, prune, textureCompress, meshopt } from '@gltf-tr
 import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
 
-const [inp, out, trisArg, texArg, rArg, wArg] = process.argv.slice(2);
+const [inp, out, trisArg, texArg, rArg, wArg, modeArg, discArg] = process.argv.slice(2);
+// modeArg 'tetap': pakai poros & jari-jari dari argumen apa adanya (tanpa penyesuaian otomatis).
+// discArg: bagian jari-jari yang ikut berputar (mis. 0.8 = hanya pelek + dinding ban; telapak ban
+// tetap di bodi). Dipakai untuk mobil yang spatbornya menutup rapat ban (mobil klasik), supaya
+// spatbor tidak ikut terpotong dan berputar.
+const DISC = discArg ? +discArg : 1;
 await MeshoptDecoder.ready; await MeshoptEncoder.ready; await MeshoptSimplifier.ready;
 const io = new NodeIO().registerExtensions([...ALL_EXTENSIONS, EXTMeshoptCompression])
   .registerDependencies({ 'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder });
@@ -75,14 +81,14 @@ const triIn = (t, w) => {
   // Di sisi dalam roda, lingkar luarnya adalah lapisan spatbor yang ikut terpotong: bila ikut roda
   // ia menjadi serpihan bergerigi yang berputar. Bagian itu dibiarkan diam di bodi.
   const inner = Math.abs(z) < zin + (zmax - zin) * 0.3;
-  return rad < (inner ? 0.9 : 1.01);
+  return rad < (inner ? 0.9 : 1.01) * DISC;
 };
 const assign = () => { owner.fill(-1); for (let t = 0; t < idx.length; t += 3) for (let w = 0; w < 4; w++) if (triIn(t, wheels[w])) { owner[t / 3] = w; break; } };
 assign();
 // Titik putar tiap roda = tengah lingkar bannya sendiri (bukan tebakan poros bersama); poros yang
 // meleset beberapa milimeter saja membuat roda tampak oleng saat berputar. Ban diukur dari titik
 // terluar (|z| besar) supaya lengkung spatbor yang ikut terpotong tidak menggeser hasilnya.
-for (let pass = 0; pass < 2; pass++) {
+for (let pass = 0; pass < (modeArg === 'tetap' ? 0 : 2); pass++) {
   wheels.forEach((w, wi) => {
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     for (let t = 0; t < idx.length; t += 3) {
