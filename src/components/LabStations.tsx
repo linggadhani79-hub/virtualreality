@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { disableRaycast, fitModel, loadGlb, roundedRectShape, wrapText } from "../lib/glb";
 import { modelUrl } from "../lib/quality";
 import { playVRClickSound } from "../lib/vrAudio";
@@ -499,6 +500,9 @@ function AnswerButton({
   );
 }
 
+const kioskBase = new RoundedBoxGeometry(2.6, 0.1, 0.8, 6, 0.045);
+const kioskBack = new RoundedBoxGeometry(2.34, 2.16, 0.08, 6, 0.035);
+
 export function QuizStation({
   position,
   facing = 0,
@@ -630,22 +634,20 @@ export function QuizStation({
   return (
     <group position={position} rotation={[0, facing, 0]} name="QuizStation">
       {/* Kaki & badan kios */}
-      <mesh position={[0, 0.04, 0]} raycast={noRaycast}>
-        <boxGeometry args={[2.5, 0.08, 0.7]} />
+      <mesh geometry={kioskBase} position={[0, 0.05, 0]} raycast={noRaycast}>
         <meshStandardMaterial color="#111827" metalness={0.7} roughness={0.4} />
       </mesh>
       {[-1.05, 1.05].map((x) => (
-        <mesh key={x} position={[x, 1.25, -0.06]} raycast={noRaycast}>
-          <boxGeometry args={[0.09, 2.4, 0.09]} />
+        <mesh key={x} position={[x, 1.3, -0.06]} raycast={noRaycast}>
+          <capsuleGeometry args={[0.055, 2.4, 6, 20]} />
           <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.35} />
         </mesh>
       ))}
-      <mesh position={[0, 1.42, -0.05]} raycast={noRaycast}>
-        <boxGeometry args={[2.34, 2.12, 0.06]} />
+      <mesh geometry={kioskBack} position={[0, 1.42, -0.05]} raycast={noRaycast}>
         <meshStandardMaterial color="#0b1220" metalness={0.5} roughness={0.5} />
       </mesh>
-      <mesh position={[0, 2.5, -0.02]} raycast={noRaycast}>
-        <boxGeometry args={[2.34, 0.035, 0.1]} />
+      <mesh position={[0, 2.52, -0.04]} rotation={[0, 0, Math.PI / 2]} raycast={noRaycast}>
+        <capsuleGeometry args={[0.03, 2.2, 6, 16]} />
         <meshBasicMaterial color="#22d3ee" toneMapped={false} />
       </mesh>
 

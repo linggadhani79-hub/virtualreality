@@ -201,6 +201,36 @@ function drawScreen(
     .forEach((line, i) => ctx.fillText(line, 88, my + 24 + i * 52));
 }
 
+function makeTagTexture(num: number, label: string, color: string) {
+  const c = document.createElement("canvas");
+  c.width = 512;
+  c.height = 112;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "rgba(11,18,32,0.9)";
+  ctx.beginPath();
+  (ctx as any).roundRect?.(4, 4, 504, 104, 52) ?? ctx.rect(4, 4, 504, 104);
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 6;
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(58, 56, 36, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#0b1220";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "900 46px system-ui, sans-serif";
+  ctx.fillText("?", 58, 59);
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "left";
+  ctx.font = "800 40px system-ui, sans-serif";
+  ctx.fillText(label, 112, 59, 380);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 const gameButtonGeometry = new THREE.ExtrudeGeometry(roundedRectShape(0.62, 0.24, 0.06), {
   depth: 0.035,
   bevelEnabled: true,
@@ -255,8 +285,8 @@ function GameButton({ label, color, position, onPress }: { label: string; color:
   );
 }
 
-const platformGeometry = new RoundedBoxGeometry(5.6, PLATFORM_Y, 2.8, 4, 0.05);
-const standTop = new RoundedBoxGeometry(1, 0.06, 1, 3, 0.028);
+const platformGeometry = new RoundedBoxGeometry(5.6, PLATFORM_Y, 2.8, 6, 0.055);
+const standTop = new RoundedBoxGeometry(1, 0.06, 1, 6, 0.029);
 const postGeometry = new THREE.CylinderGeometry(0.09, 0.11, 4.3, 16);
 const hintGeometry = new THREE.ConeGeometry(0.16, 0.34, 20);
 const cableCurve = new THREE.CatmullRomCurve3([
@@ -298,6 +328,47 @@ export function AssemblyGame({
   const rootRef = useRef<THREE.Group>(null);
   const shake = useRef<{ index: number; t: number }>({ index: -1, t: 0 });
   const finished = done >= STEPS.length;
+  const tags = useMemo(() => STEPS.map((st, i) => makeTagTexture(i + 1, st.label, st.color)), []);
+  useEffect(() => () => tags.forEach((t) => t.dispose()), [tags]);
+  const tagRefs = useRef<(THREE.Mesh | null)[]>([]);
+  const help = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = 1024;
+    c.height = 640;
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "rgba(11,18,32,0.97)";
+    ctx.beginPath();
+    (ctx as any).roundRect?.(6, 6, 1012, 628, 34) ?? ctx.rect(6, 6, 1012, 628);
+    ctx.fill();
+    ctx.strokeStyle = "#facc15";
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    ctx.textBaseline = "top";
+    ctx.fillStyle = "#facc15";
+    ctx.font = "900 60px system-ui, sans-serif";
+    ctx.fillText("CARA BERMAIN", 46, 40);
+    ctx.fillStyle = "#e2e8f0";
+    ctx.font = "600 36px system-ui, sans-serif";
+    const lines = [
+      "1. Lihat komponen berlabel di sekitar panggung.",
+      "2. Pilih (klik / laser / tatap) komponen yang harus",
+      "    dipasang lebih dulu. Mulai dari dasar mobil.",
+      "3. Benar: komponen terbang ke tempatnya.",
+      "    Salah: komponen bergoyang, coba yang lain.",
+      "4. Enam komponen terpasang = mobil selesai.",
+      "PETUNJUK: panah kuning menunjuk komponen berikutnya.",
+      "Skor & langkah ada di layar dinding kanan.",
+    ];
+    lines.forEach((l, i) => {
+      ctx.fillStyle = i >= 6 ? "#67e8f9" : "#e2e8f0";
+      ctx.fillText(l, 46, 130 + i * 58, 940);
+    });
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    return t;
+  }, []);
+  useEffect(() => () => help.dispose(), [help]);
 
   // ---- model komponen (salinan; geometri & tekstur dipakai bersama dengan etalase) ----
   useEffect(() => {
@@ -380,6 +451,8 @@ export function AssemblyGame({
       if (step.lift > 0 && step.id !== "kabel") g.rotation.y = (1 - e) * state.clock.elapsedTime * 0.5;
     });
     if (shake.current.t > 0) shake.current.t = Math.max(0, shake.current.t - delta);
+    // label nama selalu menghadap pemain
+    for (const tag of tagRefs.current) if (tag) tag.quaternion.copy(state.camera.quaternion);
     if (hintRef.current) {
       const step = STEPS[done];
       hintRef.current.visible = hint && !!step;
@@ -478,6 +551,17 @@ export function AssemblyGame({
         <mesh geometry={standTop} position={[0, 0.56, 0]} scale={[2.0, 1, 1.3]} raycast={noRaycast}>
           <meshStandardMaterial color="#334155" metalness={0.6} roughness={0.45} />
         </mesh>
+        {/* pegangan dorong */}
+        <mesh position={[-1.05, 0.8, 0]} rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast}>
+          <capsuleGeometry args={[0.022, 1.0, 6, 14]} />
+          <meshStandardMaterial color="#cbd5e1" metalness={0.8} roughness={0.3} />
+        </mesh>
+        {[-0.5, 0.5].map((z) => (
+          <mesh key={z} position={[-1.02, 0.68, z]} rotation={[0, 0, 0.12]} raycast={noRaycast}>
+            <cylinderGeometry args={[0.02, 0.02, 0.26, 12]} />
+            <meshStandardMaterial color="#cbd5e1" metalness={0.8} roughness={0.3} />
+          </mesh>
+        ))}
         {[
           [-0.85, -0.5],
           [0.85, -0.5],
@@ -486,7 +570,7 @@ export function AssemblyGame({
         ].map(([x, z], i) => (
           <group key={i} position={[x, 0, z]}>
             <mesh position={[0, 0.32, 0]} raycast={noRaycast}>
-              <cylinderGeometry args={[0.025, 0.025, 0.44, 10]} />
+              <cylinderGeometry args={[0.025, 0.025, 0.44, 16]} />
               <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.3} />
             </mesh>
             <mesh position={[0, 0.06, 0]} rotation={[0, 0, Math.PI / 2]} raycast={noRaycast}>
@@ -534,6 +618,20 @@ export function AssemblyGame({
               </mesh>
             </>
           )}
+          {/* label nama: hilang setelah komponen terpasang */}
+          {i >= done && (
+            <mesh
+              ref={(m) => {
+                tagRefs.current[i] = m;
+              }}
+              position={[0, step.pick[1] + 0.22, 0]}
+              raycast={noRaycast}
+              renderOrder={30}
+            >
+              <planeGeometry args={[0.92, 0.2]} />
+              <meshBasicMaterial map={tags[i]} transparent depthWrite={false} toneMapped={false} />
+            </mesh>
+          )}
           {/* kotak pilih (tak terlihat); hilang setelah terpasang agar tidak menghalangi laser */}
           {i >= done && (
             <mesh
@@ -572,6 +670,21 @@ export function AssemblyGame({
         <mesh position={[0, 0, 0.02]} raycast={noRaycast}>
           <planeGeometry args={[3.5, 3.5 * (720 / 1600)]} />
           <meshBasicMaterial map={texture} toneMapped={false} />
+        </mesh>
+      </group>
+      {/* papan cara bermain di samping konsol */}
+      <group position={[-1.9, 0, 4.7]} rotation={[0, 0.25, 0]}>
+        <mesh position={[0, 0.55, 0]} raycast={noRaycast}>
+          <cylinderGeometry args={[0.035, 0.05, 1.1, 28]} />
+          <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.35} />
+        </mesh>
+        <mesh position={[0, 0.012, 0]} raycast={noRaycast}>
+          <cylinderGeometry args={[0.2, 0.22, 0.024, 28]} />
+          <meshStandardMaterial color="#111827" metalness={0.7} roughness={0.4} />
+        </mesh>
+        <mesh position={[0, 1.42, 0.02]} rotation={[-0.25, 0, 0]} raycast={noRaycast}>
+          <planeGeometry args={[1.5, 0.9375]} />
+          <meshBasicMaterial map={help} transparent toneMapped={false} side={THREE.DoubleSide} />
         </mesh>
       </group>
       {/* konsol tombol di depan pemain */}
