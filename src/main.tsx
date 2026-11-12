@@ -24,7 +24,20 @@ if (import.meta.env.PROD && "serviceWorker" in navigator && window.self === wind
   window.addEventListener("load", () => {
     // Tingkat kualitas ikut di alamat: bila pengguna mengganti "Kualitas Aset", service worker baru
     // terpasang dan menyimpan model tingkat itu untuk dipakai offline.
-    navigator.serviceWorker.register(`/sw.js?tier=${qualityTier}`).catch(() => {});
+    const sw = navigator.serviceWorker;
+    // Versi baru mengambil alih saat halaman versi lama masih terbuka → muat ulang sekali,
+    // supaya pengguna tidak perlu menyegarkan sendiri untuk melihat pembaruan.
+    const hadController = !!sw.controller;
+    let reloaded = false;
+    sw.addEventListener("controllerchange", () => {
+      // hanya sesaat setelah dibuka: jangan memotong pemakaian (mis. sedang di dalam VR)
+      if (!hadController || reloaded || performance.now() > 90_000) return;
+      reloaded = true;
+      window.location.reload();
+    });
+    sw.register(`/sw.js?tier=${qualityTier}`).catch(() => {});
+    // Setelah halaman tampil, minta service worker menyimpan model 3D untuk pemakaian offline
+    sw.ready.then((reg) => reg.active?.postMessage({ type: "precache" })).catch(() => {});
     // Minta browser tidak menghapus simpanan offline saat ruang penyimpanan menipis
     navigator.storage?.persist?.().catch(() => {});
   });

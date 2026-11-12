@@ -113,7 +113,10 @@ Satu objek harus bisa dipilih dengan mouse, laser Quest, dan tatapan VR HP. Sela
 ## Yang belum ada / diketahui kurang
 
 - Jangan menaruh bidang besar yang nyaris berimpit (selisih < 2 cm) dengan lantai: tembus di VR HP.
-- Service worker menyimpan tingkat kualitas yang dikirim halaman (`/sw.js?tier=`).
+- Service worker menyimpan tingkat kualitas yang dikirim halaman (`/sw.js?tier=`). Saat memasang ia
+  hanya menunggu kerangka aplikasi (`/` dan `/assets/*`); model disimpan setelah halaman mengirim
+  pesan `precache`. Jangan mengembalikan unduhan model ke tahap `install`: di internet lambat versi
+  baru jadi tidak kunjung aktif dan perangkat terus menampilkan versi lama.
 - Tabrakan dengan peralatan (hanya dinding hanggar yang menahan pemain).
 - Slide modul hanya teks (belum gambar/video).
 - Modul buatan admin tersimpan di perangkat itu; agar berlaku di semua perangkat, simpan JSON-nya
