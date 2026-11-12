@@ -12,7 +12,8 @@ Untuk pekerjaan apa pun di repo ini, baca dulu `.claude/skills/ev-lab/SKILL.md`.
 - **Aset ditanam di aplikasi** (`public/models`, `public/lab`), bukan diunduh dari luar. Tidak ada
   CDN: decoder, font, dan pencahayaan semuanya lokal.
 - **Tidak ada fitur unggah/unduh aset** di aplikasi. Sisi admin = mengisi **Modul Ajar Digital**.
-- **Langsung pakai:** dibuka langsung ke lab, tanpa login, tanpa layar unduh.
+- **Tanpa pilihan mode:** aplikasi dibuka di beranda (`HomeScreen`) dengan tombol *Masuk Lab* dan
+  *Kebijakan Privasi*; tidak ada layar Mode Mahasiswa / Mode Admin, login, maupun layar unduh.
 - **Jangan mengubah desain/tampilan mobil.** Perbaikan pada model hanya yang diminta.
 - **Mulus di Quest lebih penting** dari jumlah segitiga: pakai dua tingkat kualitas (`-hq`/`-lite`).
 
