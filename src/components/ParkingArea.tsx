@@ -466,7 +466,7 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
       {/* papan perbandingan (menghadap timur, ke arah datangnya pemain) */}
       <group position={[BOARD.x, 0, BOARD.z]} rotation={[0, Math.PI / 2, 0]}>
         {[-2.9, 2.9].map((x) => (
-          <mesh key={x} position={[x, 1.2, -0.06]} raycast={noRaycast}>
+          <mesh key={x} position={[x, 1.2, -0.22]} raycast={noRaycast}>
             <cylinderGeometry args={[0.09, 0.11, 2.4, 14]} />
             <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.35} />
           </mesh>
