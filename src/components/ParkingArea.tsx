@@ -9,8 +9,9 @@ import { InfoSign, Scenery, StaticModel } from "./LabStations";
 /**
  * Area parkir & SPBU di sisi barat, di luar lintasan uji.
  *
- *  - Jalan lingkar tempat dua mobil terus berjalan berdampingan waktu: mobil BENSIN dan mobil
- *    LISTRIK. Di atas tiap mobil ada meteran jarak, biaya, dan emisi yang terus bertambah.
+ *  - Jalan lingkar tempat sepasang mobil (BENSIN dan LISTRIK) berjalan dengan meteran jarak,
+ *    biaya, dan emisi di atasnya. Tiap dua putaran pasangan itu pulang ke petak parkir dan
+ *    pasangan yang parkir berangkat menggantikan. Semua roda berputar sesuai jarak tempuh.
  *  - Papan besar "Boros mana?" yang membandingkan keduanya secara langsung.
  *  - SPBU (pengisian bensin) berukuran nyata, petak parkir, dan mobil yang diparkir.
  *
@@ -57,9 +58,6 @@ const BOARD = { x: -58.8, z: 10.5 };
 export const PARKING_SOLIDS = [
   // papan perbandingan
   { minX: BOARD.x - 0.4, maxX: BOARD.x + 0.4, minZ: BOARD.z - 3.3, maxZ: BOARD.z + 3.3 },
-  // mobil yang diparkir
-  { minX: BAYS[0].x - 1.1, maxX: BAYS[0].x + 1.1, minZ: BAY_Z - 2.4, maxZ: BAY_Z + 2.4 },
-  { minX: BAYS[2].x - 1.1, maxX: BAYS[2].x + 1.1, minZ: BAY_Z - 2.4, maxZ: BAY_Z + 2.4 },
 ];
 
 /* ---------------- lintasan lingkar ---------------- */
@@ -281,21 +279,115 @@ const resetGeometry = new THREE.ExtrudeGeometry(roundedRectShape(1.5, 0.42, 0.1)
 
 /* ---------------- komponen utama ---------------- */
 
-type CarDef = { model: string; offset: number; flip: boolean };
+/**
+ * Armada: dua pasang (bensin + listrik). Satu pasang berjalan di jalan lingkar, pasangan lain
+ * parkir; tiap beberapa putaran mereka bergantian. `noseMinusX` = hidung model menghadap -X.
+ */
+type CarDef = { model: string; kind: "bensin" | "listrik"; bay: number; noseMinusX: boolean; pair: 0 | 1 };
+const FLEET: CarDef[] = [
+  { model: "klasik-roda", kind: "bensin", bay: 0, noseMinusX: true, pair: 0 },
+  { model: "mpv-roda", kind: "listrik", bay: 2, noseMinusX: true, pair: 0 },
+  { model: "suv-roda", kind: "bensin", bay: 1, noseMinusX: true, pair: 1 },
+  { model: "mobil", kind: "listrik", bay: 3, noseMinusX: true, pair: 1 },
+];
+const SPEED = 5.2; // m/s di jalan lingkar
+const PARK_SPEED = 2.6; // m/s saat keluar / masuk petak
+const LAPS_PER_TURN = 2;
+
+type Curve = { pts: THREE.Vector3[]; dist: number[]; length: number };
+
+function polyline(points: [number, number][]): Curve {
+  const pts = points.map(([x, z]) => new THREE.Vector3(x, 0, z));
+  const dist = [0];
+  for (let i = 1; i < pts.length; i++) dist.push(dist[i - 1] + pts[i].distanceTo(pts[i - 1]));
+  return { pts, dist, length: dist[dist.length - 1] };
+}
+
+function bezier(p0: [number, number], p1: [number, number], p2: [number, number], p3: [number, number], n = 24): [number, number][] {
+  const out: [number, number][] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const a = (1 - t) ** 3, b = 3 * (1 - t) ** 2 * t, c = 3 * (1 - t) * t * t, d = t ** 3;
+    out.push([a * p0[0] + b * p1[0] + c * p2[0] + d * p3[0], a * p0[1] + b * p1[1] + c * p2[1] + d * p3[1]]);
+  }
+  return out;
+}
+
+function sampleCurve(curve: Curve, s: number, outPos: THREE.Vector3): number {
+  s = Math.min(Math.max(s, 0), curve.length);
+  let lo = 0;
+  while (lo < curve.pts.length - 2 && curve.dist[lo + 1] < s) lo++;
+  const a = curve.pts[lo];
+  const b = curve.pts[lo + 1];
+  const t = (s - curve.dist[lo]) / (curve.dist[lo + 1] - curve.dist[lo] || 1);
+  outPos.set(a.x + (b.x - a.x) * t, 0, a.z + (b.z - a.z) * t);
+  return Math.atan2(b.x - a.x, b.z - a.z);
+}
+
+const SOUTH_Z = PARKING.cz + PARKING.hz; // lurusan selatan (mobil melaju ke barat)
+const EAST_X = PARKING.cx + PARKING.hx; // lurusan timur (mobil melaju ke selatan)
+const JOIN_Z = 11;
+
+/** Dari lurusan selatan belok kanan masuk petak, berhenti menghadap utara. */
+function enterCurve(bayX: number): Curve {
+  return polyline(bezier([bayX + 5, SOUTH_Z], [bayX + 1.6, SOUTH_Z], [bayX, SOUTH_Z - 2], [bayX, BAY_Z]));
+}
+
+/** Keluar petak ke utara, belok ke timur melintasi pelataran, lalu belok kanan ke lurusan timur. */
+function exitCurve(bayX: number): Curve {
+  return polyline([
+    [bayX, BAY_Z],
+    ...bezier([bayX, 9.8], [bayX, 6.9], [bayX + 2.4, 6.3], [-38.8, 6.3]).slice(0),
+    ...bezier([-38.8, 6.3], [-35.2, 6.3], [EAST_X, 7.2], [EAST_X, JOIN_Z]).slice(1),
+  ]);
+}
+
+/** Jarak di sepanjang jalan lingkar untuk sebuah titik pada lurusan selatan / timur. */
+function loopS(path: LoopPath, x: number, z: number): number {
+  let best = 0;
+  let bestD = Infinity;
+  for (let i = 0; i < path.pts.length; i++) {
+    const d = (path.pts[i].x - x) ** 2 + (path.pts[i].z - z) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  }
+  return path.dist[best];
+}
+
+type CarState = {
+  mode: "parked" | "exiting" | "loop" | "entering";
+  s: number; // jarak pada kurva yang sedang diikuti
+  driven: number; // total jarak tempuh (untuk putaran roda)
+  wantPark: boolean;
+};
 
 export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: number; z1: number } }) {
   const root = useRef<THREE.Group>(null);
   const path = useMemo(buildLoop, []);
-  const cars: CarDef[] = useMemo(
-    () => [
-      { model: "mobil-klasik", offset: 0, flip: false },
-      { model: "mobil-mpv", offset: 0.5, flip: true },
-    ],
-    [],
+  const curves = useMemo(
+    () =>
+      FLEET.map((car) => {
+        const x = BAYS[car.bay].x;
+        return { enter: enterCurve(x), exit: exitCurve(x), sEnter: loopS(path, x + 5, SOUTH_Z), sJoin: loopS(path, EAST_X, JOIN_Z) };
+      }),
+    [path],
   );
   const carRefs = useRef<(THREE.Group | null)[]>([]);
   const labelRefs = useRef<(THREE.Mesh | null)[]>([]);
-  const [carObjects, setCarObjects] = useState<(THREE.Object3D | null)[]>([null, null]);
+  const wheelRefs = useRef<{ node: THREE.Object3D; radius: number }[][]>(FLEET.map(() => []));
+  const [carObjects, setCarObjects] = useState<(THREE.Object3D | null)[]>(FLEET.map(() => null));
+  // pasangan 0 mulai di jalan (berseberangan), pasangan 1 mulai parkir
+  const states = useRef<CarState[]>(
+    FLEET.map((car, i) => ({
+      mode: car.pair === 0 ? "loop" : "parked",
+      s: car.pair === 0 ? (i === 0 ? 0 : 0.5) * path.length : 0,
+      driven: 0,
+      wantPark: false,
+    })),
+  );
+  const fleet = useRef({ active: 0 as 0 | 1, phase: "drive" as "drive" | "return" | "depart", phaseDist: 0, departTimer: 0 });
   const travelled = useRef(0); // meter di lintasan
   const lastDraw = useRef(-1);
   const [hotReset, setHotReset] = useState(false);
@@ -313,6 +405,7 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
 
   const meters = useMemo(
     () =>
+      // satu meteran per jenis: [bensin, listrik]
       [0, 1].map(() => {
         const canvas = document.createElement("canvas");
         canvas.width = 640;
@@ -344,17 +437,24 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
 
   useEffect(() => {
     let cancelled = false;
-    cars.forEach((car, i) => {
+    FLEET.forEach((car, i) => {
       loadGlb(modelUrl(car.model))
         .then((shared) => {
           if (cancelled) return;
           const model = shared.clone();
           // Model memanjang di sumbu X; putar agar hidung mobil searah +Z lokal (arah gerak)
           const holder = new THREE.Group();
-          model.rotation.y = car.flip ? Math.PI / 2 : -Math.PI / 2;
+          model.rotation.y = car.noseMinusX ? Math.PI / 2 : -Math.PI / 2;
           holder.add(model);
-          fitModel(holder, 4.5);
+          const scale = fitModel(holder, 4.5);
           disableRaycast(holder);
+          const wheels: { node: THREE.Object3D; radius: number }[] = [];
+          holder.traverse((o) => {
+            if (o.name.startsWith("wheel_") && !o.parent?.name.startsWith("wheel_")) {
+              wheels.push({ node: o, radius: ((o.userData.radius as number) || 0.15) * scale });
+            }
+          });
+          wheelRefs.current[i] = wheels;
           setCarObjects((prev) => {
             const next = [...prev];
             next[i] = holder;
@@ -366,7 +466,7 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
     return () => {
       cancelled = true;
     };
-  }, [cars]);
+  }, []);
 
   const redraw = () => {
     const km = (travelled.current * ASSUMPTIONS.scale) / 1000;
@@ -401,19 +501,110 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
     if (inside) return;
 
     const delta = Math.min(rawDelta, 0.05);
-    travelled.current += delta * 5.2; // m/s
-    cars.forEach((car, i) => {
+    // (saat pengembangan, window.__timeScale mempercepat simulasi untuk pengujian)
+    const reps = import.meta.env.DEV ? Math.max(1, Math.round((window as any).__timeScale || 1)) : 1;
+    for (let rep = 0; rep < reps; rep++) {
+    const f = fleet.current;
+    const L = path.length;
+
+    // ---- giliran: pasangan aktif berjalan beberapa putaran, pulang parkir, lalu pasangan lain berangkat ----
+    if (f.phase === "drive") {
+      f.phaseDist += delta * SPEED;
+      travelled.current += delta * SPEED; // meteran hanya menghitung saat kedua mobil sama-sama melaju
+      if (f.phaseDist >= LAPS_PER_TURN * L) {
+        f.phase = "return";
+        FLEET.forEach((car, i) => {
+          if (car.pair === f.active) states.current[i].wantPark = true;
+        });
+      }
+    } else if (f.phase === "return") {
+      if (FLEET.every((car, i) => car.pair !== f.active || states.current[i].mode === "parked")) {
+        f.active = f.active === 0 ? 1 : 0;
+        f.phase = "depart";
+        f.departTimer = 0;
+      }
+    } else {
+      // berangkat satu per satu dengan jeda supaya tidak beriringan terlalu rapat
+      f.departTimer += delta;
+      let k = 0;
+      FLEET.forEach((car, i) => {
+        if (car.pair !== f.active) return;
+        const st = states.current[i];
+        if (st.mode === "parked" && f.departTimer > k * 9) {
+          st.mode = "exiting";
+          st.s = 0;
+        }
+        k++;
+      });
+      if (FLEET.every((car, i) => car.pair !== f.active || states.current[i].mode === "loop")) {
+        f.phase = "drive";
+        f.phaseDist = 0;
+      }
+    }
+
+    FLEET.forEach((car, i) => {
       const g = carRefs.current[i];
       if (!g) return;
-      const heading = samplePath(path, travelled.current + car.offset * path.length, tmp);
+      const st = states.current[i];
+      const c = curves[i];
+      let heading = 0;
+      let step = 0;
+      if (st.mode === "loop") {
+        step = delta * SPEED;
+        const before = ((st.s % L) + L) % L;
+        st.s += step;
+        const after = ((st.s % L) + L) % L;
+        // saatnya pulang: begitu melewati titik belok ke petaknya, pindah ke jalur masuk
+        const crossed = before <= c.sEnter ? after >= c.sEnter && after - before < L / 2 : after >= c.sEnter && after < before;
+        if (st.wantPark && crossed) {
+          st.mode = "entering";
+          st.s = 0;
+          st.wantPark = false;
+        }
+        heading = samplePath(path, st.s, tmp);
+        if (st.mode === "entering") heading = sampleCurve(c.enter, 0, tmp);
+      } else if (st.mode === "entering") {
+        // melambat halus menjelang berhenti
+        const left = c.enter.length - st.s;
+        step = delta * Math.max(0.5, Math.min(SPEED, PARK_SPEED + left * 0.25)) * (left < 0.05 ? 0 : 1);
+        st.s += step;
+        heading = sampleCurve(c.enter, st.s, tmp);
+        if (st.s >= c.enter.length - 0.05) {
+          st.mode = "parked";
+          st.s = 0;
+        }
+      } else if (st.mode === "exiting") {
+        step = delta * Math.min(SPEED, 1.2 + st.s * 0.45);
+        st.s += step;
+        heading = sampleCurve(c.exit, st.s, tmp);
+        if (st.s >= c.exit.length) {
+          st.mode = "loop";
+          st.s = c.sJoin;
+        }
+      } else {
+        tmp.set(BAYS[car.bay].x, 0, BAY_Z);
+        heading = Math.PI; // menghadap utara (-Z)
+      }
       g.position.copy(tmp);
       g.rotation.y = heading;
-      const label = labelRefs.current[i];
-      if (label) {
-        label.position.set(tmp.x, 3.1, tmp.z);
-        label.rotation.y = Math.atan2(camPos.x - tmp.x, camPos.z - tmp.z);
+
+      // roda menggelinding sesuai jarak tempuh
+      if (step > 0) {
+        const sign = car.noseMinusX ? 1 : -1;
+        for (const w of wheelRefs.current[i]) w.node.rotation.z += (sign * step) / w.radius;
+      }
+
+      // meteran mengikuti mobil yang sedang berada di jalan, per jenis
+      if (st.mode !== "parked") {
+        const label = labelRefs.current[car.kind === "bensin" ? 0 : 1];
+        if (label) {
+          label.visible = true;
+          label.position.set(tmp.x, 3.1, tmp.z);
+          label.rotation.y = Math.atan2(camPos.x - tmp.x, camPos.z - tmp.z);
+        }
       }
     });
+    }
     // Meteran & papan digambar ulang ±2 kali per detik (bukan tiap frame)
     if (state.clock.elapsedTime - lastDraw.current > 0.5) {
       lastDraw.current = state.clock.elapsedTime;
@@ -440,27 +631,35 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
         <meshStandardMaterial color="#2f3136" roughness={0.95} />
       </mesh>
 
-      {/* dua mobil yang terus berjalan + meteran di atasnya */}
-      {cars.map((car, i) => (
-        <group key={car.model}>
-          <group
-            ref={(g) => {
-              carRefs.current[i] = g;
-            }}
-          >
-            {carObjects[i] && <primitive object={carObjects[i]!} />}
-          </group>
-          <mesh
-            ref={(m) => {
-              labelRefs.current[i] = m;
-            }}
-            raycast={noRaycast}
-            renderOrder={10}
-          >
-            <planeGeometry args={[3.6, 1.406]} />
-            <meshBasicMaterial map={meters[i].texture} transparent depthWrite={false} toneMapped={false} />
-          </mesh>
+      {/* armada: sepasang berjalan, sepasang parkir, bergantian */}
+      {FLEET.map((car, i) => (
+        <group
+          key={car.model}
+          name={`Parking_car_${car.model}`}
+          ref={(g) => {
+            carRefs.current[i] = g;
+          }}
+          position={[BAYS[car.bay].x, 0, BAY_Z]}
+          rotation={[0, Math.PI, 0]}
+        >
+          {carObjects[i] && <primitive object={carObjects[i]!} />}
         </group>
+      ))}
+      {/* meteran: satu untuk mobil bensin, satu untuk mobil listrik yang sedang di jalan */}
+      {[0, 1].map((k) => (
+        <mesh
+          key={k}
+          name={`Parking_meter_${k}`}
+          ref={(m) => {
+            labelRefs.current[k] = m;
+          }}
+          visible={false}
+          raycast={noRaycast}
+          renderOrder={10}
+        >
+          <planeGeometry args={[3.6, 1.406]} />
+          <meshBasicMaterial map={meters[k].texture} transparent depthWrite={false} toneMapped={false} />
+        </mesh>
       ))}
 
       {/* papan perbandingan (menghadap timur, ke arah datangnya pemain) */}
@@ -505,8 +704,8 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
         title="SPBU — Pengisian Bensin"
         subtitle="Mobil bermesin bakar"
         accent="#f97316"
-        position={[-38.6, 0, 6.6]}
-        facing={0.9}
+        position={[-36.9, 0, 4.3]}
+        facing={-2.4}
         facts={[
           "Isi penuh ±5 menit, tetapi hanya 25–30% energi bensin menjadi gerak; sisanya panas.",
           "Setiap liter bensin yang dibakar menghasilkan ±2,3 kg CO₂ dari knalpot.",
@@ -526,10 +725,6 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
           "Lihat SPBU, petak parkir, dan papan \"Boros mana?\".",
         ]}
       />
-
-      {/* mobil yang diparkir */}
-      <StaticModel model="mobil-klasik" size={4.5} position={[BAYS[0].x, 0, BAY_Z]} rotation={Math.PI / 2} lod={false} />
-      <StaticModel model="zerone" size={4.5} position={[BAYS[2].x, 0, BAY_Z]} rotation={Math.PI / 2} lod={false} />
 
       {/* pepohonan di sekeliling */}
       <Scenery
