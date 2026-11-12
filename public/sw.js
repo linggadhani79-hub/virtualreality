@@ -15,7 +15,8 @@ async function manifestFiles() {
   // hanya cadangan.
   const asked = new URL(self.location.href).searchParams.get("tier");
   const lite = asked ? asked === "lite" : /OculusBrowser|Quest|Pico|Android|iPhone|iPad|iPod/i.test(self.navigator.userAgent);
-  const skip = lite ? /-hq\.glb$/ : /-lite\.glb$/;
+  // "-far" = model jarak jauh, hanya dipakai tingkat ringan
+  const skip = lite ? /-hq\.glb$/ : /-(lite|far)\.glb$/;
   return files.filter((f) => !skip.test(f));
 }
 

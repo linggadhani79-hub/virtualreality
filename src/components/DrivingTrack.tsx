@@ -151,6 +151,12 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
   const gate = { s0: sBack + 10, len: 12 };
   const bumps = [sBack + front - 16, sBack + front - 10];
   const chargeS = sRight + side / 2;
+  const corners: [number, number][] = [
+    [front, sLeft],
+    [sLeft + side, sBack],
+    [sBack + front, sRight],
+    [sRight + side, L],
+  ];
   const PULL = -1.7; // menepi ke luar (negatif = sisi luar lintasan)
 
   const pointAt = (s: number, out: THREE.Vector3, tan?: THREE.Vector3) => {
@@ -189,6 +195,8 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
     if (s > slalom.s0 - 8 && s < slalom.s0 + slalom.d * slalom.n + 2) return 3.2;
     if (s > gate.s0 - 6 && s < gate.s0 + gate.len + 2) return 2.6;
     if (bumps.some((b) => near(b, 5))) return 1.8;
+    // tikungan: pelan (mobil mengerem sebelum membelok → rem regeneratif)
+    if (corners.some(([a, b]) => s >= a && s <= b)) return 3.4;
     return CRUISE;
   };
 
@@ -279,6 +287,13 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
         root.traverse((o) => {
           if (!o.name.startsWith("wheel_")) return;
           wheels.push({ node: o, radius: ((o.userData.radius as number) || 0.16) * scale });
+          // cakram gelap menutup sisi dalam roda, supaya sela jari-jari tidak memperlihatkan
+          // bagian dalam model
+          const rr = (o.userData.radius as number) || 0.16;
+          const back = new THREE.Mesh(new THREE.CircleGeometry(rr * 0.9, 28), new THREE.MeshBasicMaterial({ color: 0x0b0d12, side: THREE.DoubleSide }));
+          back.position.z = (o.name.endsWith("L") ? -1 : 1) * ((o.userData.inner as number) || 0.29);
+          back.raycast = () => {};
+          o.add(back);
           const m = o as THREE.Mesh;
           if (m.isMesh) {
             // dua sisi: bagian dalam roda hasil potongan tidak tampak bolong saat berputar
@@ -390,7 +405,12 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
       }
       if (m.wait <= 0) m.stopped = "";
     } else {
+      // Lihat ke depan: mulai mengerem lebih awal supaya sudah pelan saat tiba di rintangan / tikungan
       let target = speedLimit(sLap);
+      for (let d = 1; d <= 14; d += 1) {
+        const lim = speedLimit((sLap + d) % L);
+        target = Math.min(target, Math.sqrt(lim * lim + 2 * ACCEL * 0.7 * d));
+      }
       if (stopAt >= 0) {
         const gap = stopAt - sLap;
         target = Math.min(target, Math.sqrt(Math.max(0, 2 * ACCEL * 0.8 * gap)));
