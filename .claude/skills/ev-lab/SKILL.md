@@ -42,6 +42,7 @@ dilanggar (tanpa database, aset ditanam, tanpa unggah/unduh, langsung pakai, des
 | `src/lib/quality.ts` | Tingkat kualitas `hq`/`lite`, `modelUrl(nama)` |
 | `src/lib/worldBounds.ts` | Dinding yang menahan pemain |
 | `scripts/build-car-model.mjs` | Mengolah model mobil (pisah roda per komponen mesh, kompres) |
+| `scripts/split-fused-wheels.mjs` | Memotong roda dari mobil yang rodanya menyatu dengan bodi (dipakai `mobil-konsep`) |
 | `scripts/darken-car-glass.mjs` | Menggelapkan kaca mobil pada tekstur (dijalankan pada `mobil-*.glb`) |
 | `scripts/build-part-model.mjs` | Mengolah model komponen/pemandangan menjadi `-hq` / `-lite` |
 | `public/xr-profiles/` | Tata letak tombol controller (JSON) agar pustaka XR tidak mengambil dari CDN |

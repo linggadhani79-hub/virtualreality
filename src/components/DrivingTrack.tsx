@@ -263,6 +263,7 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
 
   // ---- model mobil & stasiun ----
   const [car, setCar] = useState<THREE.Object3D | null>(null);
+  const carWheels = useRef<{ node: THREE.Object3D; radius: number }[]>([]);
   const [solar, setSolar] = useState<THREE.Object3D | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -270,8 +271,25 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
       .then((shared) => {
         if (cancelled) return;
         const root = shared.clone();
-        fitModel(root, 4.4);
+        const scale = fitModel(root, 4.4);
         disableRaycast(root);
+        // Roda dipisah menjadi node "wheel_*" (scripts/split-fused-wheels.mjs) supaya bisa berputar
+        const wheels: { node: THREE.Object3D; radius: number }[] = [];
+        let wheelMat: THREE.Material | null = null;
+        root.traverse((o) => {
+          if (!o.name.startsWith("wheel_")) return;
+          wheels.push({ node: o, radius: ((o.userData.radius as number) || 0.16) * scale });
+          const m = o as THREE.Mesh;
+          if (m.isMesh) {
+            // dua sisi: bagian dalam roda hasil potongan tidak tampak bolong saat berputar
+            if (!wheelMat) {
+              wheelMat = (m.material as THREE.Material).clone();
+              wheelMat.side = THREE.DoubleSide;
+            }
+            m.material = wheelMat;
+          }
+        });
+        carWheels.current = wheels;
         setCar(root);
       })
       .catch((err) => console.warn("[DrivingTrack] Mobil gagal dimuat:", err));
@@ -375,7 +393,10 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
       }
       m.v += Math.sign(target - m.v) * Math.min(Math.abs(target - m.v), ACCEL * delta);
       const before = Math.floor(m.s / L);
-      m.s += Math.max(m.v, stopAt >= 0 ? 0.25 : 0) * delta;
+      const ds = Math.max(m.v, stopAt >= 0 ? 0.25 : 0) * delta;
+      m.s += ds;
+      // roda menggelinding sesuai jarak tempuh (depan mobil = -X, poros roda = Z)
+      for (const w of carWheels.current) w.node.rotation.z += ds / w.radius;
       if (Math.floor(m.s / L) !== before) {
         m.lap++;
         m.didZebra = false;

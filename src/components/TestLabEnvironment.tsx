@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { ExhibitStand, InfoSign, QuizStation, Scenery, StaticModel } from "./LabStations";
 import { ReadingCorner } from "./ReadingCorner";
 import { Barrier, Cone, DiagnosticCart, Extinguisher, Lift, SafetyStation, Workshop } from "./LabProps";
@@ -344,6 +345,10 @@ function FloorDecal({
   );
 }
 
+const lampHousing = new RoundedBoxGeometry(3.7, 0.1, 0.8, 4, 0.045);
+const lampDiffuser = new RoundedBoxGeometry(3.5, 0.1, 0.62, 5, 0.048);
+const beamGeometry = new RoundedBoxGeometry(1, 0.3, 0.25, 4, 0.06);
+
 export function TestLabEnvironment() {
   const W = HALL.x1 - HALL.x0;
   const D = HALL.z1 - HALL.z0;
@@ -492,15 +497,25 @@ export function TestLabEnvironment() {
       </mesh>
       {trussZ.map((z) => (
         <group key={z} position={[cx, 0, z]}>
-          <mesh position={[0, HALL.h - 0.35, 0]} raycast={noRaycast}>
-            <boxGeometry args={[W, 0.3, 0.25]} />
+          <mesh geometry={beamGeometry} position={[0, HALL.h - 0.35, 0]} scale={[W, 1, 1]} raycast={noRaycast}>
             <meshStandardMaterial color="#475569" metalness={0.6} roughness={0.45} />
           </mesh>
           {Array.from({ length: Math.round(W / 6.3) }, (_, i) => (i + 0.5) * (W / Math.round(W / 6.3)) - W / 2).map((x) => (
-            <mesh key={x} position={[x, HALL.h - 0.75, 2]} raycast={noRaycast}>
-              <boxGeometry args={[3.6, 0.08, 0.7]} />
-              <meshBasicMaterial color="#f8fafc" toneMapped={false} />
-            </mesh>
+            <group key={x} position={[x, HALL.h - 0.72, 2]}>
+              {/* rumah lampu + penutup membulat + batang gantung */}
+              <mesh geometry={lampHousing} position={[0, 0.07, 0]} raycast={noRaycast}>
+                <meshStandardMaterial color="#334155" metalness={0.6} roughness={0.4} />
+              </mesh>
+              <mesh geometry={lampDiffuser} raycast={noRaycast}>
+                <meshBasicMaterial color="#f8fafc" toneMapped={false} />
+              </mesh>
+              {[-1.3, 1.3].map((dx) => (
+                <mesh key={dx} position={[dx, 0.25, 0]} raycast={noRaycast}>
+                  <cylinderGeometry args={[0.015, 0.015, 0.32, 10]} />
+                  <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.3} />
+                </mesh>
+              ))}
+            </group>
           ))}
         </group>
       ))}
