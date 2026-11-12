@@ -4,6 +4,8 @@ import { ExhibitStand, InfoSign, QuizStation, Scenery, StaticModel } from "./Lab
 import { ReadingCorner } from "./ReadingCorner";
 import { Barrier, Cone, DiagnosticCart, Extinguisher, Lift, SafetyStation, Workshop } from "./LabProps";
 import { LabBuilding } from "./LabBuilding";
+import { AssemblyGame } from "./AssemblyGame";
+import { DrivingTrack } from "./DrivingTrack";
 import { worldBounds } from "../lib/worldBounds";
 
 /**
@@ -14,11 +16,14 @@ import { worldBounds } from "../lib/worldBounds";
  * plafon, stasiun pengisian, kerucut & pembatas, bengkel kecil, serta poster materi.
  *
  * Tata letak (meter, titik mulai pemain di 0,0,0 menghadap -Z):
- *   hanggar  : X -14..14, Z -14..6, tinggi 7
+ *   hanggar  : X -14..24, Z -14..6, tinggi 7 (X 14..24 = area game merakit mobil)
  *   lintasan : sepanjang sumbu X pada Z = -6 (tempat contoh mobil berjalan)
  */
 
-const HALL = { x0: -14, x1: 14, z0: -14, z1: 6, h: 7 };
+// Sayap kanan (X 14..24) adalah area game merakit mobil.
+const HALL = { x0: -14, x1: 24, z0: -14, z1: 6, h: 7 };
+// Lintasan luar: persegi panjang bersudut bulat mengelilingi gedung (garis tengah jalan)
+const TRACK = { cx: 5, cz: -2, hx: 30, hz: 24, r: 9 };
 const LANE_Z = -6;
 const LANE_HALF = 1.7;
 const LANE_LEN = 21;
@@ -362,6 +367,7 @@ export function TestLabEnvironment() {
   const txtExhibit = useCanvasTexture(1024, 128, floorText("ETALASE KOMPONEN EV", "rgba(125,211,252,0.95)"));
   const txtChassis = useCanvasTexture(1024, 128, floorText("RANGKA & RODA EV", "rgba(125,211,252,0.95)"));
   const txtNonEv = useCanvasTexture(2048, 128, floorText("BENGKEL NON-EV · MESIN BENSIN", "rgba(253,186,116,0.95)"));
+  const txtGame = useCanvasTexture(1024, 128, floorText("GAME RAKIT MOBIL EV", "rgba(250,204,21,0.95)"));
   const compare = useCanvasTexture(1280, 900, drawComparePoster);
   const sky = useCanvasTexture(16, 256, drawSky);
 
@@ -490,7 +496,7 @@ export function TestLabEnvironment() {
             <boxGeometry args={[W, 0.3, 0.25]} />
             <meshStandardMaterial color="#475569" metalness={0.6} roughness={0.45} />
           </mesh>
-          {[-9, -3, 3, 9].map((x) => (
+          {Array.from({ length: Math.round(W / 6.3) }, (_, i) => (i + 0.5) * (W / Math.round(W / 6.3)) - W / 2).map((x) => (
             <mesh key={x} position={[x, HALL.h - 0.75, 2]} raycast={noRaycast}>
               <boxGeometry args={[3.6, 0.08, 0.7]} />
               <meshBasicMaterial color="#f8fafc" toneMapped={false} />
@@ -501,6 +507,7 @@ export function TestLabEnvironment() {
       {/* Cahaya dalam ruangan (tanpa bayangan agar ringan) */}
       <pointLight position={[0, 5.6, -6]} intensity={16} distance={22} decay={2} color="#eaf4ff" />
       <pointLight position={[0, 5.6, 1]} intensity={7} distance={18} decay={2} color="#fff7ed" />
+      <pointLight position={[19, 5.6, -5]} intensity={14} distance={20} decay={2} color="#eaf4ff" />
 
       {/* ================= PAPAN & POSTER ================= */}
       <mesh position={[0, 4.7, HALL.z0 + 0.03]} raycast={noRaycast}>
@@ -686,6 +693,10 @@ export function TestLabEnvironment() {
         <meshBasicMaterial map={compare} toneMapped={false} />
       </mesh>
 
+      {/* ----- Game merakit mobil listrik (sayap kanan) ----- */}
+      <FloorDecal position={[19, 0.6]} size={[5.6, 0.6]} map={txtGame} rotation={Math.PI} />
+      <AssemblyGame position={[19, 0, -5.6]} screen={{ position: [HALL.x1 - 19 - 0.1, 2.7, 3.6], rotationY: -Math.PI / 2 }} />
+
       {/* Tanya jawab (dinding depan kiri) */}
       <FloorDecal position={[-9.5, 2.6]} size={[3.6, 0.5]} map={txtQuiz} rotation={Math.PI} />
       <QuizStation position={[-9.5, 0, 5.2]} facing={Math.PI} />
@@ -701,7 +712,8 @@ export function TestLabEnvironment() {
       <Extinguisher position={[5.6, 0, HALL.z1 - 0.45]} />
 
       {/* ----- Area pengisian: charger asli dari aset pemilik ----- */}
-      <StaticModel model="charger" size={2.0} position={[7.9, 0, -13.1]} />
+      {/* punggung charger DC terbuka, jadi ditempel ke dinding belakang */}
+      <StaticModel model="charger" size={2.0} position={[7.9, 0, HALL.z0 + 0.33]} />
       <StaticModel model="stasiun-cas" size={1.9} position={[11.1, 0, -13.0]} />
       <InfoSign
         position={[9.5, 0, -12.9]}
@@ -735,23 +747,20 @@ export function TestLabEnvironment() {
         <sphereGeometry args={[220, 24, 16]} />
         <meshBasicMaterial map={sky} side={THREE.BackSide} toneMapped={false} fog={false} depthWrite={false} />
       </mesh>
-      <Scenery
-        model="taman"
-        size={7}
-        places={[
-          [-10.6, 11.2, 0.3],
-          [10.6, 11.4, 2.2],
-        ]}
-      />
+      {/* lintasan aspal ala ujian SIM mengelilingi gedung + mobil yang berkeliling */}
+      <DrivingTrack loop={TRACK} />
       <Scenery
         model="pohon"
         size={8.5}
         places={[
-          [-10.5, 13.5, 0.4],
-          [11, 14.5, 2.6, 1.15],
-          [-19.5, 6, 4.0, 0.9],
-          [20, 4.5, 1.1, 1.05],
-          [0.5, 26, 5.2, 1.3],
+          [-11.5, 13, 0.4],
+          [14, 14, 2.6, 1.1],
+          [-19.5, -2, 4.0, 0.9],
+          [29.5, -14, 1.1, 1.0],
+          [5, 31, 5.2, 1.25],
+          [-32, -12, 3.1, 1.1],
+          [42, 16, 0.7, 1.15],
+          [-4, -33, 2.0, 1.2],
         ]}
       />
 

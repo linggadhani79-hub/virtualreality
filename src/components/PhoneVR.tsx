@@ -249,7 +249,7 @@ export function PhoneVROverlay({ onExit }: { onExit: () => void }) {
       </div>
 
       <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[9px] text-white/50 bg-black/40 px-3 py-1 rounded-full pointer-events-none whitespace-nowrap">
-        Tatap objek = pilih · Ketuk = pilih cepat · Tahan layar = jalan maju
+        Tatap objek = pilih · Ketuk = pilih cepat · Berjalan / jalan di tempat = maju · Tahan layar = maju
       </div>
     </div>
   );

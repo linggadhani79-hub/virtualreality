@@ -126,12 +126,13 @@ export function LabBuilding({ hall }: { hall: Hall }) {
   const W = hall.x1 - hall.x0;
   const D = hall.z1 - hall.z0;
   const cz = (hall.z0 + hall.z1) / 2;
+  const cx = (hall.x0 + hall.x1) / 2;
   const T = 0.3; // tebal dinding
 
   const roofTex = useDrawn(256, 8, drawRoof, [D / 4, 1]);
   const windowTex = useDrawn(512, 256, drawWindow);
   const signTex = useDrawn(2048, 208, drawEntranceSign);
-  const paverTex = useDrawn(256, 256, drawPavers, [5, 8]);
+  const paverTex = useDrawn(256, 256, drawPavers, [5, 6]);
 
   // Tanah: ubin dari aset lantai taman, disambung bercermin
   const ground = useMemo(() => {
@@ -171,7 +172,7 @@ export function LabBuilding({ hall }: { hall: Hall }) {
   const HALF = W / 2 + 0.9; // setengah bentang atap (ada teritis)
   const RISE = 3.1;
   const sideWindowsZ = [-10, -6, -2, 2];
-  const backWindowsX = [-10.5, -6.3, -2.1, 2.1, 6.3, 10.5];
+  const backWindowsX = Array.from({ length: Math.floor(W / 4.2) }, (_, i) => cx + (i - (Math.floor(W / 4.2) - 1) / 2) * 4.2);
 
   return (
     <group name="LabBuilding">
@@ -182,34 +183,34 @@ export function LabBuilding({ hall }: { hall: Hall }) {
         <meshStandardMaterial map={ground} color="#8a8f88" roughness={1} metalness={0} />
       </mesh>
       {/* jalan paving menuju pintu + tepi */}
-      <mesh position={[0, 0.004, hall.z1 + 8]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
-        <planeGeometry args={[11, 16]} />
+      <mesh position={[0, 0.004, hall.z1 + 6.5]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
+        <planeGeometry args={[11, 13]} />
         <meshStandardMaterial map={paverTex} roughness={0.9} />
       </mesh>
       {[-5.6, 5.6].map((x) => (
-        <mesh key={x} position={[x, 0.03, hall.z1 + 8]} raycast={noRaycast}>
-          <boxGeometry args={[0.2, 0.1, 16]} />
+        <mesh key={x} position={[x, 0.03, hall.z1 + 6.5]} raycast={noRaycast}>
+          <boxGeometry args={[0.2, 0.1, 13]} />
           <meshStandardMaterial color="#cbd5e1" roughness={0.8} />
         </mesh>
       ))}
 
       {/* ================= ATAP LENGKUNG ================= */}
-      <mesh geometry={roof} position={[0, hall.h + 0.05, cz]} scale={[HALF, RISE, 1]} raycast={noRaycast}>
+      <mesh geometry={roof} position={[cx, hall.h + 0.05, cz]} scale={[HALF, RISE, 1]} raycast={noRaycast}>
         <meshStandardMaterial map={roofTex} metalness={0.55} roughness={0.45} side={THREE.DoubleSide} />
       </mesh>
       {[hall.z1 + T + 0.5, hall.z0 - T - 0.5].map((z, i) => (
-        <mesh key={z} geometry={gable} position={[0, hall.h + 0.05, z]} rotation={[0, i ? Math.PI : 0, 0]} scale={[HALF, RISE, 1]} raycast={noRaycast}>
+        <mesh key={z} geometry={gable} position={[cx, hall.h + 0.05, z]} rotation={[0, i ? Math.PI : 0, 0]} scale={[HALF, RISE, 1]} raycast={noRaycast}>
           <meshStandardMaterial color="#dbe2ea" roughness={0.7} side={THREE.DoubleSide} />
         </mesh>
       ))}
       {/* lisplang membulat di kedua sisi */}
-      {[-HALF + 0.1, HALF - 0.1].map((x) => (
+      {[cx - HALF + 0.1, cx + HALF - 0.1].map((x) => (
         <mesh key={x} geometry={fascia} position={[x, hall.h + 0.02, cz]} raycast={noRaycast}>
           <meshStandardMaterial color="#1e3a8a" metalness={0.5} roughness={0.4} />
         </mesh>
       ))}
       {/* plat penutup teritis (dilihat dari bawah) */}
-      <mesh position={[0, hall.h + 0.03, cz]} rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast}>
+      <mesh position={[cx, hall.h + 0.03, cz]} rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast}>
         <planeGeometry args={[HALF * 2, D + 1.6]} />
         <meshStandardMaterial color="#e2e8f0" roughness={0.8} />
       </mesh>
@@ -228,7 +229,7 @@ export function LabBuilding({ hall }: { hall: Hall }) {
         [
           [hall.x0 - T - 0.05, cz, D + 0.5, Math.PI / 2],
           [hall.x1 + T + 0.05, cz, D + 0.5, Math.PI / 2],
-          [0, hall.z0 - T - 0.05, W + 0.5, 0],
+          [cx, hall.z0 - T - 0.05, W + 0.5, 0],
         ] as [number, number, number, number][]
       ).map(([x, z, len, rot], i) => (
         <group key={i} position={[x, 0, z]} rotation={[0, rot, 0]}>
@@ -276,7 +277,7 @@ export function LabBuilding({ hall }: { hall: Hall }) {
         </group>
       ))}
       {/* jendela depan */}
-      {[-9.6, 9.6].map((x) => (
+      {[(hall.x0 - 5) / 2, 9.6, hall.x1 - 5].filter((x, i) => i < 2 || hall.x1 > 18).map((x) => (
         <mesh key={x} position={[x, 3.4, hall.z1 + T + 0.012]} raycast={noRaycast}>
           <planeGeometry args={[4.6, 2.3]} />
           <meshStandardMaterial map={windowTex} roughness={0.15} metalness={0.3} />
@@ -310,7 +311,7 @@ export function LabBuilding({ hall }: { hall: Hall }) {
 
       {/* ================= HALAMAN ================= */}
       {/* bolard di tepi jalan */}
-      {[9, 12, 15, 18].map((z) =>
+      {[9, 12, 15, 17.6].map((z) =>
         [-5.95, 5.95].map((x) => (
           <group key={`${x}:${z}`} position={[x, 0, z]}>
             <mesh geometry={bollardGeometry} position={[0, 0.36, 0]} raycast={noRaycast}>
