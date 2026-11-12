@@ -642,6 +642,37 @@ function SceneBridge({ onScene }: { onScene: (scene: THREE.Scene) => void }) {
   return null;
 }
 
+/** Tombol bulat kecil untuk tata letak HP: ikon + keterangan singkat di bawahnya. */
+function MobileChip({
+  id,
+  icon,
+  label,
+  title,
+  onClick,
+}: {
+  id?: string;
+  icon: string;
+  label: string;
+  title?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      id={id}
+      title={title}
+      onClick={onClick}
+      className="flex flex-col items-center gap-0.5 active:scale-95 transition-transform cursor-pointer"
+    >
+      <span className="w-11 h-11 rounded-full bg-neutral-950/65 backdrop-blur-md border border-white/20 shadow-lg flex items-center justify-center text-lg leading-none text-white">
+        {icon}
+      </span>
+      <span className="text-[9px] font-bold text-white leading-none px-1.5 py-0.5 rounded-full bg-neutral-950/60">
+        {label}
+      </span>
+    </button>
+  );
+}
+
 function AdaptiveUI({
   viewMode,
   setViewMode,
@@ -750,7 +781,7 @@ function AdaptiveUI({
   return (
     <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between p-6 overflow-hidden">
       {/* Top Banner (Alerts) */}
-      <div className="flex flex-col items-center gap-2 mt-16 md:mt-2 relative">
+      <div className={`flex flex-col items-center gap-2 relative ${mobileMode ? "mt-0" : "mt-16 md:mt-2"}`}>
         <div className="absolute left-0 top-0 pointer-events-auto flex items-center gap-2">
           <button
             id="btn-exit-map"
@@ -758,7 +789,7 @@ function AdaptiveUI({
             className="flex items-center gap-2 bg-neutral-800/80 hover:bg-neutral-700/80 text-white px-4 py-2 rounded-full font-medium transition-all duration-200 backdrop-blur-md shadow-lg border border-white/10 text-[13px] cursor-pointer"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-            <span>Keluar Map</span>
+            {!mobileMode && <span>Keluar Map</span>}
           </button>
           {!LOCAL_ONLY && (
 <button
@@ -805,8 +836,67 @@ function AdaptiveUI({
           </div>
         </div>
 
-        {/* Right Edge: Sleek Side Menu Dock */}
-        <div className="flex flex-col items-end gap-3 pointer-events-auto">
+        {/* HP: tombol dipecah dan ditata di tepi layar supaya bagian tengah tetap lapang.
+            Pengaturan (jarang dipakai) di pojok kanan atas, aksi utama di kanan bawah dekat jempol. */}
+        {mobileMode && (
+          <>
+            <div
+              id="mobile-settings-row"
+              className="fixed right-3 flex items-start gap-2 pointer-events-auto"
+              style={{ top: "calc(env(safe-area-inset-top, 0px) + 12px)" }}
+            >
+              <MobileChip
+                id="m-btn-view"
+                icon="👁"
+                label={viewMode === "tpp" ? "TPV" : viewMode === "dev" ? "DEV" : "FPV"}
+                title="Sudut pandang"
+                onClick={() => setViewMode(viewMode === "tpp" ? "dev" : viewMode === "dev" ? "fpp" : "tpp")}
+              />
+              <MobileChip
+                id="m-btn-quality"
+                icon="✨"
+                label={qualityTier === "hq" ? "Tinggi" : "Ringan"}
+                title="Kualitas aset (aplikasi dimuat ulang saat diganti)"
+                onClick={() => setQualityTier(qualityTier === "hq" ? "lite" : "hq")}
+              />
+              <MobileChip
+                id="m-btn-lab"
+                icon="🚗"
+                label={sampleCarVisible ? "Lab" : "Kosong"}
+                title="Tampilkan / sembunyikan Lab Uji Kendaraan"
+                onClick={onToggleSampleCar}
+              />
+              {isAdmin && (
+                <MobileChip id="m-btn-module" icon="📖" label="Modul" title="Modul Ajar Digital" onClick={onOpenModuleEditor} />
+              )}
+              <MobileChip id="m-btn-input" icon="⌨" label="Tombol" title="Ganti ke kontrol keyboard" onClick={() => setMobileMode(false)} />
+            </div>
+
+            <div id="mobile-action-column" className="flex flex-col items-center gap-3 pointer-events-auto pb-1">
+              <MobileChip
+                id="m-btn-jump"
+                icon="⤒"
+                label="Lompat"
+                title="Lompat"
+                onClick={() => {
+                  playerActions.jump = true;
+                }}
+              />
+              <button
+                id="m-btn-vr"
+                title="Masuk Mode VR (360°)"
+                onClick={() => setShowVrModal(true)}
+                className="w-16 h-16 rounded-full bg-indigo-600 active:scale-95 text-white shadow-xl shadow-indigo-900/50 border border-indigo-300/40 flex flex-col items-center justify-center cursor-pointer"
+              >
+                <span className="text-2xl leading-none">🥽</span>
+                <span className="text-[10px] font-extrabold leading-none mt-0.5">VR</span>
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Right Edge: Sleek Side Menu Dock (layar lebar / kontrol keyboard) */}
+        <div className={`flex-col items-end gap-3 pointer-events-auto ${mobileMode ? "hidden" : "flex"}`}>
           {/* Di HP panel ini menutupi layar, jadi diringkas menjadi tombol-tombol kecil terpisah */}
           <div className={`bg-neutral-950/80 backdrop-blur-xl text-white p-4 rounded-3xl shadow-2xl flex flex-col border border-white/10 w-52 ${mobileMode ? "dock-compact" : ""}`}>
             <div className="dock-head border-b border-white/10 pb-3 mb-3">
@@ -2109,7 +2199,7 @@ export default function App() {
       {appState !== "select_mode" && (
         <>
           {/* Title Header - only in 2D mode */}
-          {!isVRActive && !phoneVRActive && (
+          {!isVRActive && !phoneVRActive && !mobileMode && (
             <div className="absolute top-0 left-0 w-full p-6 z-10 pointer-events-none flex justify-center">
               <div className="bg-white/10 backdrop-blur-md text-white px-6 py-2.5 rounded-full border border-white/20 text-xs tracking-[0.2em] font-semibold uppercase shadow-2xl flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
