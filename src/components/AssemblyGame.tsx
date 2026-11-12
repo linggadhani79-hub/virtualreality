@@ -74,9 +74,9 @@ const STEPS: StepDef[] = [
     done: "Motor dipasang di poros roda: tenaganya langsung memutar roda tanpa poros kopel.",
     early: "Pasang baterai dulu; motor dipasang setelah sumber energinya ada di rangka.",
     model: "motor-listrik",
-    size: 0.62,
+    size: 0.5,
     start: [-1.3, 0.92, 3.5],
-    end: [1.36, 0.36, 0],
+    end: [1.36, 0.3, 0],
     lift: 1.2,
     pick: [0.7, 0.8, 0.7],
     color: "#f97316",
@@ -87,9 +87,10 @@ const STEPS: StepDef[] = [
     done: "Inverter duduk di atas motor: mengubah DC baterai menjadi AC 3 fasa untuk motor.",
     early: "Inverter mengatur motor, jadi motornya harus terpasang dulu.",
     model: "inverter",
-    size: 0.62,
+    size: 0.5,
     start: [1.2, 0.92, 3.5],
-    end: [1.36, 0.74, 0],
+    // tepat di atas motor (motor setinggi ± 0,5 m dari y = 0,3), tidak saling menembus
+    end: [1.36, 0.82, 0],
     lift: 1.2,
     pick: [0.8, 0.5, 0.6],
     color: "#a78bfa",
@@ -294,7 +295,7 @@ const cableCurve = new THREE.CatmullRomCurve3([
   new THREE.Vector3(0.45, 0.6, 0.52),
   new THREE.Vector3(1.0, 0.72, 0.44),
   new THREE.Vector3(1.3, 0.9, 0.2),
-  new THREE.Vector3(1.36, 0.98, 0.0),
+  new THREE.Vector3(1.36, 0.97, 0.0),
 ]);
 const cableGeometry = new THREE.TubeGeometry(cableCurve, 40, 0.028, 10);
 const coilGeometry = new THREE.TorusGeometry(0.24, 0.035, 10, 32);
@@ -325,6 +326,7 @@ export function AssemblyGame({
   const groups = useRef<(THREE.Group | null)[]>([]);
   const hintRef = useRef<THREE.Mesh>(null);
   const partsRef = useRef<THREE.Group>(null);
+  const bodyWheels = useRef<THREE.Object3D[]>([]);
   const rootRef = useRef<THREE.Group>(null);
   const shake = useRef<{ index: number; t: number }>({ index: -1, t: 0 });
   const finished = done >= STEPS.length;
@@ -373,6 +375,7 @@ export function AssemblyGame({
   // ---- model komponen (salinan; geometri & tekstur dipakai bersama dengan etalase) ----
   useEffect(() => {
     let cancelled = false;
+    bodyWheels.current = [];
     for (const step of STEPS) {
       if (!step.model) continue;
       loadGlb(modelUrl(step.model))
@@ -383,8 +386,13 @@ export function AssemblyGame({
           disableRaycast(root);
           if (step.id === "bodi") {
             root.traverse((o) => {
-              // sasis sudah punya roda: roda bodi disembunyikan agar tidak dobel
-              if (o.name.startsWith("wheel_")) o.visible = false;
+              // Selama bodi masih tergantung, rodanya disembunyikan (roda ada di rangka). Begitu bodi
+              // terpasang, roda bodi yang ditampilkan dan rangka disembunyikan: jarak sumbu roda rangka
+              // sedikit berbeda dari lengkung roda bodi, jadi roda rangka tampak tidak pas.
+              if (o.name.startsWith("wheel_")) {
+                o.visible = false;
+                bodyWheels.current.push(o);
+              }
               const m = o as THREE.Mesh;
               // bahan sendiri, supaya mode Komponen pada mobil di lintasan tidak ikut mengubah bodi ini
               if (m.isMesh) m.material = (m.material as THREE.Material).clone();
@@ -419,7 +427,9 @@ export function AssemblyGame({
     const delta = Math.min(rawDelta, 0.05);
     // Tingkat ringan (Quest / HP): model komponen (± 460 rb segitiga) baru digambar saat pemain
     // mendekat, supaya tidak membebani pandangan dari bagian lab yang lain.
-    if (partsRef.current && rootRef.current && qualityTier === "lite") {
+    if (import.meta.env.DEV && (window as any).__rakitInstant) {
+      if (partsRef.current) partsRef.current.visible = true;
+    } else if (partsRef.current && rootRef.current && qualityTier === "lite") {
       state.camera.getWorldPosition(_a);
       rootRef.current.getWorldPosition(_b);
       const d = Math.hypot(_a.x - _b.x, _a.z - _b.z);
@@ -436,7 +446,9 @@ export function AssemblyGame({
       if (!g) return;
       const target = i < done ? 1 : 0;
       const p = progress.current[i];
-      const next = p + Math.sign(target - p) * Math.min(Math.abs(target - p), delta / (target ? 1.5 : 0.5));
+      // hanya saat pengembangan: lewati animasi untuk pengujian otomatis
+      const instant = import.meta.env.DEV && (window as any).__rakitInstant;
+      const next = instant ? target : p + Math.sign(target - p) * Math.min(Math.abs(target - p), delta / (target ? 1.5 : 0.5));
       progress.current[i] = next;
       const e = next * next * (3 - 2 * next); // halus di awal & akhir
       _a.set(...step.start);
@@ -451,6 +463,13 @@ export function AssemblyGame({
       if (step.lift > 0 && step.id !== "kabel") g.rotation.y = (1 - e) * state.clock.elapsedTime * 0.5;
     });
     if (shake.current.t > 0) shake.current.t = Math.max(0, shake.current.t - delta);
+    // bodi sudah duduk: tukar roda rangka dengan roda bodi yang pas di lengkung rodanya
+    const landed = progress.current[STEPS.length - 1] > 0.985;
+    for (const w of bodyWheels.current) w.visible = landed;
+    for (let i = 0; i < STEPS.length - 1; i++) {
+      const g = groups.current[i];
+      if (g) g.visible = !landed;
+    }
     // label nama selalu menghadap pemain
     for (const tag of tagRefs.current) if (tag) tag.quaternion.copy(state.camera.quaternion);
     if (hintRef.current) {
