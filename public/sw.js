@@ -1,12 +1,12 @@
 // Service worker: menyimpan SEMUA berkas aplikasi (kode, ikon, model 3D) saat pertama dibuka,
 // sehingga setelah itu aplikasi bisa dijalankan tanpa internet (offline).
+// Pemasangan hanya menunggu kerangka aplikasi; model disimpan setelah halaman tampil.
 const BUILD_ID = "__BUILD_ID__";
 const CACHE = "evlab-" + BUILD_ID;
 
-async function precache() {
-  const cache = await caches.open(CACHE);
+async function manifestFiles() {
   const res = await fetch("/precache-manifest.json", { cache: "no-store" });
-  if (!res.ok) return;
+  if (!res.ok) return [];
   let { files } = await res.json();
   // Model 3D punya dua tingkat kualitas; simpan hanya yang dipakai perangkat ini
   // (Quest / HP: "-lite", PC: "-hq"). Tingkat lain tetap diambil saat diminta.
@@ -16,7 +16,15 @@ async function precache() {
   const asked = new URL(self.location.href).searchParams.get("tier");
   const lite = asked ? asked === "lite" : /OculusBrowser|Quest|Pico|Android|iPhone|iPad|iPod/i.test(self.navigator.userAgent);
   const skip = lite ? /-hq\.glb$/ : /-lite\.glb$/;
-  files = files.filter((f) => !skip.test(f));
+  return files.filter((f) => !skip.test(f));
+}
+
+// "Kerangka" aplikasi: halaman + kode + gaya (± 2–3 MB). Hanya ini yang ditunggu saat memasang,
+// supaya versi baru langsung aktif walau internet lambat.
+const isShell = (f) => f === "/" || f.startsWith("/assets/");
+
+async function store(files, report) {
+  const cache = await caches.open(CACHE);
   // Satu per satu supaya satu berkas gagal tidak membatalkan semuanya
   let done = 0;
   for (const url of files) {
@@ -27,7 +35,7 @@ async function precache() {
       }
     } catch {}
     done++;
-    if (done % 5 === 0 || done === files.length) {
+    if (report && (done % 5 === 0 || done === files.length)) {
       const clients = await self.clients.matchAll({ includeUncontrolled: true });
       clients.forEach((c) => c.postMessage({ type: "offline-progress", done, total: files.length }));
     }
@@ -36,7 +44,26 @@ async function precache() {
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
-  event.waitUntil(precache().catch(() => {}));
+  event.waitUntil(
+    manifestFiles()
+      .then((files) => store(files.filter(isShell), false))
+      .catch(() => {}),
+  );
+});
+
+// Model 3D dan berkas lain (puluhan MB) disimpan belakangan, setelah halaman memintanya.
+// Dulu semuanya diunduh saat memasang, sehingga di internet lambat versi baru tidak kunjung aktif
+// dan perangkat terus menampilkan versi lama.
+let storingAll = null;
+self.addEventListener("message", (event) => {
+  if (event.data?.type !== "precache") return;
+  storingAll ??= manifestFiles()
+    .then((files) => store(files, true))
+    .catch(() => {})
+    .finally(() => {
+      storingAll = null;
+    });
+  event.waitUntil(storingAll);
 });
 
 self.addEventListener("activate", (event) => {
