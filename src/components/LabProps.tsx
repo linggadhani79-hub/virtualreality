@@ -39,7 +39,7 @@ function roundedBox(w: number, h: number, d: number, r: number) {
   const key = `${w}|${h}|${d}|${radius}`;
   let g = roundedCache.get(key);
   if (!g) {
-    g = new RoundedBoxGeometry(w, h, d, 3, radius);
+    g = new RoundedBoxGeometry(w, h, d, 6, radius);
     roundedCache.set(key, g);
   }
   return g;
@@ -84,7 +84,7 @@ function Tube({ points, radius, children }: { points: Vec3[]; radius: number; ch
   );
 }
 
-function lathe(profile: [number, number][], segments = 24) {
+function lathe(profile: [number, number][], segments = 40) {
   return new THREE.LatheGeometry(
     profile.map(([r, y]) => new THREE.Vector2(r, y)),
     segments,
@@ -109,7 +109,7 @@ const coneBody = lathe(
   ],
   20,
 );
-const coneBase = new RoundedBoxGeometry(0.36, 0.04, 0.36, 3, 0.018);
+const coneBase = new RoundedBoxGeometry(0.36, 0.04, 0.36, 6, 0.018);
 const coneBandLow = new THREE.CylinderGeometry(CONE_R(0.29) + 0.002, CONE_R(0.2) + 0.002, 0.09, 20, 1, true);
 const coneBandHigh = new THREE.CylinderGeometry(CONE_R(0.42) + 0.002, CONE_R(0.36) + 0.002, 0.06, 20, 1, true);
 
@@ -165,7 +165,7 @@ export function Barrier({ position, rotation = 0 }: { position: Vec3; rotation?:
           </mesh>
           {/* tutup pengisian air */}
           <mesh position={[0, 0.815, 0]} raycast={noRaycast}>
-            <cylinderGeometry args={[0.04, 0.045, 0.03, 14]} />
+            <cylinderGeometry args={[0.04, 0.045, 0.03, 28]} />
             <meshStandardMaterial color="#111827" roughness={0.6} />
           </mesh>
         </group>
@@ -320,7 +320,7 @@ export function Workshop({ position }: { position: Vec3 }) {
               <meshStandardMaterial color="#991b1b" roughness={0.35} metalness={0.45} />
             </RBox>
             <mesh position={[0.022, 0.05, 0]} rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast}>
-              <capsuleGeometry args={[0.011, 0.7, 3, 8]} />
+              <capsuleGeometry args={[0.011, 0.7, 3, 16]} />
               <Steel color="#e2e8f0" />
             </mesh>
           </group>
@@ -332,7 +332,7 @@ export function Workshop({ position }: { position: Vec3 }) {
           [0.22, 0.4],
         ].map(([x, z], i) => (
           <mesh key={i} position={[x, 0.06, z]} rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast}>
-            <cylinderGeometry args={[0.06, 0.06, 0.045, 16]} />
+            <cylinderGeometry args={[0.06, 0.06, 0.045, 28]} />
             <Rubber />
           </mesh>
         ))}
@@ -347,7 +347,7 @@ export function Workshop({ position }: { position: Vec3 }) {
         {[-0.82, 0.82].map((z) =>
           [-0.32, 0.32].map((x) => (
             <mesh key={`${x}:${z}`} position={[x, 0.425, z]} raycast={noRaycast}>
-              <cylinderGeometry args={[0.028, 0.028, 0.85, 12]} />
+              <cylinderGeometry args={[0.028, 0.028, 0.85, 28]} />
               <Steel color="#334155" />
             </mesh>
           )),
@@ -360,7 +360,7 @@ export function Workshop({ position }: { position: Vec3 }) {
           <meshStandardMaterial color="#1d4ed8" roughness={0.45} metalness={0.3} />
         </RBox>
         <mesh position={[0.02, 0.5, -0.4]} rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast}>
-          <torusGeometry args={[0.07, 0.012, 6, 16, Math.PI]} />
+          <torusGeometry args={[0.07, 0.012, 10, 28, Math.PI]} />
           <Steel color="#cbd5e1" />
         </mesh>
         {/* papan alat menempel di dinding */}
@@ -382,7 +382,7 @@ export function Workshop({ position }: { position: Vec3 }) {
           </RBox>
           {[-0.2, 0.2].map((z, i) => (
             <mesh key={z} position={[0.1, 0.215, z]} raycast={noRaycast}>
-              <cylinderGeometry args={[0.022, 0.022, 0.035, 12]} />
+              <cylinderGeometry args={[0.022, 0.022, 0.035, 28]} />
               <meshStandardMaterial color={i === 0 ? "#dc2626" : "#111827"} roughness={0.4} metalness={0.4} />
             </mesh>
           ))}
@@ -403,7 +403,7 @@ export function Workshop({ position }: { position: Vec3 }) {
         {/* motor listrik peraga: rumah bersirip + poros */}
         <group position={[0, 1.07, 0.5]} rotation={[Math.PI / 2, 0, 0]}>
           <mesh raycast={noRaycast}>
-            <cylinderGeometry args={[0.13, 0.13, 0.3, 24]} />
+            <cylinderGeometry args={[0.13, 0.13, 0.3, 28]} />
             <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.35} />
           </mesh>
           {[-0.1, -0.05, 0, 0.05, 0.1].map((y) => (
@@ -413,12 +413,12 @@ export function Workshop({ position }: { position: Vec3 }) {
           ))}
           {[-0.165, 0.165].map((y) => (
             <mesh key={y} position={[0, y, 0]} raycast={noRaycast}>
-              <cylinderGeometry args={[0.115, 0.115, 0.03, 24]} />
+              <cylinderGeometry args={[0.115, 0.115, 0.03, 28]} />
               <meshStandardMaterial color="#f97316" metalness={0.4} roughness={0.45} />
             </mesh>
           ))}
           <mesh position={[0, 0.25, 0]} raycast={noRaycast}>
-            <cylinderGeometry args={[0.022, 0.022, 0.16, 12]} />
+            <cylinderGeometry args={[0.022, 0.022, 0.16, 28]} />
             <Steel color="#e2e8f0" />
           </mesh>
           {/* dudukan */}
@@ -547,12 +547,12 @@ export function Lift({
                     <meshStandardMaterial color="#facc15" metalness={0.35} roughness={0.45} />
                   </RBox>
                   <mesh raycast={noRaycast}>
-                    <cylinderGeometry args={[0.07, 0.07, 0.1, 16]} />
+                    <cylinderGeometry args={[0.07, 0.07, 0.1, 28]} />
                     <Steel color="#334155" />
                   </mesh>
                   {/* bantalan karet di ujung lengan */}
                   <mesh position={[inward * 1.0, 0.055, 0]} raycast={noRaycast}>
-                    <cylinderGeometry args={[0.075, 0.085, 0.045, 18]} />
+                    <cylinderGeometry args={[0.075, 0.085, 0.045, 28]} />
                     <Rubber />
                   </mesh>
                 </group>
@@ -571,7 +571,7 @@ export function Lift({
       </RBox>
       {/* unit hidrolik di sisi luar tiang kanan */}
       <mesh position={[1.72, 1.55, 0]} raycast={noRaycast}>
-        <capsuleGeometry args={[0.085, 0.42, 4, 14]} />
+        <capsuleGeometry args={[0.085, 0.42, 4, 16]} />
         <Steel color="#334155" />
       </mesh>
 
@@ -661,7 +661,7 @@ export function DiagnosticCart({ position, rotation = 0 }: { position: Vec3; rot
             <meshStandardMaterial color="#475569" metalness={0.5} roughness={0.4} />
           </RBox>
           <mesh position={[0, 0.03, 0.02]} rotation={[0, 0, Math.PI / 2]} raycast={noRaycast}>
-            <capsuleGeometry args={[0.01, 0.3, 3, 8]} />
+            <capsuleGeometry args={[0.01, 0.3, 3, 16]} />
             <Steel color="#e2e8f0" />
           </mesh>
         </group>
@@ -685,11 +685,11 @@ export function DiagnosticCart({ position, rotation = 0 }: { position: Vec3; rot
       </Tube>
       {/* monitor + tiang */}
       <mesh position={[0, 1.06, -0.16]} raycast={noRaycast}>
-        <cylinderGeometry args={[0.022, 0.03, 0.2, 12]} />
+        <cylinderGeometry args={[0.022, 0.03, 0.2, 28]} />
         <Steel color="#1e293b" />
       </mesh>
       <mesh position={[0, 0.975, -0.16]} raycast={noRaycast}>
-        <cylinderGeometry args={[0.11, 0.12, 0.012, 20]} />
+        <cylinderGeometry args={[0.11, 0.12, 0.012, 28]} />
         <Steel color="#1e293b" />
       </mesh>
       <group position={[0, 1.34, -0.14]} rotation={[-0.2, 0, 0]}>
@@ -710,11 +710,11 @@ export function DiagnosticCart({ position, rotation = 0 }: { position: Vec3; rot
       ].map(([x, z], i) => (
         <group key={i} position={[x, 0, z]}>
           <mesh position={[0, 0.115, 0]} raycast={noRaycast}>
-            <cylinderGeometry args={[0.02, 0.02, 0.07, 10]} />
+            <cylinderGeometry args={[0.02, 0.02, 0.07, 28]} />
             <Steel color="#94a3b8" />
           </mesh>
           <mesh position={[0, 0.055, 0]} rotation={[0, 0, Math.PI / 2]} raycast={noRaycast}>
-            <cylinderGeometry args={[0.055, 0.055, 0.04, 16]} />
+            <cylinderGeometry args={[0.055, 0.055, 0.04, 28]} />
             <Rubber />
           </mesh>
         </group>
@@ -812,11 +812,11 @@ function Glove({ position, mirror = 1 }: { position: Vec3; mirror?: number }) {
     <group position={position} scale={[mirror, 1, 1]}>
       {/* manset panjang */}
       <mesh position={[0, 0.03, 0]} raycast={noRaycast}>
-        <cylinderGeometry args={[0.05, 0.062, 0.2, 16]} />
+        <cylinderGeometry args={[0.05, 0.062, 0.2, 28]} />
         {mat}
       </mesh>
       <mesh position={[0, 0.132, 0]} raycast={noRaycast}>
-        <torusGeometry args={[0.061, 0.008, 6, 16]} />
+        <torusGeometry args={[0.061, 0.008, 10, 28]} />
         <meshStandardMaterial color="#c2410c" roughness={0.6} />
       </mesh>
       {/* telapak */}
@@ -826,12 +826,12 @@ function Glove({ position, mirror = 1 }: { position: Vec3; mirror?: number }) {
       {/* jari (menggantung ke bawah) */}
       {[-0.039, -0.013, 0.013, 0.039].map((x, i) => (
         <mesh key={x} position={[x, -0.19 - (i === 1 || i === 2 ? 0.008 : 0), 0]} raycast={noRaycast}>
-          <capsuleGeometry args={[0.0125, i === 3 ? 0.045 : 0.06, 3, 8]} />
+          <capsuleGeometry args={[0.0125, i === 3 ? 0.045 : 0.06, 3, 16]} />
           {mat}
         </mesh>
       ))}
       <mesh position={[-0.066, -0.115, 0.004]} rotation={[0, 0, -0.55]} raycast={noRaycast}>
-        <capsuleGeometry args={[0.014, 0.045, 3, 8]} />
+        <capsuleGeometry args={[0.014, 0.045, 3, 16]} />
         {mat}
       </mesh>
     </group>
@@ -843,16 +843,16 @@ function Boot({ position }: { position: Vec3 }) {
     <group position={position}>
       {/* batang sepatu */}
       <mesh position={[0, 0.2, -0.03]} raycast={noRaycast}>
-        <cylinderGeometry args={[0.062, 0.056, 0.28, 16]} />
+        <cylinderGeometry args={[0.062, 0.056, 0.28, 28]} />
         <meshStandardMaterial color="#facc15" roughness={0.5} />
       </mesh>
       <mesh position={[0, 0.34, -0.03]} raycast={noRaycast}>
-        <torusGeometry args={[0.061, 0.009, 6, 16]} />
+        <torusGeometry args={[0.061, 0.009, 10, 28]} />
         <meshStandardMaterial color="#111827" roughness={0.6} />
       </mesh>
       {/* punggung kaki & ujung membulat */}
       <mesh position={[0, 0.06, 0.035]} rotation={[Math.PI / 2, 0, 0]} scale={[1, 1, 0.82]} raycast={noRaycast}>
-        <capsuleGeometry args={[0.058, 0.13, 4, 12]} />
+        <capsuleGeometry args={[0.058, 0.13, 4, 16]} />
         <meshStandardMaterial color="#facc15" roughness={0.5} />
       </mesh>
       {/* sol */}
@@ -906,7 +906,7 @@ export function SafetyStation({ position }: { position: Vec3 }) {
         </mesh>
         {/* rusuk penguat & lidah depan */}
         <mesh position={[0, 0.07, 0]} rotation={[0, 0, Math.PI / 2]} scale={[1, 0.22, 1]} raycast={noRaycast}>
-          <torusGeometry args={[0.062, 0.02, 6, 20, Math.PI]} />
+          <torusGeometry args={[0.062, 0.02, 10, 28, Math.PI]} />
           <meshStandardMaterial color="#eab308" roughness={0.35} />
         </mesh>
         <RBox args={[0.2, 0.012, 0.09]} radius={0.005} position={[0, 0.006, 0.15]}>
@@ -916,12 +916,12 @@ export function SafetyStation({ position }: { position: Vec3 }) {
       <group position={[-0.225, 1.385, 0.08]} scale={1.45}>
         {[-0.05, 0.05].map((x) => (
           <mesh key={x} position={[x, 0, 0]} rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast}>
-            <cylinderGeometry args={[0.042, 0.045, 0.045, 18]} />
+            <cylinderGeometry args={[0.042, 0.045, 0.045, 28]} />
             <meshStandardMaterial color="#0ea5e9" transparent opacity={0.6} roughness={0.1} />
           </mesh>
         ))}
         <mesh rotation={[Math.PI / 2, 0, 0]} scale={[1, 1, 0.55]} raycast={noRaycast}>
-          <torusGeometry args={[0.1, 0.012, 6, 24]} />
+          <torusGeometry args={[0.1, 0.012, 10, 28]} />
           <meshStandardMaterial color="#111827" roughness={0.6} />
         </mesh>
       </group>
@@ -940,18 +940,18 @@ export function SafetyStation({ position }: { position: Vec3 }) {
 
       {/* ---------- rak bawah: sarung tangan tergantung & sepatu ---------- */}
       <mesh position={[0.225, 1.18, 0.08]} rotation={[0, 0, Math.PI / 2]} raycast={noRaycast}>
-        <cylinderGeometry args={[0.012, 0.012, 0.42, 8]} />
+        <cylinderGeometry args={[0.012, 0.012, 0.42, 28]} />
         <Steel color="#94a3b8" />
       </mesh>
       <Glove position={[0.12, 1.04, 0.08]} />
       <Glove position={[0.33, 1.04, 0.08]} mirror={-1} />
       {/* matras isolasi tergulung */}
       <mesh position={[-0.45, 0.62, 0.04]} rotation={[0, 0, Math.PI / 2]} raycast={noRaycast}>
-        <cylinderGeometry args={[0.08, 0.08, 0.5, 20]} />
+        <cylinderGeometry args={[0.08, 0.08, 0.5, 28]} />
         <meshStandardMaterial color="#b91c1c" roughness={0.8} />
       </mesh>
       <mesh position={[-0.45, 0.62, 0.04]} rotation={[0, 0, Math.PI / 2]} raycast={noRaycast}>
-        <cylinderGeometry args={[0.083, 0.083, 0.05, 20]} />
+        <cylinderGeometry args={[0.083, 0.083, 0.05, 28]} />
         <meshStandardMaterial color="#111827" roughness={0.7} />
       </mesh>
       <Boot position={[0.59, 0.54, 0.0]} />
@@ -959,7 +959,7 @@ export function SafetyStation({ position }: { position: Vec3 }) {
       {/* kaki lemari */}
       {[-W / 2 + 0.06, W / 2 - 0.06].map((x) => (
         <mesh key={x} position={[x, 0.25, 0.04]} raycast={noRaycast}>
-          <cylinderGeometry args={[0.022, 0.022, 0.5, 10]} />
+          <cylinderGeometry args={[0.022, 0.022, 0.5, 28]} />
           <Steel color="#64748b" />
         </mesh>
       ))}
@@ -990,7 +990,7 @@ export function Extinguisher({ position }: { position: Vec3 }) {
     <group position={position}>
       {/* dudukan lantai */}
       <mesh position={[0, 0.025, 0]} raycast={noRaycast}>
-        <cylinderGeometry args={[0.13, 0.14, 0.05, 20]} />
+        <cylinderGeometry args={[0.13, 0.14, 0.05, 28]} />
         <Steel color="#1e293b" />
       </mesh>
       <mesh geometry={extinguisherBody}>
@@ -998,12 +998,12 @@ export function Extinguisher({ position }: { position: Vec3 }) {
       </mesh>
       {/* label */}
       <mesh position={[0, 0.34, 0]} raycast={noRaycast}>
-        <cylinderGeometry args={[0.0915, 0.0915, 0.16, 20, 1, true]} />
+        <cylinderGeometry args={[0.0915, 0.0915, 0.16, 28, 1, true]} />
         <meshStandardMaterial color="#f8fafc" roughness={0.5} />
       </mesh>
       {/* katup, tuas, pengukur tekanan */}
       <mesh position={[0, 0.68, 0]} raycast={noRaycast}>
-        <cylinderGeometry args={[0.028, 0.032, 0.07, 12]} />
+        <cylinderGeometry args={[0.028, 0.032, 0.07, 28]} />
         <Steel color="#cbd5e1" />
       </mesh>
       <RBox args={[0.17, 0.018, 0.035]} radius={0.008} position={[0.045, 0.735, 0]} rotation={[0, 0, 0.18]}>
@@ -1013,7 +1013,7 @@ export function Extinguisher({ position }: { position: Vec3 }) {
         <meshStandardMaterial color="#111827" roughness={0.5} />
       </RBox>
       <mesh position={[0, 0.69, 0.04]} rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast}>
-        <cylinderGeometry args={[0.024, 0.024, 0.014, 14]} />
+        <cylinderGeometry args={[0.024, 0.024, 0.014, 28]} />
         <meshStandardMaterial color="#f8fafc" roughness={0.3} />
       </mesh>
       {/* selang + corong */}
@@ -1029,7 +1029,7 @@ export function Extinguisher({ position }: { position: Vec3 }) {
         <Rubber />
       </Tube>
       <mesh position={[-0.113, 0.26, 0.04]} raycast={noRaycast}>
-        <cylinderGeometry args={[0.014, 0.03, 0.13, 12]} />
+        <cylinderGeometry args={[0.014, 0.03, 0.13, 28]} />
         <Rubber />
       </mesh>
     </group>

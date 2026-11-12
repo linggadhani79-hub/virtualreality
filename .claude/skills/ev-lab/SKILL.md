@@ -27,6 +27,9 @@ dilanggar (tanpa database, aset ditanam, tanpa unggah/unduh, langsung pakai, des
 | `src/App.tsx` | Aplikasi utama, `Player` (gerak, kamera), UI 2D, dok tombol |
 | `src/components/TestLabEnvironment.tsx` | Hanggar, aspal, marka, poster, langit, penempatan semua stasiun & zona |
 | `src/components/LabProps.tsx` | Peralatan buatan sendiri (kerucut, pembatas, bengkel, lift dengan tombol naik/turun, troli, lemari APD, APAR) dengan bentuk membulat |
+| `src/components/AssemblyGame.tsx` | Game "Rakit Mobil Listrik" (urutan komponen, layar skor, tombol PETUNJUK / ULANGI) |
+| `src/components/DrivingTrack.tsx` | Lintasan aspal luar ala ujian SIM + mobil yang berkeliling dan mampir mengisi daya |
+| `src/components/HumanCharacter.tsx` | Avatar teknisi (mode orang ketiga), animasi jalan & lompat |
 | `src/components/LabBuilding.tsx` | Tampak luar gedung (atap lengkung, jendela, kanopi), halaman, dan tanah (`public/lab/tanah.webp`, ubin dari aset taman disambung bercermin) |
 | `src/components/SampleEVCar.tsx` | Mobil, mode Komponen (sasis asli + titik sorot), panel tombol 3D |
 | `src/components/LabStations.tsx` | `ExhibitStand` (etalase, `low` = panggung rendah), `InfoSign`, `StaticModel`, `Scenery` (taman/pohon), `QuizStation` |
@@ -73,14 +76,15 @@ Satu objek harus bisa dipilih dengan mouse, laser Quest, dan tatapan VR HP. Sela
    dipotong dengan silinder), lalu `scripts/darken-car-glass.mjs`.
 3. Muat dengan `loadGlb(modelUrl("nama"))` + `fitModel(root, meter)`; tempatkan lewat
    `ExhibitStand` atau komponen baru di `TestLabEnvironment.tsx`.
-4. Tata letak hanggar: X −14..14, Z −14..6, kolom tiap 4 m di Z = −12, −8, −4, 0, 4 (lebar bebas
+4. Tata letak hanggar: X −14..24 (X 14..24 = sayap game rakit), Z −14..6, kolom tiap 4 m di Z = −12, −8, −4, 0, 4 (lebar bebas
    antar kolom 3,6 m — poster dinding samping jangan lebih lebar dari itu). Pemain mulai di (0,0,0)
    menghadap −Z; lintasan mobil di Z = −6.
 5. Zona: kiri depan = komponen EV (baterai, motor listrik, inverter); kanan tengah = rangka & roda
    EV (model `sasis`, sama dengan yang di dalam mobil); kanan depan = sepeda motor listrik + pojok
    baca; belakang kiri = **bengkel non-EV** (sasis tangga di lift, mesin 4 silinder, V8, piston,
    rem, rangka bermesin bensin `sasis-mesin`) + poster perbandingan; belakang kanan = pengisian
-   (charger DC, stasiun AC, konektor CCS2); depan kiri = kuis; luar pintu = halaman, taman, pohon.
+   (charger DC, stasiun AC, konektor CCS2); depan kiri = kuis; sayap kanan = game rakit mobil;
+   luar gedung = halaman, pohon, dan lintasan uji melingkar (`TRACK` di `TestLabEnvironment.tsx`).
 6. Mengganti isi sebuah model: **pakai nama berkas baru** (jangan menimpa nama lama). Service
    worker lama masih menyajikan berkas bernama sama pada kunjungan pertama setelah deploy.
 7. `loadGlb` menyimpan satu objek per alamat; pakai `.clone()` bila model yang sama tampil di lebih
@@ -100,6 +104,10 @@ Satu objek harus bisa dipilih dengan mouse, laser Quest, dan tatapan VR HP. Sela
   Emulator bawaan `@react-three/xr` dimatikan karena bentrok versi three.js.
 - Uji offline pada build produksi (`NODE_ENV=production node dist/server.cjs`), lalu
   `context.setOffline(true)`.
+- Animasi berbasis waktu berjalan sangat lambat di Chromium headless (2–3 fps): tunggu lebih lama
+  atau periksa keadaan akhir, jangan menyimpulkan animasinya macet.
+- VR HP: `window.__phoneVR` (dev) untuk memeriksa keadaan; langkah kaki diuji dengan mengirim
+  event `devicemotion` buatan sambil menimpa `performance.now`.
 - Headset Quest fisik belum pernah diuji dari sesi Claude: katakan terus terang di laporan.
 
 ## Yang belum ada / diketahui kurang

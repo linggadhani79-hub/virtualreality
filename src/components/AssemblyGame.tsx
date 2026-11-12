@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { disableRaycast, fitModel, loadGlb, roundedRectShape, wrapText } from "../lib/glb";
-import { modelUrl } from "../lib/quality";
+import { modelUrl, qualityTier } from "../lib/quality";
 import { playVRClickSound, playVRHoverSound } from "../lib/vrAudio";
 
 /**
@@ -294,6 +294,8 @@ export function AssemblyGame({
   const progress = useRef<number[]>(STEPS.map(() => 0));
   const groups = useRef<(THREE.Group | null)[]>([]);
   const hintRef = useRef<THREE.Mesh>(null);
+  const partsRef = useRef<THREE.Group>(null);
+  const rootRef = useRef<THREE.Group>(null);
   const shake = useRef<{ index: number; t: number }>({ index: -1, t: 0 });
   const finished = done >= STEPS.length;
 
@@ -344,6 +346,14 @@ export function AssemblyGame({
 
   useFrame((state, rawDelta) => {
     const delta = Math.min(rawDelta, 0.05);
+    // Tingkat ringan (Quest / HP): model komponen (± 460 rb segitiga) baru digambar saat pemain
+    // mendekat, supaya tidak membebani pandangan dari bagian lab yang lain.
+    if (partsRef.current && rootRef.current && qualityTier === "lite") {
+      state.camera.getWorldPosition(_a);
+      rootRef.current.getWorldPosition(_b);
+      const d = Math.hypot(_a.x - _b.x, _a.z - _b.z);
+      if (partsRef.current.visible ? d > 17 : d < 15.5) partsRef.current.visible = !partsRef.current.visible;
+    }
     // jam berjalan (diperbarui tiap detik saja agar layar tidak digambar ulang tiap frame)
     if (startedAt.current !== null) {
       const now = finishedAt.current ?? state.clock.elapsedTime;
@@ -427,7 +437,7 @@ export function AssemblyGame({
   };
 
   return (
-    <group position={position} name="AssemblyGame">
+    <group ref={rootRef} position={position} name="AssemblyGame">
       {/* ---------- Panggung rakit ---------- */}
       <mesh geometry={platformGeometry} position={[0, PLATFORM_Y / 2, 0]}>
         <meshStandardMaterial color="#1e293b" metalness={0.5} roughness={0.5} />
@@ -500,6 +510,7 @@ export function AssemblyGame({
       ))}
 
       {/* ---------- Komponen ---------- */}
+      <group ref={partsRef}>
       {STEPS.map((step, i) => (
         <group
           key={step.id}
@@ -537,6 +548,7 @@ export function AssemblyGame({
           )}
         </group>
       ))}
+      </group>
       {/* tali derek bodi */}
       {done < STEPS.length &&
         [-1.2, 1.2].map((x) => (

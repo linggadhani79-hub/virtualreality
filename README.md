@@ -34,6 +34,12 @@ Media ajar kendaraan listrik (EV) berbasis **WebXR**. Satu kode sumber, bisa dij
   Bensin" di dinding belakang.
 - **Peralatan & gedung**: lemari APD, bengkel perkakas berisolasi, troli diagnostik, APAR; gedung
   beratap lengkung dengan halaman paving, taman, dan pepohonan.
+- **Game Rakit Mobil Listrik** (sayap kanan): pilih komponen sesuai urutan perakitan — rangka,
+  baterai, motor, inverter, kabel tegangan tinggi, bodi — dengan layar waktu dan jumlah salah pilih.
+- **Lintasan uji di luar gedung** ala ujian SIM (garis henti, zig-zag, jalur sempit, polisi tidur);
+  mobil listrik berkeliling dan tiap dua putaran mengisi daya di stasiun tenaga surya.
+- **Gerak pemain**: spasi / tombol LOMPAT untuk melompat; di VR HP, berjalan sungguhan (atau jalan
+  di tempat) menggerakkan pemain maju lewat deteksi langkah.
 - **Tanya jawab**: kios kuis 10 soal pilihan ganda dengan penjelasan dan skor (tanpa internet).
 - **Pojok baca**: buku-buku modul ajar di meja; buku yang dipilih berdiri di penyangganya dan
   isinya tampil sebagai slideshow di layar besar.

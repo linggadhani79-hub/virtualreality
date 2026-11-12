@@ -479,7 +479,7 @@ export function TestLabEnvironment() {
       {trussZ.map((z) =>
         columnX.map((x) => (
           <mesh key={`${x}:${z}`} position={[x, HALL.h / 2, z]} raycast={noRaycast}>
-            <boxGeometry args={[0.4, HALL.h, 0.4]} />
+            <cylinderGeometry args={[0.2, 0.2, HALL.h, 24]} />
             <meshStandardMaterial color="#475569" metalness={0.6} roughness={0.45} />
           </mesh>
         )),
@@ -694,7 +694,7 @@ export function TestLabEnvironment() {
       </mesh>
 
       {/* ----- Game merakit mobil listrik (sayap kanan) ----- */}
-      <FloorDecal position={[19, 0.6]} size={[5.6, 0.6]} map={txtGame} rotation={Math.PI} />
+      <FloorDecal position={[19, 0.6]} size={[5.6, 0.6]} map={txtGame} />
       <AssemblyGame position={[19, 0, -5.6]} screen={{ position: [HALL.x1 - 19 - 0.1, 2.7, 3.6], rotationY: -Math.PI / 2 }} />
 
       {/* Tanya jawab (dinding depan kiri) */}
