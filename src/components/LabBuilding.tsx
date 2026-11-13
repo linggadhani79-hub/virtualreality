@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { RoofSolarPanels } from "./SolarPower";
 
 /**
  * Tampak luar gedung lab + halaman: atap lengkung, lis & kolom sudut membulat, jendela, kanopi
@@ -204,6 +205,8 @@ export function LabBuilding({ hall }: { hall: Hall }) {
           <meshStandardMaterial color="#dbe2ea" roughness={0.7} side={THREE.DoubleSide} />
         </mesh>
       ))}
+      {/* panel surya di atap: sumber listrik lampu lab (lihat sudut energi di dalam) */}
+      <RoofSolarPanels cx={cx} base={hall.h + 0.05} half={HALF} rise={RISE} z0={hall.z0} z1={hall.z1} />
       {/* lisplang membulat di kedua sisi */}
       {[cx - HALF + 0.1, cx + HALF - 0.1].map((x) => (
         <mesh key={x} geometry={fascia} position={[x, hall.h + 0.02, cz]} raycast={noRaycast}>

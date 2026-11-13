@@ -6,6 +6,7 @@ import { ReadingCorner } from "./ReadingCorner";
 import { Barrier, Cone, DiagnosticCart, Extinguisher, Lift, SafetyStation, Workshop } from "./LabProps";
 import { LabBuilding } from "./LabBuilding";
 import { AssemblyGame } from "./AssemblyGame";
+import { EnergyRoom } from "./SolarPower";
 import { ParkingArea, PARKING_SOLIDS } from "./ParkingArea";
 import { DrivingTrack } from "./DrivingTrack";
 import { boxAt, worldBounds, type Box } from "../lib/worldBounds";
@@ -66,6 +67,8 @@ const SOLIDS: Box[] = [
   boxAt(0, -3.1, 1.2, 0.3),
   boxAt(-11.6, -6, 0.25, 1.2),
   boxAt(11.6, -6, 0.25, 1.2),
+  // sudut energi surya: lemari baterai
+  { minX: 14.4, maxX: 17.35, minZ: HALL.z0, maxZ: HALL.z0 + 0.66 },
   // game rakit: panggung, tiang derek, troli & meja komponen, konsol
   { minX: 16.2, maxX: 21.8, minZ: -7.0, maxZ: -4.2 },
   boxAt(16.05, -7.35, 0.15),
@@ -444,6 +447,7 @@ export function TestLabEnvironment() {
   const txtExhibit = useCanvasTexture(1024, 128, floorText("ETALASE KOMPONEN EV", "rgba(125,211,252,0.95)"));
   const txtChassis = useCanvasTexture(1024, 128, floorText("RANGKA & RODA EV", "rgba(125,211,252,0.95)"));
   const txtNonEv = useCanvasTexture(2048, 128, floorText("BENGKEL NON-EV · MESIN BENSIN", "rgba(253,186,116,0.95)"));
+  const txtSolar = useCanvasTexture(1024, 128, floorText("ENERGI SURYA", "rgba(251,191,36,0.95)"));
   const txtGame = useCanvasTexture(1024, 128, floorText("GAME RAKIT MOBIL EV", "rgba(250,204,21,0.95)"));
   const compare = useCanvasTexture(1280, 900, drawComparePoster);
   const sky = useCanvasTexture(16, 256, drawSky);
@@ -573,8 +577,8 @@ export function TestLabEnvironment() {
             <meshStandardMaterial color="#475569" metalness={0.6} roughness={0.45} />
           </mesh>
           {Array.from({ length: Math.round(W / 6.3) }, (_, i) => (i + 0.5) * (W / Math.round(W / 6.3)) - W / 2).map((x) => (
-            <group key={x} position={[x, HALL.h - 0.72, 2]}>
-              {/* rumah lampu + penutup membulat + batang gantung */}
+            <group key={x} position={[x, HALL.h - 0.85, 0]}>
+              {/* lampu digantung tepat di bawah balok atap: rumah lampu + penutup membulat + 2 batang */}
               <mesh geometry={lampHousing} position={[0, 0.07, 0]} raycast={noRaycast}>
                 <meshStandardMaterial color="#334155" metalness={0.6} roughness={0.4} />
               </mesh>
@@ -582,8 +586,8 @@ export function TestLabEnvironment() {
                 <meshBasicMaterial color="#f8fafc" toneMapped={false} />
               </mesh>
               {[-1.3, 1.3].map((dx) => (
-                <mesh key={dx} position={[dx, 0.25, 0]} raycast={noRaycast}>
-                  <cylinderGeometry args={[0.015, 0.015, 0.32, 10]} />
+                <mesh key={dx} position={[dx, 0.235, 0]} raycast={noRaycast}>
+                  <cylinderGeometry args={[0.015, 0.015, 0.23, 12]} />
                   <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.3} />
                 </mesh>
               ))}
@@ -597,7 +601,8 @@ export function TestLabEnvironment() {
       <pointLight position={[19, 5.6, -5]} intensity={14} distance={20} decay={2} color="#eaf4ff" />
 
       {/* ================= PAPAN & POSTER ================= */}
-      <mesh position={[0, 4.7, HALL.z0 + 0.03]} raycast={noRaycast}>
+      {/* papan nama di atas, poster di bawahnya: tidak saling menindih */}
+      <mesh position={[0, 5.05, HALL.z0 + 0.03]} raycast={noRaycast}>
         <planeGeometry args={[14, 2.19]} />
         <meshBasicMaterial map={sign} toneMapped={false} />
       </mesh>
@@ -775,10 +780,14 @@ export function TestLabEnvironment() {
         ]}
       />
       {/* Poster perbandingan di dinding belakang */}
-      <mesh position={[4.3, 2.75, HALL.z0 + 0.04]} raycast={noRaycast}>
-        <planeGeometry args={[3.3, 2.32]} />
+      <mesh position={[4.3, 2.45, HALL.z0 + 0.04]} raycast={noRaycast}>
+        <planeGeometry args={[3.1, 2.18]} />
         <meshBasicMaterial map={compare} toneMapped={false} />
       </mesh>
+
+      {/* ----- Sudut energi surya (belakang kanan): baterai penyimpanan, inverter, papan alur ----- */}
+      <FloorDecal position={[18.6, -12.3]} size={[5.2, 0.55]} map={txtSolar} />
+      <EnergyRoom position={[14.9, 0, HALL.z0]} wallZ={HALL.z0} />
 
       {/* ----- Game merakit mobil listrik (sayap kanan) ----- */}
       <FloorDecal position={[19, 0.6]} size={[5.6, 0.6]} map={txtGame} />

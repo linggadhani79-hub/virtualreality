@@ -290,14 +290,74 @@ const platformGeometry = new RoundedBoxGeometry(5.6, PLATFORM_Y, 2.8, 6, 0.055);
 const standTop = new RoundedBoxGeometry(1, 0.06, 1, 6, 0.029);
 const postGeometry = new THREE.CylinderGeometry(0.09, 0.11, 4.3, 16);
 const hintGeometry = new THREE.ConeGeometry(0.16, 0.34, 20);
-const cableCurve = new THREE.CatmullRomCurve3([
-  new THREE.Vector3(-0.2, 0.52, 0.36),
-  new THREE.Vector3(0.45, 0.6, 0.52),
-  new THREE.Vector3(1.0, 0.72, 0.44),
-  new THREE.Vector3(1.3, 0.9, 0.2),
-  new THREE.Vector3(1.36, 0.97, 0.0),
-]);
-const cableGeometry = new THREE.TubeGeometry(cableCurve, 40, 0.028, 10);
+/**
+ * Jalur kabel dengan tikungan membulat: garis lurus antar-titik, tiap sudut diganti lengkung
+ * berjari-jari `bend` (seperti kabel sungguhan yang ditekuk rapi, bukan melayang).
+ */
+function routed(points: [number, number, number][], bend: number) {
+  const v = points.map((p) => new THREE.Vector3(...p));
+  const path = new THREE.CurvePath<THREE.Vector3>();
+  let from = v[0].clone();
+  for (let i = 1; i < v.length - 1; i++) {
+    const inDir = v[i].clone().sub(v[i - 1]).normalize();
+    const outDir = v[i + 1].clone().sub(v[i]).normalize();
+    const r = Math.min(bend, v[i].distanceTo(v[i - 1]) / 2, v[i].distanceTo(v[i + 1]) / 2);
+    const a = v[i].clone().addScaledVector(inDir, -r);
+    const c = v[i].clone().addScaledVector(outDir, r);
+    path.add(new THREE.LineCurve3(from, a));
+    path.add(new THREE.QuadraticBezierCurve3(a, v[i].clone(), c));
+    from = c;
+  }
+  path.add(new THREE.LineCurve3(from, v[v.length - 1].clone()));
+  return path;
+}
+const tube = (points: [number, number, number][], radius: number, bend = 0.06) =>
+  new THREE.TubeGeometry(routed(points, bend), 96, radius, 10, false);
+
+// Kabel tegangan tinggi pada mobil yang dirakit (koordinat lokal game; ukuran komponen diukur dari
+// modelnya: baterai x ±0,85 / atas y 0,45, inverter x 1,11–1,61 / y 0,82–0,96, motor y 0,30–0,80).
+//  - sepasang kabel DC (+/−) dari konektor ujung baterai, menyusur di atas rangka, naik ke inverter
+//  - tiga kabel AC fase dari sisi inverter turun ke motor
+const DC_Z = [-0.045, 0.045];
+const cableGeometries = [
+  ...DC_Z.map((z) =>
+    tube(
+      [
+        [0.8, 0.43, z],
+        [0.96, 0.43, z],
+        [1.04, 0.43, z],
+        [1.04, 0.89, z],
+        [1.12, 0.89, z],
+      ],
+      0.019,
+    ),
+  ),
+  ...[-0.07, 0, 0.07].map((x) =>
+    tube(
+      [
+        [1.36 + x, 0.89, 0.12],
+        [1.36 + x, 0.89, 0.2],
+        [1.36 + x, 0.62, 0.2],
+        [1.36 + x, 0.62, 0.165],
+      ],
+      0.013,
+      0.04,
+    ),
+  ),
+];
+// konektor (soket di ujung kabel) dan klem pengikat kabel
+const plugGeometry = new THREE.CylinderGeometry(0.032, 0.032, 0.06, 16).rotateZ(Math.PI / 2);
+const phasePlug = new THREE.CylinderGeometry(0.022, 0.022, 0.04, 14).rotateX(Math.PI / 2);
+const clampGeometry = new THREE.TorusGeometry(0.03, 0.008, 6, 18);
+const CABLE_PLUGS: [number, number, number][] = [
+  ...DC_Z.map((z) => [0.8, 0.43, z] as [number, number, number]),
+  ...DC_Z.map((z) => [1.1, 0.89, z] as [number, number, number]),
+];
+const CABLE_CLAMPS: { p: [number, number, number]; r: [number, number, number] }[] = [
+  ...DC_Z.map((z) => ({ p: [1.04, 0.62, z] as [number, number, number], r: [Math.PI / 2, 0, 0] as [number, number, number] })),
+  ...DC_Z.map((z) => ({ p: [0.9, 0.43, z] as [number, number, number], r: [0, Math.PI / 2, 0] as [number, number, number] })),
+];
+
 const coilGeometry = new THREE.TorusGeometry(0.24, 0.035, 10, 32);
 
 const _a = new THREE.Vector3();
@@ -632,9 +692,28 @@ export function AssemblyGame({
               <mesh geometry={coilGeometry} rotation={[Math.PI / 2, 0, 0]} position={[0, 0.11, 0]} scale={0.92} visible={i >= done} raycast={noRaycast}>
                 <meshStandardMaterial color="#f97316" roughness={0.5} />
               </mesh>
-              <mesh geometry={cableGeometry} visible={i < done} raycast={noRaycast}>
-                <meshStandardMaterial color="#ea580c" emissive="#ea580c" emissiveIntensity={0.35} roughness={0.5} />
-              </mesh>
+              <group visible={i < done}>
+                {cableGeometries.map((g, k) => (
+                  <mesh key={k} geometry={g} raycast={noRaycast}>
+                    <meshStandardMaterial color="#f97316" emissive="#ea580c" emissiveIntensity={0.25} roughness={0.45} />
+                  </mesh>
+                ))}
+                {CABLE_PLUGS.map((p, k) => (
+                  <mesh key={k} geometry={plugGeometry} position={p} raycast={noRaycast}>
+                    <meshStandardMaterial color="#1f2937" metalness={0.5} roughness={0.4} />
+                  </mesh>
+                ))}
+                {[-0.07, 0, 0.07].flatMap((x) => [0.89, 0.62].map((y) => [1.36 + x, y, y > 0.8 ? 0.13 : 0.165] as [number, number, number])).map((p, k) => (
+                  <mesh key={`f${k}`} geometry={phasePlug} position={p} raycast={noRaycast}>
+                    <meshStandardMaterial color="#1f2937" metalness={0.5} roughness={0.4} />
+                  </mesh>
+                ))}
+                {CABLE_CLAMPS.map((c, k) => (
+                  <mesh key={`c${k}`} geometry={clampGeometry} position={c.p} rotation={c.r} raycast={noRaycast}>
+                    <meshStandardMaterial color="#111827" roughness={0.6} />
+                  </mesh>
+                ))}
+              </group>
             </>
           )}
           {/* label nama: hilang setelah komponen terpasang */}
