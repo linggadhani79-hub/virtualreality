@@ -32,6 +32,7 @@ dilanggar (tanpa database, aset ditanam, tanpa unggah/unduh, langsung pakai, des
 | `src/components/DrivingTrack.tsx` | Lintasan aspal luar ala ujian SIM + mobil yang berkeliling dan mampir mengisi daya |
 | `src/components/ParkingArea.tsx` | Area parkir & SPBU di barat luar lintasan (pusat X −47,5 Z 5): jalan lingkar dengan mobil bensin vs listrik yang terus berjalan + meteran biaya, papan "Boros mana?", SPBU ukuran nyata, petak parkir. Disembunyikan saat pemain di dalam gedung. Angka biaya ada di `ASSUMPTIONS`. Armada 4 mobil (`FLEET`): sepasang berjalan, sepasang parkir, bergantian tiap 2 putaran; roda dipisah dengan `split-fused-wheels.mjs` (mobil klasik: `0.078 0.36 tetap 0.8` agar spatbor tidak ikut berputar). `window.__timeScale` (dev) mempercepat simulasi untuk uji |
 | `src/components/HumanCharacter.tsx` | Avatar teknisi (mode orang ketiga), animasi jalan & lompat |
+| `src/components/SolarPower.tsx` | Panel surya di atap (`RoofSolarPanels`, satu InstancedMesh) dan sudut energi di dalam: lemari baterai, inverter, papan alur energi (`EnergyRoom`) |
 | `src/components/LabBuilding.tsx` | Tampak luar gedung (atap lengkung, jendela, kanopi), halaman, dan tanah (`public/lab/tanah.webp`, ubin dari aset taman disambung bercermin) |
 | `src/components/SampleEVCar.tsx` | Mobil, mode Komponen (sasis asli + titik sorot), panel tombol 3D |
 | `src/components/LabStations.tsx` | `ExhibitStand` (etalase, `low` = panggung rendah), `InfoSign`, `StaticModel`, `Scenery` (taman/pohon), `QuizStation` |
