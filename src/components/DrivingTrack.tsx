@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { disableRaycast, fitModel, loadGlb } from "../lib/glb";
 import { modelUrl } from "../lib/quality";
 
@@ -67,47 +68,106 @@ function drawRoad(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.fillRect(w * 0.492, 0, w * 0.016, h * 0.5);
 }
 
-function makeSignTexture(lines: string[], bg: string, fg = "#ffffff") {
+type SignShape = "board" | "stop";
+
+function makeSignTexture(lines: string[], bg: string, fg: string, shape: SignShape) {
   const c = document.createElement("canvas");
-  c.width = 512;
-  c.height = 256;
+  c.width = shape === "stop" ? 512 : 768;
+  c.height = shape === "stop" ? 512 : 384;
+  const W = c.width;
+  const H = c.height;
   const ctx = c.getContext("2d")!;
-  ctx.fillStyle = bg;
-  ctx.beginPath();
-  (ctx as any).roundRect?.(6, 6, 500, 244, 34) ?? ctx.rect(6, 6, 500, 244);
-  ctx.fill();
-  ctx.strokeStyle = fg;
-  ctx.lineWidth = 10;
-  ctx.stroke();
+  if (shape === "stop") {
+    // segi delapan merah bertepi putih
+    const oct = (r: number) => {
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = Math.PI / 8 + (i * Math.PI) / 4;
+        ctx[i ? "lineTo" : "moveTo"](W / 2 + Math.cos(a) * r, H / 2 + Math.sin(a) * r);
+      }
+      ctx.closePath();
+    };
+    ctx.fillStyle = "#ffffff";
+    oct(254);
+    ctx.fill();
+    ctx.fillStyle = bg;
+    oct(226);
+    ctx.fill();
+  } else {
+    ctx.fillStyle = fg;
+    ctx.beginPath();
+    (ctx as any).roundRect?.(0, 0, W, H, 44) ?? ctx.rect(0, 0, W, H);
+    ctx.fill();
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    (ctx as any).roundRect?.(14, 14, W - 28, H - 28, 32) ?? ctx.rect(14, 14, W - 28, H - 28);
+    ctx.fill();
+  }
   ctx.fillStyle = fg;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  lines.forEach((l, i) => {
-    ctx.font = `900 ${i === 0 ? 86 : 50}px system-ui, sans-serif`;
-    ctx.fillText(l, 256, lines.length === 1 ? 132 : i === 0 ? 96 : 186, 460);
-  });
+  // ukuran huruf menyesuaikan lebar papan (tidak dipaksa menyempit)
+  const fit = (text: string, weight: number, size: number, maxW: number) => {
+    do {
+      ctx.font = `${weight} ${size}px system-ui, sans-serif`;
+      size -= 4;
+    } while (ctx.measureText(text).width > maxW && size > 20);
+  };
+  const maxW = shape === "stop" ? 360 : W - 90;
+  if (lines.length === 1) {
+    fit(lines[0], 900, shape === "stop" ? 150 : 170, maxW);
+    ctx.fillText(lines[0], W / 2, H / 2 + 6);
+  } else {
+    fit(lines[0], 900, 124, maxW);
+    ctx.fillText(lines[0], W / 2, H * 0.36);
+    fit(lines[1], 700, 66, maxW);
+    ctx.fillText(lines[1], W / 2, H * 0.72);
+  }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
+  t.anisotropy = 8;
   return t;
 }
 
-function RoadSign({ position, facing, lines, bg, fg }: { position: [number, number, number]; facing: number; lines: string[]; bg: string; fg?: string }) {
-  const texture = useMemo(() => makeSignTexture(lines, bg, fg), []); // eslint-disable-line react-hooks/exhaustive-deps
+const signBoard = new RoundedBoxGeometry(1.7, 0.85, 0.05, 4, 0.024);
+const signOctagon = new THREE.CylinderGeometry(0.52, 0.52, 0.05, 8).rotateY(Math.PI / 8).rotateX(Math.PI / 2);
+const signPole = new THREE.CylinderGeometry(0.038, 0.045, 1, 16);
+const signFoot = new THREE.CylinderGeometry(0.16, 0.2, 0.07, 20);
+const signClamp = new RoundedBoxGeometry(0.16, 0.09, 0.07, 3, 0.02);
+
+/**
+ * Rambu di tepi jalan: papan tebal bersudut bulat di depan tiang (dijepit dua klem).
+ * `facing` = arah muka depan papan (menghadap kendaraan yang datang).
+ */
+function RoadSign({ position, facing, lines, bg, fg = "#ffffff", shape = "board" }: { position: [number, number, number]; facing: number; lines: string[]; bg: string; fg?: string; shape?: SignShape }) {
+  const texture = useMemo(() => makeSignTexture(lines, bg, fg, shape), []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => texture.dispose(), [texture]);
+  const stop = shape === "stop";
+  const w = stop ? 1.04 : 1.7;
+  const h = stop ? 1.04 : 0.85;
+  const cy = 2.25; // tinggi tengah papan
   return (
     <group position={position} rotation={[0, facing, 0]}>
-      <mesh position={[0, 1.2, 0]} raycast={noRaycast}>
-        <cylinderGeometry args={[0.04, 0.05, 2.4, 12]} />
+      <mesh geometry={signFoot} position={[0, 0.035, 0]} raycast={noRaycast}>
+        <meshStandardMaterial color="#475569" roughness={0.8} />
+      </mesh>
+      <mesh geometry={signPole} position={[0, (cy + h / 2 - 0.06) / 2, 0]} scale={[1, cy + h / 2 - 0.06, 1]} raycast={noRaycast}>
         <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.3} />
       </mesh>
-      {/* dua muka, supaya terbaca dari kedua arah */}
-      {[0, Math.PI].map((r) => (
-        <mesh key={r} position={[0, 2.45, r ? -0.03 : 0.03]} rotation={[0, r, 0]} raycast={noRaycast}>
-          <planeGeometry args={[1.5, 0.75]} />
-          <meshBasicMaterial map={texture} transparent toneMapped={false} />
+      {[-0.22, 0.22].map((dy) => (
+        <mesh key={dy} geometry={signClamp} position={[0, cy + dy * (h / 0.85), 0.03]} raycast={noRaycast}>
+          <meshStandardMaterial color="#64748b" metalness={0.8} roughness={0.35} />
         </mesh>
       ))}
+      {/* badan papan (di depan tiang) */}
+      <mesh geometry={stop ? signOctagon : signBoard} position={[0, cy, 0.085]} raycast={noRaycast}>
+        <meshStandardMaterial color={stop ? "#e2e8f0" : "#cbd5e1"} metalness={0.5} roughness={0.5} />
+      </mesh>
+      {/* muka depan saja; punggung papan polos seperti rambu sungguhan (tiang ada di belakang) */}
+      <mesh position={[0, cy, 0.085 + 0.0265]} raycast={noRaycast}>
+        <planeGeometry args={[w - (stop ? 0 : 0.03), h - (stop ? 0 : 0.03)]} />
+        <meshBasicMaterial map={texture} transparent alphaTest={0.5} toneMapped={false} />
+      </mesh>
     </group>
   );
 }
@@ -227,7 +287,8 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
       nor.set(-tan.z, 0, tan.x);
       // pastikan normal menunjuk ke dalam lintasan
       if (nor.dot(center.clone().sub(p)) < 0) nor.negate();
-      const v = path.dist[i] / 6;
+      // jumlah ulangan tekstur dibulatkan agar garis putus-putus menyambung rapi di titik temu lingkar
+      const v = (path.dist[i] / path.length) * Math.round(path.length / 6);
       pos.set([p.x + nor.x * (ROAD_W / 2), 0, p.z + nor.z * (ROAD_W / 2)], i * 6);
       pos.set([p.x - nor.x * (ROAD_W / 2), 0, p.z - nor.z * (ROAD_W / 2)], i * 6 + 3);
       uv.set([0, v], i * 4);
@@ -258,6 +319,11 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
     if (n.dot(new THREE.Vector3(loop.cx, 0, loop.cz).sub(p)) < 0) n.negate();
     p.addScaledVector(n, lat);
     return { p, heading: Math.atan2(t.x, t.z) };
+  };
+  /** Rambu: 1,3 m di luar tepi jalan, mukanya menghadap kendaraan yang datang. */
+  const signAt = (sAlong: number) => {
+    const { p, heading } = place(sAlong, -(ROAD_W / 2 + 1.3));
+    return { position: [p.x, 0, p.z] as [number, number, number], facing: heading + Math.PI };
   };
   const cones = useMemo(() => Array.from({ length: slalom.n }, (_, i) => place(slalom.s0 + i * slalom.d, 0)), [path]); // eslint-disable-line react-hooks/exhaustive-deps
   const gatePoles = useMemo(
@@ -501,9 +567,9 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
           <meshBasicMaterial color="#f8fafc" toneMapped={false} />
         </mesh>
       </group>
-      <RoadSign position={[zebra.p.x + 5.2, 0, zebra.p.z + ROAD_W / 2 + 0.8]} facing={Math.PI / 2} lines={["STOP"]} bg="#dc2626" />
+      <RoadSign {...signAt(zebraS - 3.4)} lines={["STOP"]} bg="#dc2626" shape="stop" />
 
-      <RoadSign position={[cones[0].p.x - ROAD_W / 2 - 0.8, 0, cones[0].p.z + 13]} facing={0} lines={["REM REGENERATIF", "Mengerem = mengisi baterai"]} bg="#0e7490" />
+      <RoadSign {...signAt(slalom.s0 - 17)} lines={["REM REGENERATIF", "Mengerem = mengisi baterai"]} bg="#0e7490" />
       {/* ----- 2. Zig-zag ----- */}
       {cones.map((c, i) => (
         <group key={i} position={[c.p.x, 0.012, c.p.z]}>
@@ -516,7 +582,7 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
           </mesh>
         </group>
       ))}
-      <RoadSign position={[cones[0].p.x - ROAD_W / 2 - 0.8, 0, cones[0].p.z + 8]} facing={0} lines={["ZIG-ZAG", "Uji kelincahan"]} bg="#1d4ed8" />
+      <RoadSign {...signAt(slalom.s0 - 8)} lines={["ZIG-ZAG", "Uji kelincahan"]} bg="#1d4ed8" />
 
       {/* ----- 3. Jalur sempit ----- */}
       {gatePoles.map((c, i) => (
@@ -530,7 +596,7 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
           </mesh>
         </group>
       ))}
-      <RoadSign position={[gatePoles[0].p.x - 6, 0, gatePoles[0].p.z - ROAD_W / 2 - 2.2]} facing={-Math.PI / 2} lines={["JALUR SEMPIT", "Uji ketepatan"]} bg="#1d4ed8" />
+      <RoadSign {...signAt(gate.s0 - 7)} lines={["JALUR SEMPIT", "Uji ketepatan"]} bg="#1d4ed8" />
 
       {/* ----- 4. Polisi tidur ----- */}
       {bumpPlaces.map((b, i) => (
@@ -538,7 +604,7 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
           <meshStandardMaterial color={i % 2 ? "#facc15" : "#111827"} roughness={0.7} />
         </mesh>
       ))}
-      <RoadSign position={[bumpPlaces[0].p.x - 5, 0, bumpPlaces[0].p.z - ROAD_W / 2 - 0.8]} facing={-Math.PI / 2} lines={["PELAN", "Polisi tidur"]} bg="#f59e0b" fg="#111827" />
+      <RoadSign {...signAt(bumps[0] - 7)} lines={["PELAN", "Polisi tidur"]} bg="#f59e0b" fg="#111827" />
 
       {/* ----- 5. Stasiun pengisian tenaga surya ----- */}
       <group position={[station.p.x, 0, station.p.z]} rotation={[0, Math.PI / 2, 0]}>
@@ -548,7 +614,7 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
         <planeGeometry args={[2.6, 6.2]} />
         <meshBasicMaterial color="#16a34a" transparent opacity={0.55} toneMapped={false} />
       </mesh>
-      <RoadSign position={[station.p.x - 2.4, 0, station.p.z - 6.5]} facing={-Math.PI / 2 + Math.PI} lines={["EV CHARGING", "Tenaga surya"]} bg="#16a34a" />
+      <RoadSign {...signAt(chargeS - 13)} lines={["EV CHARGING", "Tenaga surya"]} bg="#16a34a" />
       <mesh ref={cableRef} geometry={cable} visible={false} raycast={noRaycast}>
         <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.8} roughness={0.5} />
       </mesh>
