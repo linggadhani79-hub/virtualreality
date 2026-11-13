@@ -619,6 +619,43 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
     redraw();
   };
 
+  const junction = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = 256;
+    c.height = 320;
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "#2a2c30";
+    ctx.fillRect(0, 0, 256, 320);
+    let seed = 23;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let i = 0; i < 5200; i++) {
+      const v = 34 + Math.floor(rnd() * 44);
+      ctx.fillStyle = `rgba(${v},${v},${v + 4},0.6)`;
+      ctx.fillRect(rnd() * 256, rnd() * 320, 1.6, 1.6);
+    }
+    // garis tepi di dua sisi simpang, melengkung keluar di kedua ujung (mulut simpang melebar)
+    ctx.strokeStyle = "#f1f5f9";
+    ctx.lineWidth = 8;
+    ctx.lineCap = "round";
+    for (const y of [16, 304]) {
+      const out = y < 160 ? -1 : 1;
+      ctx.beginPath();
+      ctx.moveTo(4, y + out * 14);
+      ctx.quadraticCurveTo(22, y, 46, y);
+      ctx.lineTo(210, y);
+      ctx.quadraticCurveTo(234, y, 252, y + out * 14);
+      ctx.stroke();
+    }
+    // garis henti sebelum masuk lintasan uji
+    ctx.fillStyle = "#f1f5f9";
+    ctx.fillRect(196, 168, 10, 122);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 8;
+    return t;
+  }, []);
+  useEffect(() => () => junction.dispose(), [junction]);
+
   return (
     <group ref={root} name="ParkingArea">
       {/* tanah beraspal + sambungan ke lintasan uji */}
@@ -626,9 +663,11 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
         <planeGeometry args={[GROUND_W, GROUND_D]} />
         <meshStandardMaterial map={ground} roughness={0.95} metalness={0.02} />
       </mesh>
-      <mesh position={[X0 + GROUND_W + 1.6, 0.018, PARKING.cz]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
-        <planeGeometry args={[3.4, 5]} />
-        <meshStandardMaterial color="#2f3136" roughness={0.95} />
+      {/* Persimpangan ke lintasan uji: aspal bertekstur sama, bergaris tepi sendiri, dan menutup
+          garis tepi kedua jalan di mulut simpang supaya sambungannya tidak terpotong garis putih. */}
+      <mesh position={[X0 + GROUND_W + 1.45, 0.046, PARKING.cz]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
+        <planeGeometry args={[4.3, 5.4]} />
+        <meshStandardMaterial map={junction} roughness={0.95} metalness={0} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
       </mesh>
 
       {/* armada: sepasang berjalan, sepasang parkir, bergantian */}

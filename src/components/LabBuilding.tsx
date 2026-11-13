@@ -183,8 +183,9 @@ export function LabBuilding({ hall }: { hall: Hall }) {
         <meshStandardMaterial map={ground} color="#8a8f88" roughness={1} metalness={0} />
       </mesh>
       {/* jalan paving menuju pintu + tepi */}
-      <mesh position={[0, 0.004, hall.z1 + 6.5]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
-        <planeGeometry args={[11, 13]} />
+      {/* sedikit masuk ke bawah aspal lintasan supaya tidak ada celah di sambungannya */}
+      <mesh position={[0, 0.004, hall.z1 + 6.75]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
+        <planeGeometry args={[11, 13.5]} />
         <meshStandardMaterial map={paverTex} roughness={0.9} />
       </mesh>
       {[-5.6, 5.6].map((x) => (
