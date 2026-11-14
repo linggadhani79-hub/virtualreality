@@ -37,7 +37,8 @@ dilanggar (tanpa database, aset ditanam, tanpa unggah/unduh, langsung pakai, des
 | `src/components/SampleEVCar.tsx` | Mobil, mode Komponen (sasis asli + titik sorot), panel tombol 3D |
 | `src/components/LabStations.tsx` | `ExhibitStand` (etalase, `low` = panggung rendah), `InfoSign`, `StaticModel`, `Scenery` (taman/pohon), `QuizStation` |
 | `src/components/ReadingCorner.tsx` | Meja buku (buku berdiri di penyangga saat dipilih) + layar slideshow modul ajar |
-| `src/components/ModuleEditor.tsx`, `src/lib/modules.ts` | Editor admin & data modul ajar |
+| `src/components/ModuleEditor.tsx`, `src/lib/modules.ts` | Editor admin & data modul ajar (slide boleh punya `image` + `caption`; daftar `ILLUSTRATIONS`) |
+| `public/lab/ilustrasi/*.webp` | Ilustrasi buku: render model 3D asli + foto dari dalam lab (960×720) |
 | `src/components/WebXRControllerManager.tsx` | Tangan VR (tanpa gambar controller; jari mengikuti trigger/grip/tombol), laser, pemilihan |
 | `src/components/GuardianBoundary.tsx` | Penanda batas ruang VR |
 | `src/components/PhoneVR.tsx`, `src/lib/phoneVR.ts` | VR HP (layar ganda, giroskop, tatapan) |
@@ -124,7 +125,9 @@ Satu objek harus bisa dipilih dengan mouse, laser Quest, dan tatapan VR HP. Sela
   hanya menunggu kerangka aplikasi (`/` dan `/assets/*`); model disimpan setelah halaman mengirim
   pesan `precache`. Jangan mengembalikan unduhan model ke tahap `install`: di internet lambat versi
   baru jadi tidak kunjung aktif dan perangkat terus menampilkan versi lama.
-- Slide modul hanya teks (belum gambar/video).
+- Slide modul bisa bergambar (ilustrasi lab), belum video.
+- Modul yang pernah disimpan admin di perangkat menimpa modul bawaan; tombol *Kembalikan bawaan*
+  di editor memunculkan modul baru.
 - Modul buatan admin tersimpan di perangkat itu; agar berlaku di semua perangkat, simpan JSON-nya
   sebagai `public/lab/modul.json` lalu build ulang.
 - Skor kuis tidak disimpan/dikirim ke mana pun.
