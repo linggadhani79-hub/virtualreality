@@ -62,14 +62,19 @@ const guessR = (cx) => {
   }
   return guessR.r;
 };
-const centers = [-1, 1].map((sign) => axleX(sign));
-const r = rArg ? +rArg * len : (guessR(centers[0]) + guessR(centers[1])) / 2;
-const cy = mn[1] + r;
+// Tebakan otomatis bisa ditimpa (model dengan spatbor besar, mis. mobil klasik):
+//   WHEEL_CX="-0.735,0.539" WHEEL_CY=-0.198 WHEEL_R=0.149 (satuan model)
+const env = process.env;
+const centers = env.WHEEL_CX ? env.WHEEL_CX.split(",").map(Number) : [-1, 1].map((sign) => axleX(sign));
+const r = env.WHEEL_R ? +env.WHEEL_R : rArg ? +rArg * len : (guessR(centers[0]) + guessR(centers[1])) / 2;
+const cy = env.WHEEL_CY ? +env.WHEEL_CY.split(",")[0] : mn[1] + r;
 const zin = zmax * (1 - (wArg ? +wArg : 0.36)); // batas dalam roda
 console.log('poros x', centers.map((v) => v.toFixed(3)), 'jari-jari', r.toFixed(3), 'pusat y', cy.toFixed(3), 'batas dalam |z| >', zin.toFixed(3));
 
 const wheels = [];
-for (const cx of centers) for (const sz of [-1, 1]) wheels.push({ cx, sz, name: `wheel_${cx < 0 ? 'A' : 'B'}${sz < 0 ? 'L' : 'R'}` });
+// WHEEL_CY boleh dua nilai (poros depan,belakang) bila tinggi pusat roda berbeda
+const cys = env.WHEEL_CY && env.WHEEL_CY.includes(",") ? env.WHEEL_CY.split(",").map(Number) : null;
+centers.forEach((cx, ci) => { for (const sz of [-1, 1]) wheels.push({ cx, sz, ...(cys ? { cy: cys[ci], r } : {}), name: `wheel_${cx < 0 ? 'A' : 'B'}${sz < 0 ? 'L' : 'R'}` }); });
 const inWheel = (i, w) => Math.sign(pos[i * 3 + 2]) === w.sz && Math.abs(pos[i * 3 + 2]) > zin && Math.hypot(pos[i * 3] - w.cx, pos[i * 3 + 1] - cy) < r * 1.015;
 const owner = new Int8Array(idx.length / 3).fill(-1);
 // segitiga ikut roda bila titik tengahnya di dalam silinder roda
@@ -101,22 +106,84 @@ for (let pass = 0; pass < (modeArg === 'tetap' ? 0 : 2); pass++) {
 }
 wheels.forEach((w) => console.log(w.name, 'pusat', w.cx.toFixed(4), (w.cy ?? cy).toFixed(4), 'jari-jari', (w.r ?? r).toFixed(4)));
 
+// ---- Pecah halus segitiga yang dilewati garis potong ----
+// Tanpa ini tepi roda mengikuti segitiga model (bergerigi) dan menyisakan lubang/serpihan. Segitiga
+// yang titik-titiknya berada di wilayah berbeda (roda vs bodi) dibelah empat berulang kali, lalu
+// tiap keping ikut wilayah titik tengahnya: tepi potong menjadi lingkaran yang rapi.
+const regionAt = (x, y, z) => {
+  for (let w = 0; w < 4; w++) {
+    const wh = wheels[w];
+    if (Math.sign(z) !== wh.sz || Math.abs(z) <= zin) continue;
+    const rad = Math.hypot(x - wh.cx, y - (wh.cy ?? cy)) / (wh.r ?? r);
+    const inner = Math.abs(z) < zin + (zmax - zin) * 0.3;
+    if (rad < (inner ? 0.9 : 1.01) * DISC) return w;
+  }
+  return -1;
+};
+const A = attrs.map((a) => {
+  const data = []; const e = new Array(a.size);
+  for (let i = 0; i < n; i++) data.push(...a.acc.getElement(i, e));
+  return { s: a.s, type: a.acc.getType(), size: a.size, data };
+});
+const PI = A.findIndex((a) => a.s === 'POSITION');
+const vpos = (v) => [A[PI].data[v * 3], A[PI].data[v * 3 + 1], A[PI].data[v * 3 + 2]];
+const vreg = (v) => { const p = vpos(v); return regionAt(p[0], p[1], p[2]); };
+const midpoint = (u, v) => {
+  const id = A[PI].data.length / 3;
+  for (const a of A) for (let k = 0; k < a.size; k++) a.data.push((a.data[u * a.size + k] + a.data[v * a.size + k]) / 2);
+  const ni = A.findIndex((a) => a.s === 'NORMAL');
+  if (ni >= 0) { const d = A[ni].data; const l = Math.hypot(d[id * 3], d[id * 3 + 1], d[id * 3 + 2]) || 1; d[id * 3] /= l; d[id * 3 + 1] /= l; d[id * 3 + 2] /= l; }
+  return id;
+};
+const DEPTH = +(env.WHEEL_SUBDIV || 4);
+const outIdx = [];
+const split = (a, b, c, depth) => {
+  const ra = vreg(a), rb = vreg(b), rc = vreg(c);
+  if (depth >= DEPTH || (ra === rb && rb === rc)) { outIdx.push(a, b, c); return; }
+  const ab = midpoint(a, b), bc = midpoint(b, c), ca = midpoint(c, a);
+  split(a, ab, ca, depth + 1); split(ab, b, bc, depth + 1); split(ca, bc, c, depth + 1); split(ab, bc, ca, depth + 1);
+};
+for (let t = 0; t < idx.length; t += 3) split(idx[t], idx[t + 1], idx[t + 2], 0);
+const own = new Int8Array(outIdx.length / 3);
+for (let t = 0; t < outIdx.length; t += 3) {
+  const p0 = vpos(outIdx[t]), p1 = vpos(outIdx[t + 1]), p2 = vpos(outIdx[t + 2]);
+  own[t / 3] = regionAt((p0[0] + p1[0] + p2[0]) / 3, (p0[1] + p1[1] + p2[1]) / 3, (p0[2] + p1[2] + p2[2]) / 3);
+}
+// Keping kecil yang terpisah dari roda (ujung spatbor/apron yang kebetulan masuk lingkaran)
+// dikembalikan ke bodi: hanya bagian roda yang tersambung yang ikut berputar.
+{
+  const key = (v) => { const p = vpos(v); return `${Math.round(p[0] * 2e4)},${Math.round(p[1] * 2e4)},${Math.round(p[2] * 2e4)}`; };
+  for (let w = 0; w < 4; w++) {
+    const tris = []; for (let t = 0; t < own.length; t++) if (own[t] === w) tris.push(t);
+    const ids = new Map(); const par = [];
+    const idOf = (k) => { let i = ids.get(k); if (i === undefined) { i = par.length; ids.set(k, i); par.push(i); } return i; };
+    const find = (x) => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+    const triRoot = tris.map((t) => { const a = idOf(key(outIdx[t * 3])), b = idOf(key(outIdx[t * 3 + 1])), c = idOf(key(outIdx[t * 3 + 2])); par[find(a)] = find(b); par[find(b)] = find(c); return a; });
+    const size = new Map(); tris.forEach((t, k) => { const r0 = find(triRoot[k]); size.set(r0, (size.get(r0) || 0) + 1); });
+    const biggest = Math.max(0, ...size.values());
+    let dropped = 0;
+    tris.forEach((t, k) => { if (size.get(find(triRoot[k])) < biggest * 0.04) { own[t] = -1; dropped++; } });
+    if (dropped) console.log(wheels[w].name, 'keping lepas dikembalikan ke bodi:', dropped, 'segitiga');
+  }
+}
+console.log('segitiga setelah dipecah di garis potong:', idx.length / 3, '→', outIdx.length / 3);
+
 const buffer = root.listBuffers()[0];
 const makePrim = (who, center) => {
-  const remap = new Map(); const data = attrs.map(() => []); const I = [];
-  for (let t = 0; t < idx.length; t += 3) {
-    if (owner[t / 3] !== who) continue;
+  const remap = new Map(); const data = A.map(() => []); const I = [];
+  for (let t = 0; t < outIdx.length; t += 3) {
+    if (own[t / 3] !== who) continue;
     for (let k = 0; k < 3; k++) {
-      const v = idx[t + k]; let m = remap.get(v);
+      const v = outIdx[t + k]; let m = remap.get(v);
       if (m === undefined) {
         m = remap.size; remap.set(v, m);
-        attrs.forEach((a, ai) => { const e = a.acc.getElement(v, new Array(a.size)); if (a.s === 'POSITION') { e[0] -= center[0]; e[1] -= center[1]; e[2] -= center[2]; } data[ai].push(...e); });
+        A.forEach((a, ai) => { const e = a.data.slice(v * a.size, v * a.size + a.size); if (a.s === 'POSITION') { e[0] -= center[0]; e[1] -= center[1]; e[2] -= center[2]; } data[ai].push(...e); });
       }
       I.push(m);
     }
   }
   const p = doc.createPrimitive().setMaterial(material).setIndices(doc.createAccessor().setType('SCALAR').setArray(new Uint32Array(I)).setBuffer(buffer));
-  attrs.forEach((a, ai) => p.setAttribute(a.s, doc.createAccessor().setType(a.acc.getType()).setArray(new Float32Array(data[ai])).setBuffer(buffer)));
+  A.forEach((a, ai) => p.setAttribute(a.s, doc.createAccessor().setType(a.type).setArray(new Float32Array(data[ai])).setBuffer(buffer)));
   return { p, tris: I.length / 3 };
 };
 
