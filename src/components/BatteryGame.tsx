@@ -27,7 +27,8 @@ const N = 8;
 const CELL_NOM = 3.7; // V
 const CELL_AH = 3; // Ah
 const SPACING = 0.15;
-const TOP = 0.93; // tinggi permukaan meja
+const TOP = 0.76; // tinggi permukaan meja (rendah: nyaman dipakai berdiri maupun duduk)
+const BOARD_Y = 1.95; // pusat papan informasi
 const CELL_H = 0.2;
 const cellX = (i: number) => (i - (N - 1) / 2) * SPACING;
 const TERM_Z = 0.035; // + di depan (+Z), − di belakang
@@ -234,6 +235,102 @@ function drawBoard(ctx: CanvasRenderingContext2D, cells: Cell[], step: Step, tar
   ctx.textAlign = "left";
 }
 
+/* ---------------------- papan perhitungan seri / paralel ---------------------- */
+
+const fmt = (n: number, d = 1) => n.toLocaleString("id-ID", { minimumFractionDigits: d, maximumFractionDigits: d });
+
+function drawCalc(ctx: CanvasRenderingContext2D, id: ConfigId) {
+  const W = 1000;
+  const H = 1200;
+  const cfg = CONFIGS.find((c) => c.id === id)!;
+  ctx.fillStyle = "#0b1220";
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "#f59e0b";
+  ctx.lineWidth = 8;
+  ctx.strokeRect(4, 4, W - 8, H - 8);
+  ctx.textBaseline = "top";
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#fbbf24";
+  ctx.font = "900 46px system-ui, sans-serif";
+  ctx.fillText("HITUNG PAKET BATERAI", 40, 30);
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "600 26px system-ui, sans-serif";
+  ctx.fillText("Satu sel: 3,7 V · 3 Ah  →  3,7 × 3 = 11,1 Wh", 40, 92);
+
+  const V = cfg.s * CELL_NOM;
+  const Ah = cfg.p * CELL_AH;
+  const Wh = V * Ah;
+  const I = cfg.p * 6; // arus kontinu 2C per sel = 6 A
+  const rows: [string, string][] = [
+    [`Rangkaian ${id}`, `${cfg.s} seri × ${cfg.p} paralel = ${cfg.s * cfg.p} sel`],
+    ["Tegangan (seri)", `V = ${cfg.s} × 3,7 = ${fmt(V)} V`],
+    ["Kapasitas (paralel)", `Ah = ${cfg.p} × 3 = ${Ah} Ah`],
+    ["Energi", `E = V × Ah = ${fmt(V)} × ${Ah} = ${fmt(Wh)} Wh`],
+    ["", `= ${fmt(Wh / 1000, 4)} kWh  (÷ 1.000)`],
+    ["Arus maks (2C/sel)", `I = ${cfg.p} × 6 A = ${I} A`],
+    ["Daya maks", `P = V × I = ${fmt(V)} × ${I} = ${fmt(V * I, 0)} W`],
+  ];
+  let y = 150;
+  ctx.fillStyle = "#111c33";
+  ctx.fillRect(28, y - 10, W - 56, rows.length * 56 + 14);
+  rows.forEach(([a, b]) => {
+    ctx.fillStyle = "#93c5fd";
+    ctx.font = "700 28px system-ui, sans-serif";
+    ctx.fillText(a, 46, y + 8, 300);
+    ctx.fillStyle = "#f8fafc";
+    ctx.font = "800 30px system-ui, sans-serif";
+    ctx.fillText(b, 360, y + 6, W - 400);
+    y += 56;
+  });
+
+  // tabel perbandingan
+  y += 30;
+  ctx.fillStyle = "#4ade80";
+  ctx.font = "900 32px system-ui, sans-serif";
+  ctx.fillText("Bandingkan: sel sama, energi sama!", 40, y);
+  y += 50;
+  const cols = [40, 250, 450, 650, 830];
+  ctx.font = "700 26px system-ui, sans-serif";
+  ctx.fillStyle = "#94a3b8";
+  ["Rangkaian", "Tegangan", "Kapasitas", "Energi", "Arus"].forEach((h, k) => ctx.fillText(h, cols[k], y));
+  y += 40;
+  CONFIGS.forEach((c) => {
+    const v = c.s * CELL_NOM;
+    const ah = c.p * CELL_AH;
+    if (c.id === id) {
+      ctx.fillStyle = "rgba(245,158,11,0.22)";
+      ctx.fillRect(28, y - 8, W - 56, 46);
+    }
+    ctx.fillStyle = c.id === id ? "#fde68a" : "#e2e8f0";
+    ctx.font = "800 28px system-ui, sans-serif";
+    [c.id, `${fmt(v)} V`, `${ah} Ah`, `${fmt(v * ah)} Wh`, `${c.p * 6} A`].forEach((t, k) => ctx.fillText(t, cols[k], y));
+    y += 48;
+  });
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "600 24px system-ui, sans-serif";
+  wrapText(ctx, "Seri menaikkan tegangan, paralel menaikkan kapasitas dan arus. Jumlah energi (Wh) hanya bergantung pada jumlah sel.", W - 80)
+    .slice(0, 2)
+    .forEach((l) => (ctx.fillText(l, 40, y + 6), (y += 32)));
+
+  // skala mobil
+  y += 26;
+  ctx.fillStyle = "#1e293b";
+  ctx.fillRect(28, y - 8, W - 56, H - y - 22);
+  ctx.fillStyle = "#c4b5fd";
+  ctx.font = "900 30px system-ui, sans-serif";
+  ctx.fillText("Skala mobil listrik 60 kWh (sel yang sama)", 46, y + 4);
+  const lines = [
+    "Seri 96 sel: 96 × 3,7 = 355 V",
+    "Kapasitas: 60.000 Wh ÷ 355 V ≈ 169 Ah → paralel 169 ÷ 3 ≈ 57",
+    "Paket 96S57P = 5.472 sel → 5.472 × 11,1 Wh ≈ 60,7 kWh",
+    "Jarak: konsumsi 15 kWh/100 km → 60 ÷ 15 × 100 ≈ 400 km",
+    "Isi daya AC 7 kW: 60 ÷ 7 ≈ 8,6 jam (biaya ≈ 60 kWh × tarif/kWh)",
+  ];
+  ctx.fillStyle = "#e2e8f0";
+  ctx.font = "700 26px system-ui, sans-serif";
+  lines.forEach((l, k) => ctx.fillText(l, 46, y + 52 + k * 40, W - 92));
+}
+
 function drawMeter(ctx: CanvasRenderingContext2D, mode: "V" | "R", reading: string, hint: string) {
   const W = 512;
   const H = 300;
@@ -284,6 +381,12 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
 
   const board = useLiveCanvas(1600, 900);
   const meter = useLiveCanvas(512, 300);
+  const calc = useLiveCanvas(1000, 1200);
+  const calcId = config ?? target;
+  useEffect(() => {
+    drawCalc(calc.ctx, calcId);
+    calc.t.needsUpdate = true;
+  }, [calc, calcId]);
   useEffect(() => {
     drawBoard(board.ctx, cells, step, target, msg, mistakes);
     board.t.needsUpdate = true;
@@ -689,7 +792,7 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
       </group>
 
       {/* ---- papan informasi di belakang meja ---- */}
-      <group position={[0, 2.25, -0.55]}>
+      <group position={[0, BOARD_Y, -0.55]}>
         <mesh position={[0, 0, -0.03]} raycast={noRaycast}>
           <boxGeometry args={[2.72, 1.56, 0.05]} />
           <meshStandardMaterial color="#1e293b" metalness={0.5} roughness={0.4} />
@@ -699,8 +802,28 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
           <meshBasicMaterial map={board.t} toneMapped={false} />
         </mesh>
         {[-1.2, 1.2].map((x) => (
-          <mesh key={x} position={[x, -2.25 + 0.735, -0.03]} raycast={noRaycast}>
-            <cylinderGeometry args={[0.035, 0.04, 1.47, 16]} />
+          <mesh key={x} position={[x, -BOARD_Y / 2 + 0.39, -0.03]} raycast={noRaycast}>
+            <cylinderGeometry args={[0.035, 0.04, BOARD_Y - 0.78, 16]} />
+            <meshStandardMaterial color="#334155" metalness={0.7} roughness={0.35} />
+          </mesh>
+        ))}
+      </group>
+
+      {/* ---- papan perhitungan seri/paralel & kWh di samping meja ---- */}
+      <group position={[-2.05, 0, -0.25]} rotation={[0, 0.5, 0]}>
+        <group position={[0, 1.66, 0]}>
+          <mesh position={[0, 0, -0.03]} raycast={noRaycast}>
+            <boxGeometry args={[1.18, 1.4, 0.05]} />
+            <meshStandardMaterial color="#1e293b" metalness={0.5} roughness={0.4} />
+          </mesh>
+          <mesh raycast={noRaycast}>
+            <planeGeometry args={[1.1, 1.32]} />
+            <meshBasicMaterial map={calc.t} toneMapped={false} />
+          </mesh>
+        </group>
+        {[-0.5, 0.5].map((x) => (
+          <mesh key={x} position={[x, 0.48, -0.03]} raycast={noRaycast}>
+            <cylinderGeometry args={[0.03, 0.035, 0.96, 12]} />
             <meshStandardMaterial color="#334155" metalness={0.7} roughness={0.35} />
           </mesh>
         ))}

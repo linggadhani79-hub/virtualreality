@@ -70,6 +70,7 @@ const SOLIDS: Box[] = [
   boxAt(11.6, -6, 0.25, 1.2),
   // game restorasi baterai: meja + papan
   { minX: 17.4, maxX: 20.2, minZ: 3.9, maxZ: 5.0 },
+  { minX: 20.3, maxX: 21.4, minZ: 4.2, maxZ: 5.1 }, // papan hitung baterai
   // sudut energi surya: lemari baterai
   { minX: 14.4, maxX: 17.35, minZ: HALL.z0, maxZ: HALL.z0 + 0.66 },
   // game rakit: panggung, tiang derek, troli & meja komponen, konsol
