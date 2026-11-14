@@ -191,10 +191,28 @@ export const DEFAULT_MODULES: TeachingModule[] = [
         caption: "Sudut energi surya di dalam lab",
       },
       {
+        title: "Cara kerja sel surya",
+        body: "Sel surya terbuat dari dua lapis silikon yang berbeda muatan (tipe-n dan tipe-p).\n- Foton cahaya mengenai sel dan melepaskan elektron\n- Medan listrik di sambungan p-n mendorong elektron ke satu arah\n- Elektron mengalir lewat kabel sebagai arus DC (efek fotovoltaik)\n- Banyak sel dirangkai seri-paralel menjadi satu panel",
+        image: "stasiun-surya",
+        caption: "Panel surya terdiri dari puluhan sel silikon",
+      },
+      {
+        title: "MPPT: mengambil daya maksimum",
+        body: "Daya panel = tegangan × arus, dan titik terbaiknya berubah sesuai cahaya dan suhu.\n- Pengendali MPPT terus menggeser tegangan kerja panel\n- Mencari titik yang memberi daya terbesar\n- Tanpa MPPT, daya yang hilang bisa 10–30 %",
+        image: "energi-surya",
+        caption: "Inverter surya di lab sudah dilengkapi MPPT",
+      },
+      {
         title: "Inverter & baterai penyimpanan",
         body: "- Inverter surya mengubah DC dari panel menjadi AC untuk lampu dan alat\n- Siang hari kelebihan daya mengisi baterai penyimpanan\n- Malam hari baterai menyuplai lampu lab\n- Prinsipnya sama dengan mobil listrik: energi disimpan baterai, diubah inverter",
         image: "stasiun-surya",
         caption: "Panel surya, inverter, dan baterai bekerja bersama",
+      },
+      {
+        title: "On-grid, off-grid, dan hibrida",
+        body: "- On-grid: tersambung PLN, tanpa baterai; kelebihan daya dialirkan ke jaringan\n- Off-grid: berdiri sendiri, wajib baterai\n- Hibrida: tersambung PLN dan punya baterai — seperti lab ini\n- Panel surya juga bisa mengisi mobil listrik di stasiun pengisian",
+        image: "stasiun-surya",
+        caption: "Stasiun pengisian tenaga surya di lintasan luar",
       },
     ],
   },

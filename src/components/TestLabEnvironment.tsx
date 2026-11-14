@@ -7,6 +7,7 @@ import { Barrier, Cone, DiagnosticCart, Extinguisher, Lift, SafetyStation, Works
 import { LabBuilding } from "./LabBuilding";
 import { AssemblyGame } from "./AssemblyGame";
 import { EnergyRoom } from "./SolarPower";
+import { BatteryGame } from "./BatteryGame";
 import { ParkingArea, PARKING_SOLIDS } from "./ParkingArea";
 import { DrivingTrack } from "./DrivingTrack";
 import { boxAt, worldBounds, type Box } from "../lib/worldBounds";
@@ -67,6 +68,8 @@ const SOLIDS: Box[] = [
   boxAt(0, -3.1, 1.2, 0.3),
   boxAt(-11.6, -6, 0.25, 1.2),
   boxAt(11.6, -6, 0.25, 1.2),
+  // game restorasi baterai: meja + papan
+  { minX: 17.4, maxX: 20.2, minZ: 3.9, maxZ: 5.0 },
   // sudut energi surya: lemari baterai
   { minX: 14.4, maxX: 17.35, minZ: HALL.z0, maxZ: HALL.z0 + 0.66 },
   // game rakit: panggung, tiang derek, troli & meja komponen, konsol
@@ -447,6 +450,7 @@ export function TestLabEnvironment() {
   const txtExhibit = useCanvasTexture(1024, 128, floorText("ETALASE KOMPONEN EV", "rgba(125,211,252,0.95)"));
   const txtChassis = useCanvasTexture(1024, 128, floorText("RANGKA & RODA EV", "rgba(125,211,252,0.95)"));
   const txtNonEv = useCanvasTexture(2048, 128, floorText("BENGKEL NON-EV · MESIN BENSIN", "rgba(253,186,116,0.95)"));
+  const txtBattery = useCanvasTexture(1024, 128, floorText("RESTORASI BATERAI", "rgba(74,222,128,0.95)"));
   const txtSolar = useCanvasTexture(1024, 128, floorText("ENERGI SURYA", "rgba(251,191,36,0.95)"));
   const txtGame = useCanvasTexture(1024, 128, floorText("GAME RAKIT MOBIL EV", "rgba(250,204,21,0.95)"));
   const compare = useCanvasTexture(1280, 900, drawComparePoster);
@@ -788,6 +792,10 @@ export function TestLabEnvironment() {
       {/* ----- Sudut energi surya (belakang kanan): baterai penyimpanan, inverter, papan alur ----- */}
       <FloorDecal position={[18.6, -12.3]} size={[5.2, 0.55]} map={txtSolar} />
       <EnergyRoom position={[14.9, 0, HALL.z0]} wallZ={HALL.z0} />
+
+      {/* ----- Game restorasi baterai (depan sayap kanan) ----- */}
+      <FloorDecal position={[18.8, 2.7]} size={[4.6, 0.55]} map={txtBattery} />
+      <BatteryGame position={[18.8, 0, 4.4]} facing={Math.PI} />
 
       {/* ----- Game merakit mobil listrik (sayap kanan) ----- */}
       <FloorDecal position={[19, 0.6]} size={[5.6, 0.6]} map={txtGame} />

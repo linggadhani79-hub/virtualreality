@@ -117,7 +117,25 @@ const cabinetGeometry = new RoundedBoxGeometry(0.86, 1.9, 0.6, 5, 0.045);
 const inverterGeometry = new RoundedBoxGeometry(0.72, 0.92, 0.24, 5, 0.04);
 const panelBoxGeometry = new RoundedBoxGeometry(0.56, 0.74, 0.16, 4, 0.03);
 const conduitGeometry = new THREE.CylinderGeometry(0.035, 0.035, 1, 14);
-const elbowGeometry = new THREE.TorusGeometry(0.12, 0.035, 10, 16, Math.PI / 2);
+// Pipa dari bawah inverter turun lalu membelok ke sisi lemari baterai paling kanan
+const conduitCache = new Map<string, THREE.TubeGeometry>();
+function inverterToBattery(x: number, z: number) {
+  const key = `${x}|${z}`;
+  let g = conduitCache.get(key);
+  if (!g) {
+    const top = new THREE.Vector3(x + 3.2, 1.29, z);
+    const corner = new THREE.Vector3(x + 3.2, 0.6, z);
+    const end = new THREE.Vector3(x + 2.42, 0.6, z);
+    const r = 0.16;
+    const path = new THREE.CurvePath<THREE.Vector3>();
+    path.add(new THREE.LineCurve3(top, new THREE.Vector3(corner.x, corner.y + r, z)));
+    path.add(new THREE.QuadraticBezierCurve3(new THREE.Vector3(corner.x, corner.y + r, z), corner, new THREE.Vector3(corner.x - r, corner.y, z)));
+    path.add(new THREE.LineCurve3(new THREE.Vector3(corner.x - r, corner.y, z), end));
+    g = new THREE.TubeGeometry(path, 48, 0.035, 12, false);
+    conduitCache.set(key, g);
+  }
+  return g;
+}
 
 function drawCabinetFace(ctx: CanvasRenderingContext2D) {
   const W = 256;
@@ -273,17 +291,157 @@ function drawEnergyBoard(ctx: CanvasRenderingContext2D, f: Flow) {
   ctx.fillText("Prinsipnya sama dengan mobil listrik: energi disimpan baterai, diubah inverter.", 52, 616, W - 104);
 }
 
+/** Papan statis: cara kerja listrik tenaga surya, langkah demi langkah dengan diagram. */
+function drawSolarExplainer(ctx: CanvasRenderingContext2D) {
+  const W = 1600;
+  const H = 900;
+  ctx.fillStyle = "#0b1220";
+  ctx.beginPath();
+  (ctx as any).roundRect?.(6, 6, W - 12, H - 12, 40) ?? ctx.rect(6, 6, W - 12, H - 12);
+  ctx.fill();
+  ctx.strokeStyle = "#38bdf8";
+  ctx.lineWidth = 8;
+  ctx.stroke();
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "#7dd3fc";
+  ctx.font = "900 62px system-ui, sans-serif";
+  ctx.fillText("CARA KERJA LISTRIK TENAGA SURYA", 56, 40);
+
+  // ---- diagram ----
+  const y0 = 150;
+  // matahari
+  ctx.strokeStyle = "#f59e0b";
+  ctx.fillStyle = "#fbbf24";
+  ctx.beginPath();
+  ctx.arc(120, y0 + 90, 46, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = 7;
+  for (let i = 0; i < 10; i++) {
+    const a = (i * Math.PI) / 5;
+    ctx.beginPath();
+    ctx.moveTo(120 + Math.cos(a) * 58, y0 + 90 + Math.sin(a) * 58);
+    ctx.lineTo(120 + Math.cos(a) * 78, y0 + 90 + Math.sin(a) * 78);
+    ctx.stroke();
+  }
+  // sinar ke panel
+  ctx.setLineDash([14, 12]);
+  ctx.beginPath();
+  ctx.moveTo(190, y0 + 90);
+  ctx.lineTo(285, y0 + 90);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  const node = (x: number, title: string, sub: string, color: string) => {
+    ctx.fillStyle = "#111c33";
+    ctx.beginPath();
+    (ctx as any).roundRect?.(x, y0 + 10, 240, 160, 22) ?? ctx.rect(x, y0 + 10, 240, 160);
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.textAlign = "center";
+    ctx.font = "900 34px system-ui, sans-serif";
+    ctx.fillText(title, x + 120, y0 + 46, 220);
+    ctx.fillStyle = "#cbd5e1";
+    ctx.font = "600 26px system-ui, sans-serif";
+    ctx.fillText(sub, x + 120, y0 + 100, 220);
+    ctx.textAlign = "left";
+  };
+  const arrow = (x0: number, x1: number, label: string) => {
+    const y = y0 + 90;
+    ctx.strokeStyle = "#64748b";
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(x0, y);
+    ctx.lineTo(x1 - 16, y);
+    ctx.stroke();
+    ctx.fillStyle = "#64748b";
+    ctx.beginPath();
+    ctx.moveTo(x1, y);
+    ctx.lineTo(x1 - 20, y - 14);
+    ctx.lineTo(x1 - 20, y + 14);
+    ctx.fill();
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "800 24px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(label, (x0 + x1) / 2, y - 44);
+    ctx.textAlign = "left";
+  };
+  node(290, "PANEL SURYA", "cahaya → DC", "#f59e0b");
+  arrow(530, 600, "DC");
+  node(600, "MPPT + INVERTER", "DC → AC 220 V", "#38bdf8");
+  arrow(840, 910, "AC");
+  node(910, "LAMPU & ALAT", "beban lab", "#e2e8f0");
+  // cabang ke baterai
+  ctx.strokeStyle = "#22c55e";
+  ctx.lineWidth = 7;
+  ctx.beginPath();
+  ctx.moveTo(720, y0 + 170);
+  ctx.lineTo(720, y0 + 230);
+  ctx.lineTo(1200, y0 + 230);
+  ctx.lineTo(1200, y0 + 170);
+  ctx.stroke();
+  node(1230 - 30, "BATERAI", "simpan sisa siang", "#22c55e");
+  ctx.fillStyle = "#4ade80";
+  ctx.font = "800 24px system-ui, sans-serif";
+  ctx.fillText("siang: isi  ·  malam: suplai", 760, y0 + 240);
+
+  // ---- langkah ----
+  const steps = [
+    "Cahaya matahari (foton) mengenai sel silikon pada panel dan melepaskan elektron: terjadilah arus listrik DC (efek fotovoltaik).",
+    "Pengendali MPPT mengatur tegangan panel agar daya yang diambil selalu maksimum, walau cahaya berubah.",
+    "Inverter mengubah DC menjadi AC 220 V supaya bisa dipakai lampu, stopkontak, dan alat lab.",
+    "Siang hari, sisa daya mengisi baterai penyimpanan. Malam hari atau saat mendung, baterai yang menyuplai lampu.",
+    "Satu panel ±400–550 W saat terik. Daya turun ketika berawan dan nol di malam hari.",
+  ];
+  let y = y0 + 300;
+  ctx.font = "600 34px system-ui, sans-serif";
+  steps.forEach((t, i) => {
+    ctx.fillStyle = "#38bdf8";
+    ctx.beginPath();
+    ctx.arc(80, y + 20, 22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#0b1220";
+    ctx.textAlign = "center";
+    ctx.font = "900 28px system-ui, sans-serif";
+    ctx.fillText(String(i + 1), 80, y + 6);
+    ctx.textAlign = "left";
+    ctx.font = "600 32px system-ui, sans-serif";
+    ctx.fillStyle = "#e2e8f0";
+    // bungkus sederhana
+    const words = t.split(" ");
+    let line = "";
+    const lines: string[] = [];
+    for (const w of words) {
+      const test = line ? line + " " + w : w;
+      if (ctx.measureText(test).width > W - 200 && line) {
+        lines.push(line);
+        line = w;
+      } else line = test;
+    }
+    if (line) lines.push(line);
+    lines.forEach((l, k) => ctx.fillText(l, 124, y + k * 40));
+    y += lines.length * 40 + 18;
+  });
+}
+
 export function EnergyRoom({ position, wallZ }: { position: Vec3; /** z dinding belakang (lokal = dunia) */ wallZ: number }) {
   const cabinetFace = useMemo(() => canvasTexture(256, 560, drawCabinetFace), []);
+  const explainer = useMemo(() => canvasTexture(1600, 900, drawSolarExplainer), []);
+  useEffect(() => () => explainer.dispose(), [explainer]);
   const inverterFace = useMemo(() => canvasTexture(256, 330, drawInverterFace), []);
   const board = useMemo(() => {
     const c = document.createElement("canvas");
     c.width = 1280;
     c.height = 720;
+    // Kanvas yang sering digambar ulang: pakai kanvas biasa (bukan dipercepat GPU). Di sebagian HP
+    // Android kanvas GPU terunggah ke tekstur sebelum selesai digambar → papan tampil terpotong.
+    const ctx = c.getContext("2d", { willReadFrequently: true })!;
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 8;
-    return { c, t };
+    t.generateMipmaps = false;
+    t.minFilter = THREE.LinearFilter;
+    return { c, ctx, t };
   }, []);
   useEffect(
     () => () => {
@@ -307,9 +465,9 @@ export function EnergyRoom({ position, wallZ }: { position: Vec3; /** z dinding 
     f.solar = Math.max(1.2, 8.2 + Math.sin(t * 0.13) * 2.6 + Math.sin(t * 0.41) * 0.9);
     f.load = 3.0 + Math.sin(t * 0.07) * 0.3;
     f.soc = Math.min(98, Math.max(35, f.soc + (f.solar - f.load) * delta * 0.04));
-    if (t - lastDraw.current > 0.25) {
+    if (t - lastDraw.current > 0.5) {
       lastDraw.current = t;
-      drawEnergyBoard(board.c.getContext("2d")!, f);
+      drawEnergyBoard(board.ctx, f);
       board.t.needsUpdate = true;
     }
     // LED isi baterai di lemari berkedip pelan saat mengisi
@@ -410,16 +568,31 @@ export function EnergyRoom({ position, wallZ }: { position: Vec3; /** z dinding 
           <meshStandardMaterial color="#64748b" metalness={0.6} roughness={0.4} />
         </mesh>
       ))}
-      {/* inverter turun lalu belok ke atas lemari baterai */}
-      <mesh geometry={conduitGeometry} position={[x + 3.2, 1.07, wz + 0.12]} scale={[1, 0.38, 1]} raycast={noRaycast}>
+      {/* inverter → lemari baterai: satu pipa utuh dengan tikungan membulat (tidak terputus) */}
+      <mesh geometry={inverterToBattery(x, wz + 0.12)} raycast={noRaycast}>
         <meshStandardMaterial color="#64748b" metalness={0.6} roughness={0.4} />
       </mesh>
-      <mesh geometry={elbowGeometry} position={[x + 3.08, 0.88, wz + 0.12]} rotation={[0, 0, Math.PI]} raycast={noRaycast}>
-        <meshStandardMaterial color="#64748b" metalness={0.6} roughness={0.4} />
+      {/* dop sambungan di kedua ujung pipa */}
+      <mesh position={[x + 3.2, 1.3, wz + 0.12]} raycast={noRaycast}>
+        <cylinderGeometry args={[0.05, 0.05, 0.05, 16]} />
+        <meshStandardMaterial color="#475569" metalness={0.6} roughness={0.4} />
       </mesh>
-      <mesh geometry={conduitGeometry} position={[(x + 2.36 + x + 3.08) / 2, 0.76, wz + 0.12]} rotation={[0, 0, Math.PI / 2]} scale={[1, 3.08 - 2.36, 1]} raycast={noRaycast}>
-        <meshStandardMaterial color="#64748b" metalness={0.6} roughness={0.4} />
+      <mesh position={[x + 2.42, 0.6, wz + 0.12]} rotation={[0, 0, Math.PI / 2]} raycast={noRaycast}>
+        <cylinderGeometry args={[0.05, 0.05, 0.05, 16]} />
+        <meshStandardMaterial color="#475569" metalness={0.6} roughness={0.4} />
       </mesh>
+
+      {/* ---- papan cara kerja listrik tenaga surya (di atas lemari baterai) ---- */}
+      <group position={[x + 1.0, 3.45, wz + 0.04]}>
+        <mesh position={[0, 0, -0.02]} raycast={noRaycast}>
+          <boxGeometry args={[3.04, 1.74, 0.04]} />
+          <meshStandardMaterial color="#1e293b" metalness={0.5} roughness={0.4} />
+        </mesh>
+        <mesh raycast={noRaycast}>
+          <planeGeometry args={[2.96, 1.665]} />
+          <meshBasicMaterial map={explainer} toneMapped={false} />
+        </mesh>
+      </group>
 
       {/* ---- papan alur energi ---- */}
       <group position={[x + 7.0, 2.6, wz + 0.04]}>

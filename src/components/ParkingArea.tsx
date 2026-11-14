@@ -410,7 +410,10 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
         const canvas = document.createElement("canvas");
         canvas.width = 640;
         canvas.height = 250;
+        canvas.getContext("2d", { willReadFrequently: true }); // kanvas biasa: lihat SolarPower.tsx
         const texture = new THREE.CanvasTexture(canvas);
+        texture.generateMipmaps = false;
+        texture.minFilter = THREE.LinearFilter;
         texture.colorSpace = THREE.SRGBColorSpace;
         return { canvas, texture };
       }),
@@ -420,9 +423,11 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
     const canvas = document.createElement("canvas");
     canvas.width = 1280;
     canvas.height = 720;
+    canvas.getContext("2d", { willReadFrequently: true }); // kanvas biasa: lihat SolarPower.tsx
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
-    texture.anisotropy = 8;
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.LinearFilter;
     return { canvas, texture };
   }, []);
 

@@ -450,6 +450,45 @@ const QUESTIONS: Question[] = [
     answer: 0,
     why: "CCS2 dipakai untuk pengisian cepat DC; Type 2 untuk pengisian AC.",
   },
+  // ---- komponen ----
+  { q: "Komponen yang memantau tegangan, arus, dan suhu tiap sel baterai disebut…", options: ["BMS", "OBC", "ECU mesin", "Alternator"], answer: 0, why: "BMS (Battery Management System) menjaga setiap sel tetap dalam batas aman." },
+  { q: "Mengapa motor listrik tidak membutuhkan gigi percepatan seperti mobil bensin?", options: ["Karena torsinya besar sejak putaran nol", "Karena motornya kecil", "Karena bannya khusus", "Karena tidak punya roda gila"], answer: 0, why: "Motor listrik memberi torsi besar sejak diam dan bekerja di rentang putaran lebar, cukup dengan satu gigi reduksi." },
+  { q: "Bagian motor listrik yang diam dan berisi lilitan tembaga adalah…", options: ["Rotor", "Stator", "Komutator", "Piston"], answer: 1, why: "Stator diam dan lilitannya menghasilkan medan magnet berputar yang memutar rotor." },
+  { q: "Platform 'skateboard' pada mobil listrik berarti…", options: ["Baterai rata di lantai rangka", "Mobil beroda empat kecil", "Bodi dari kayu", "Mesin di bagasi"], answer: 0, why: "Baterai rata di lantai membuat titik berat rendah dan kabin lega." },
+  { q: "Arus yang keluar dari baterai traksi adalah…", options: ["AC 3 fasa", "DC (searah)", "AC 1 fasa", "Pulsa radio"], answer: 1, why: "Baterai selalu menyimpan dan mengeluarkan arus searah (DC); inverter mengubahnya menjadi AC." },
+  { q: "Fungsi gigi reduksi pada unit penggerak EV adalah…", options: ["Menurunkan putaran motor dan menaikkan torsi ke roda", "Mengisi baterai", "Mengubah DC ke AC", "Mendinginkan motor"], answer: 0, why: "Motor berputar sangat cepat; gigi reduksi menurunkannya sekaligus melipatgandakan torsi." },
+  { q: "Aki 12 V pada mobil listrik diisi oleh…", options: ["DC-DC converter", "Panel surya di atap", "Mesin bensin kecil", "Rem cakram"], answer: 0, why: "DC-DC converter menurunkan tegangan tinggi baterai traksi menjadi ±14 V untuk mengisi aki 12 V." },
+  { q: "Sel baterai yang paling umum dipakai mobil listrik saat ini adalah…", options: ["Lithium-ion", "Timbal-asam", "Nikel-kadmium", "Seng-karbon"], answer: 0, why: "Lithium-ion punya kepadatan energi tinggi dan umur siklus panjang." },
+  // ---- pengisian ----
+  { q: "Pengisian DC cepat dapat mengisi baterai 20–80 % dalam kira-kira…", options: ["±30 menit", "±8 jam", "±2 menit", "±3 hari"], answer: 0, why: "Dengan daya 50–350 kW, pengisian 20–80 % umumnya selesai ±30 menit." },
+  { q: "Mengapa pengisian melambat setelah baterai terisi ±80 %?", options: ["Untuk melindungi sel dari panas dan tegangan berlebih", "Karena charger lelah", "Karena listrik PLN turun", "Karena kabel memanjang"], answer: 0, why: "Mendekati penuh, arus dikurangi agar sel tidak kelebihan tegangan dan panas." },
+  { q: "Pada pengisian AC, listrik diubah menjadi DC oleh…", options: ["On-Board Charger di dalam mobil", "Stasiun pengisian", "Motor listrik", "Rem regeneratif"], answer: 0, why: "Pada pengisian AC, OBC di dalam mobil yang menyearahkan arus." },
+  { q: "Pin kecil pada konektor CCS2 berfungsi untuk…", options: ["Komunikasi antara mobil dan charger", "Mengalirkan arus besar", "Lampu indikator", "Pendingin"], answer: 0, why: "Pin sinyal dipakai mobil dan charger untuk saling memeriksa sebelum arus dialirkan." },
+  { q: "Pengisian di rumah lewat wallbox AC umumnya berdaya…", options: ["3,7–22 kW", "150–350 kW", "0,1 kW", "1 MW"], answer: 0, why: "Pengisian AC rumahan biasanya 3,7–11 kW (bisa sampai 22 kW dengan 3 fasa)." },
+  // ---- perbandingan ----
+  { q: "Efisiensi mesin bensin rata-rata hanya sekitar…", options: ["25–35 %", "85–90 %", "60–70 %", "99 %"], answer: 0, why: "Sebagian besar energi bensin terbuang sebagai panas dan gesekan." },
+  { q: "Komponen yang dimiliki mobil bensin tetapi TIDAK dimiliki mobil listrik adalah…", options: ["Knalpot", "Roda", "Rem cakram", "Setir"], answer: 0, why: "Mobil listrik tidak membakar bahan bakar sehingga tidak butuh knalpot." },
+  { q: "Bagian mesin bensin yang mengubah gerak naik-turun piston menjadi putaran adalah…", options: ["Poros engkol", "Busi", "Radiator", "Tangki"], answer: 0, why: "Batang torak meneruskan gerak piston ke poros engkol yang berputar." },
+  { q: "Mengapa kampas rem mobil listrik lebih awet?", options: ["Karena sebagian pengereman dilakukan motor (regeneratif)", "Karena mobilnya ringan sekali", "Karena tidak punya rem", "Karena bannya lebar"], answer: 0, why: "Rem regeneratif menangani perlambatan ringan, rem gesek jarang dipakai." },
+  { q: "Perawatan rutin yang TIDAK diperlukan mobil listrik adalah…", options: ["Ganti oli mesin", "Rotasi ban", "Cek minyak rem", "Ganti wiper"], answer: 0, why: "Tanpa mesin bakar, tidak ada oli mesin, busi, maupun filter bahan bakar." },
+  // ---- energi surya ----
+  { q: "Panel surya mengubah cahaya matahari menjadi…", options: ["Listrik DC", "Listrik AC", "Panas saja", "Bahan bakar"], answer: 0, why: "Sel surya menghasilkan arus searah (DC); inverter mengubahnya menjadi AC." },
+  { q: "Bahan utama sel surya pada umumnya adalah…", options: ["Silikon", "Tembaga", "Karet", "Kaca biasa"], answer: 0, why: "Sel silikon melepaskan elektron saat terkena foton cahaya (efek fotovoltaik)." },
+  { q: "Fungsi baterai penyimpanan pada sistem tenaga surya adalah…", options: ["Menyimpan kelebihan listrik siang untuk dipakai malam", "Mendinginkan panel", "Menaikkan tegangan PLN", "Menyalakan matahari"], answer: 0, why: "Siang hari kelebihan daya mengisi baterai; malam hari baterai menyuplai beban." },
+  { q: "Pengendali MPPT pada sistem surya berfungsi untuk…", options: ["Mengambil daya maksimum dari panel", "Mengukur suhu udara", "Membersihkan panel", "Memutar panel"], answer: 0, why: "MPPT terus mencari titik tegangan-arus yang memberi daya terbesar dari panel." },
+  { q: "Saat cuaca berawan, daya panel surya akan…", options: ["Turun", "Naik dua kali lipat", "Tetap sama", "Menjadi negatif"], answer: 0, why: "Cahaya yang sampai ke sel berkurang, sehingga arus dan daya turun." },
+  // ---- baterai & rangkaian ----
+  { q: "Empat sel 3,7 V dirangkai SERI. Tegangan totalnya…", options: ["14,8 V", "3,7 V", "7,4 V", "29,6 V"], answer: 0, why: "Rangkaian seri menjumlahkan tegangan: 4 × 3,7 V = 14,8 V." },
+  { q: "Dua sel 3 Ah dirangkai PARALEL. Kapasitas totalnya…", options: ["6 Ah", "3 Ah", "1,5 Ah", "9 Ah"], answer: 0, why: "Rangkaian paralel menjumlahkan kapasitas, tegangannya tetap." },
+  { q: "Sel baterai yang hambatan dalamnya sangat tinggi menandakan…", options: ["Sel sudah menurun / rusak", "Sel baru", "Sel penuh", "Sel dingin saja"], answer: 0, why: "Hambatan dalam naik seiring sel menua; sel panas dan tidak mampu memberi arus besar." },
+  { q: "Sebelum sel baru dirangkai PARALEL dengan sel lama, tegangannya harus…", options: ["Disamakan lebih dulu", "Dibuat jauh lebih tinggi", "Dibuat nol", "Dibiarkan berbeda"], answer: 0, why: "Selisih tegangan menyebabkan arus besar mengalir antar-sel saat disambung — berbahaya." },
+  { q: "Saat mengukur tegangan sel, probe merah multimeter ditempel ke…", options: ["Kutub positif (+)", "Kutub negatif (−)", "Badan sel", "Lantai"], answer: 0, why: "Probe merah ke (+) dan hitam ke (−); bila terbalik, multimeter menunjukkan nilai minus." },
+  { q: "Konfigurasi '4S2P' berarti…", options: ["4 kelompok seri, tiap kelompok 2 sel paralel", "4 sel paralel, 2 seri", "4 baterai cadangan", "4 sekring, 2 relai"], answer: 0, why: "S = seri, P = paralel. 4S2P memakai 8 sel." },
+  // ---- K3 ----
+  { q: "Arus listrik sekecil berapa yang sudah dapat membahayakan jantung?", options: ["±50 mA", "±50 A", "±5 kA", "Tidak ada yang berbahaya"], answer: 0, why: "Arus puluhan miliampere melewati dada dapat mengganggu irama jantung." },
+  { q: "Setelah service plug dilepas, teknisi harus menunggu ±10 menit karena…", options: ["Kapasitor inverter masih bermuatan", "Menunggu ban dingin", "Menunggu pelanggan", "Agar lampu mati"], answer: 0, why: "Kapasitor perlu waktu untuk membuang muatannya; pastikan 0 V dengan pengukuran." },
+  { q: "Sarung tangan isolasi kelas 0 tahan sampai tegangan kerja…", options: ["1000 V", "12 V", "220 V saja", "100 kV"], answer: 0, why: "Kelas 0 dipakai untuk tegangan kerja hingga 1000 V AC / 1500 V DC." },
+  { q: "Jika menemukan korban tersengat listrik yang masih menempel, langkah pertama adalah…", options: ["Putuskan sumber listrik / pakai tongkat isolasi", "Langsung tarik tangannya", "Siram air", "Tinggalkan"], answer: 0, why: "Menyentuh korban yang masih teraliri listrik membuat penolong ikut tersengat." },
 ];
 
 const BTN_W = 1.02;
@@ -553,6 +592,24 @@ function AnswerButton({
 const kioskBase = new RoundedBoxGeometry(2.6, 0.1, 0.8, 6, 0.045);
 const kioskBack = new RoundedBoxGeometry(2.34, 2.16, 0.08, 6, 0.035);
 
+const ROUND_SIZE = 10;
+function shuffle<T>(a: T[]): T[] {
+  const r = a.slice();
+  for (let i = r.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [r[i], r[j]] = [r[j], r[i]];
+  }
+  return r;
+}
+function makeRound(): Question[] {
+  return shuffle(QUESTIONS)
+    .slice(0, ROUND_SIZE)
+    .map((q) => {
+      const order = shuffle(q.options.map((_, i) => i));
+      return { ...q, options: order.map((i) => q.options[i]), answer: order.indexOf(q.answer) };
+    });
+}
+
 export function QuizStation({
   position,
   facing = 0,
@@ -564,9 +621,11 @@ export function QuizStation({
   const [picked, setPicked] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [finished, setFinished] = useState(false);
+  // Tiap ronde: 10 soal acak dari bank soal, urutan pilihan jawaban diacak
+  const [round, setRound] = useState(() => makeRound());
   const { canvas, texture } = useCanvasTexture(1280, 640);
-  const question = QUESTIONS[index];
-  const total = QUESTIONS.length;
+  const question = round[index];
+  const total = round.length;
 
   useEffect(() => {
     const ctx = canvas.getContext("2d")!;
@@ -641,7 +700,7 @@ export function QuizStation({
       } else {
         ctx.fillStyle = "#94a3b8";
         ctx.font = "600 36px system-ui, sans-serif";
-        ctx.fillText("Pilih salah satu jawaban di bawah (laser / tatapan / klik)", 56, 540);
+        ctx.fillText(`Pilih jawaban di bawah · ${QUESTIONS.length} soal di bank soal, 10 soal acak tiap ronde`, 56, 540, W - 112);
       }
     }
     texture.needsUpdate = true;
@@ -657,6 +716,7 @@ export function QuizStation({
   const next = () => {
     playVRClickSound();
     if (finished) {
+      setRound(makeRound());
       setIndex(0);
       setPicked(null);
       setScore(0);
