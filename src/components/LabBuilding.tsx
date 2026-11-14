@@ -46,33 +46,6 @@ function drawRoof(ctx: CanvasRenderingContext2D, w: number, h: number) {
   }
 }
 
-function drawWindow(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  ctx.fillStyle = "#1e293b";
-  ctx.fillRect(0, 0, w, h);
-  const g = ctx.createLinearGradient(0, 0, w, h);
-  g.addColorStop(0, "#7dd3fc");
-  g.addColorStop(0.5, "#38bdf8");
-  g.addColorStop(1, "#0c4a6e");
-  ctx.fillStyle = g;
-  const cols = 4;
-  const pad = 10;
-  const cw = (w - pad * (cols + 1)) / cols;
-  for (let i = 0; i < cols; i++) {
-    ctx.beginPath();
-    (ctx as any).roundRect?.(pad + i * (cw + pad), pad, cw, h - pad * 2, 8) ?? ctx.rect(pad + i * (cw + pad), pad, cw, h - pad * 2);
-    ctx.fill();
-  }
-  // kilau diagonal
-  ctx.fillStyle = "rgba(255,255,255,0.22)";
-  ctx.beginPath();
-  ctx.moveTo(w * 0.1, h);
-  ctx.lineTo(w * 0.34, 0);
-  ctx.lineTo(w * 0.46, 0);
-  ctx.lineTo(w * 0.22, h);
-  ctx.closePath();
-  ctx.fill();
-}
-
 function drawEntranceSign(ctx: CanvasRenderingContext2D, w: number, h: number) {
   const g = ctx.createLinearGradient(0, 0, w, 0);
   g.addColorStop(0, "#0b1220");
@@ -131,7 +104,6 @@ export function LabBuilding({ hall }: { hall: Hall }) {
   const T = 0.3; // tebal dinding
 
   const roofTex = useDrawn(256, 8, drawRoof, [D / 4, 1]);
-  const windowTex = useDrawn(512, 256, drawWindow);
   const signTex = useDrawn(2048, 208, drawEntranceSign);
   const paverTex = useDrawn(256, 256, drawPavers, [5, 6]);
 
@@ -172,8 +144,6 @@ export function LabBuilding({ hall }: { hall: Hall }) {
 
   const HALF = W / 2 + 0.9; // setengah bentang atap (ada teritis)
   const RISE = 3.1;
-  const sideWindowsZ = [-10, -6, -2, 2];
-  const backWindowsX = Array.from({ length: Math.floor(W / 4.2) }, (_, i) => cx + (i - (Math.floor(W / 4.2) - 1) / 2) * 4.2);
 
   return (
     <group name="LabBuilding">
@@ -247,22 +217,6 @@ export function LabBuilding({ hall }: { hall: Hall }) {
           </mesh>
         </group>
       ))}
-      {/* jendela pita di dinding samping & belakang (hanya tampak dari luar) */}
-      {[hall.x0 - T - 0.012, hall.x1 + T + 0.012].map((x, s) =>
-        sideWindowsZ.map((z) => (
-          <mesh key={`${x}:${z}`} position={[x, 4.4, z]} rotation={[0, s ? Math.PI / 2 : -Math.PI / 2, 0]} raycast={noRaycast}>
-            <planeGeometry args={[3.2, 1.6]} />
-            <meshStandardMaterial map={windowTex} roughness={0.15} metalness={0.3} />
-          </mesh>
-        )),
-      )}
-      {backWindowsX.map((x) => (
-        <mesh key={x} position={[x, 4.4, hall.z0 - T - 0.012]} rotation={[0, Math.PI, 0]} raycast={noRaycast}>
-          <planeGeometry args={[3.2, 1.6]} />
-          <meshStandardMaterial map={windowTex} roughness={0.15} metalness={0.3} />
-        </mesh>
-      ))}
-
       {/* ================= MUKA DEPAN ================= */}
       {/* lis bawah depan (kiri & kanan pintu) */}
       {[
@@ -279,13 +233,6 @@ export function LabBuilding({ hall }: { hall: Hall }) {
             <meshBasicMaterial color="#22d3ee" toneMapped={false} />
           </mesh>
         </group>
-      ))}
-      {/* jendela depan */}
-      {[(hall.x0 - 5) / 2, 9.6, hall.x1 - 5].filter((x, i) => i < 2 || hall.x1 > 18).map((x) => (
-        <mesh key={x} position={[x, 3.4, hall.z1 + T + 0.012]} raycast={noRaycast}>
-          <planeGeometry args={[4.6, 2.3]} />
-          <meshStandardMaterial map={windowTex} roughness={0.15} metalness={0.3} />
-        </mesh>
       ))}
       {/* kusen pintu membulat */}
       {[-5.2, 5.2].map((x) => (

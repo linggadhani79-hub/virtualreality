@@ -457,6 +457,18 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
           holder.traverse((o) => {
             if (o.name.startsWith("wheel_") && !o.parent?.name.startsWith("wheel_")) {
               wheels.push({ node: o, radius: ((o.userData.radius as number) || 0.15) * scale });
+              const m = o as THREE.Mesh;
+              // dua sisi: sisi dalam roda hasil potongan tidak tampak bolong saat berputar
+              if (m.isMesh) {
+                m.material = (m.material as THREE.Material).clone();
+                (m.material as THREE.Material).side = THREE.DoubleSide;
+              }
+              // cakram gelap menutup sisi dalam roda
+              const rr = (o.userData.radius as number) || 0.15;
+              const back = new THREE.Mesh(new THREE.CircleGeometry(rr * 0.9, 28), new THREE.MeshBasicMaterial({ color: 0x0b0d12, side: THREE.DoubleSide }));
+              back.position.z = (o.name.endsWith("L") ? -1 : 1) * ((o.userData.inner as number) || 0.29);
+              back.raycast = () => {};
+              o.add(back);
             }
           });
           wheelRefs.current[i] = wheels;

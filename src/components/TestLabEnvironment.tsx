@@ -427,6 +427,58 @@ const lampHousing = new RoundedBoxGeometry(3.7, 0.1, 0.8, 4, 0.045);
 const lampDiffuser = new RoundedBoxGeometry(3.5, 0.1, 0.62, 5, 0.048);
 const beamGeometry = new RoundedBoxGeometry(1, 0.3, 0.25, 4, 0.06);
 
+// Jendela sungguhan (dinding berlubang + kaca bening) hanya di dinding samping, dua per sisi
+const SIDE_WINDOWS_Z = [-10, -2];
+const WIN_W = 3.2;
+const WIN_Y0 = 3.6;
+const WIN_Y1 = 5.2;
+
+/** Potongan kotak dinding dengan UV yang diskalakan, supaya pola panel dinding tetap sama ukurannya. */
+function wallPiece(len: number, h: number, fullLen: number) {
+  const g = new THREE.BoxGeometry(0.3, h, len);
+  const uv = g.getAttribute("uv") as THREE.BufferAttribute;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (len / fullLen), uv.getY(i) * (h / HALL.h));
+  return g;
+}
+const sideWallPieces = (() => {
+  const D = HALL.z1 - HALL.z0;
+  const out: { geo: THREE.BufferGeometry; y: number; z: number }[] = [];
+  const cz = (HALL.z0 + HALL.z1) / 2;
+  out.push({ geo: wallPiece(D, WIN_Y0, D), y: WIN_Y0 / 2, z: cz });
+  out.push({ geo: wallPiece(D, HALL.h - WIN_Y1, D), y: (WIN_Y1 + HALL.h) / 2, z: cz });
+  const edges = [HALL.z0, ...SIDE_WINDOWS_Z.flatMap((z) => [z - WIN_W / 2, z + WIN_W / 2]), HALL.z1];
+  for (let i = 0; i < edges.length; i += 2) {
+    const len = edges[i + 1] - edges[i];
+    if (len > 0.01) out.push({ geo: wallPiece(len, WIN_Y1 - WIN_Y0, D), y: (WIN_Y0 + WIN_Y1) / 2, z: (edges[i] + edges[i + 1]) / 2 });
+  }
+  return out;
+})();
+const winFrameGeo = new RoundedBoxGeometry(1, 1, 1, 2, 0.12);
+const glassMaterial = new THREE.MeshStandardMaterial({ color: "#cfe8ff", transparent: true, opacity: 0.16, roughness: 0.05, metalness: 0.1, depthWrite: false, side: THREE.DoubleSide });
+
+/** Jendela pada dinding samping (sumbu Z): kusen aluminium, satu tiang tengah, kaca bening. */
+function GlassWindow({ position, width, height }: { position: [number, number, number]; width: number; height: number }) {
+  const f = 0.08; // tebal kusen
+  const frame = <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.3} />;
+  return (
+    <group position={position}>
+      <mesh material={glassMaterial} raycast={noRaycast} rotation={[0, Math.PI / 2, 0]} renderOrder={5}>
+        <planeGeometry args={[width, height]} />
+      </mesh>
+      {[height / 2, -height / 2].map((y) => (
+        <mesh key={y} geometry={winFrameGeo} position={[0, y, 0]} scale={[0.36, f, width + f]} raycast={noRaycast}>
+          {frame}
+        </mesh>
+      ))}
+      {[width / 2, -width / 2, 0].map((z) => (
+        <mesh key={z} geometry={winFrameGeo} position={[0, 0, z]} scale={[0.36, height, z === 0 ? f * 0.6 : f]} raycast={noRaycast}>
+          {frame}
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 export function TestLabEnvironment() {
   const W = HALL.x1 - HALL.x0;
   const D = HALL.z1 - HALL.z0;
@@ -516,12 +568,18 @@ export function TestLabEnvironment() {
         <boxGeometry args={[W + 0.6, HALL.h, 0.3]} />
         <meshStandardMaterial map={wallBack} roughness={0.75} />
       </mesh>
-      {/* Dinding kiri & kanan */}
+      {/* Dinding kiri & kanan, masing-masing dengan dua jendela kaca bening (terlihat tembus) */}
       {[HALL.x0 - 0.15, HALL.x1 + 0.15].map((x) => (
-        <mesh key={x} position={[x, HALL.h / 2, cz]} rotation={[0, Math.PI / 2, 0]}>
-          <boxGeometry args={[D, HALL.h, 0.3]} />
-          <meshStandardMaterial map={wallSide} roughness={0.75} />
-        </mesh>
+        <group key={x} position={[x, 0, 0]}>
+          {sideWallPieces.map((pc, i) => (
+            <mesh key={i} geometry={pc.geo} position={[0, pc.y, pc.z]}>
+              <meshStandardMaterial map={wallSide} roughness={0.75} />
+            </mesh>
+          ))}
+          {SIDE_WINDOWS_Z.map((z) => (
+            <GlassWindow key={z} position={[0, (WIN_Y0 + WIN_Y1) / 2, z]} width={WIN_W} height={WIN_Y1 - WIN_Y0} />
+          ))}
+        </group>
       ))}
       {/* Dinding depan dengan bukaan pintu besar (X -5..5, tinggi 4.6) */}
       {[
