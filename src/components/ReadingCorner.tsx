@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { roundedRectShape, wrapText } from "../lib/glb";
-import { TeachingModule, getModules, loadModules, subscribeModules } from "../lib/modules";
+import { TeachingModule, getModules, illustrationUrl, loadModules, subscribeModules } from "../lib/modules";
 import { playVRClickSound } from "../lib/vrAudio";
 
 /**
@@ -17,12 +17,27 @@ const noRaycast = () => null;
 const SCREEN_W = 5.2;
 const SCREEN_H = SCREEN_W * (9 / 16);
 
+// Gambar ilustrasi dimuat sekali per alamat. Tidak memakai event "load" (bisa terlewat saat
+// halaman sibuk): komponen memeriksa tiap frame apakah gambar yang ditunggu sudah siap.
+const images = new Map<string, HTMLImageElement>();
+function illustration(id: string): HTMLImageElement {
+  const url = illustrationUrl(id);
+  let img = images.get(url);
+  if (!img) {
+    img = new Image();
+    img.src = url;
+    images.set(url, img);
+  }
+  return img;
+}
+const ready = (img: HTMLImageElement | null) => !!img && img.complete && img.naturalWidth > 0;
+
 function drawSlide(
   canvas: HTMLCanvasElement,
   mod: TeachingModule | null,
   slideIndex: number,
   moduleCount: number,
-) {
+): boolean {
   const ctx = canvas.getContext("2d")!;
   const W = canvas.width;
   const H = canvas.height;
@@ -49,10 +64,15 @@ function drawSlide(
       580,
     );
     ctx.textAlign = "left";
-    return;
+    return true;
   }
 
   const slide = mod.slides[slideIndex];
+  const pic = slide.image ? illustration(slide.image) : null;
+  const img = ready(pic) ? pic : null;
+  const hasImage = !!slide.image;
+  // dengan ilustrasi: teks di kolom kiri, gambar + keterangan di kanan
+  const textW = hasImage ? 1000 : W - 140;
   // kepala
   ctx.fillStyle = mod.color;
   ctx.fillRect(0, 0, W, 128);
@@ -68,7 +88,7 @@ function drawSlide(
   ctx.fillStyle = "#ffffff";
   ctx.font = "900 92px system-ui, sans-serif";
   let y = 176;
-  for (const line of wrapText(ctx, slide.title, W - 140).slice(0, 2)) {
+  for (const line of wrapText(ctx, slide.title, textW).slice(0, 2)) {
     ctx.fillText(line, 70, y);
     y += 104;
   }
@@ -77,42 +97,99 @@ function drawSlide(
   y += 54;
 
   // isi: butir "- " dan nomor "1. " dibuat menjorok
-  ctx.font = "500 60px system-ui, sans-serif";
-  const lineH = 76;
+
+  // ---- kartu ilustrasi ----
+  if (hasImage) {
+    const cx = 1110;
+    const cy = 176;
+    const cw = W - cx - 70;
+    const ch = Math.round(cw * 0.75);
+    ctx.fillStyle = "#0f1a2e";
+    ctx.beginPath();
+    (ctx as any).roundRect?.(cx - 12, cy - 12, cw + 24, ch + 110, 28) ?? ctx.rect(cx - 12, cy - 12, cw + 24, ch + 110);
+    ctx.fill();
+    ctx.save();
+    ctx.beginPath();
+    (ctx as any).roundRect?.(cx, cy, cw, ch, 20) ?? ctx.rect(cx, cy, cw, ch);
+    ctx.clip();
+    if (img) ctx.drawImage(img, cx, cy, cw, ch);
+    else {
+      ctx.fillStyle = "#1e293b";
+      ctx.fillRect(cx, cy, cw, ch);
+      ctx.fillStyle = "#64748b";
+      ctx.font = "600 40px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Memuat gambar…", cx + cw / 2, cy + ch / 2 - 20);
+      ctx.textAlign = "left";
+    }
+    ctx.restore();
+    ctx.strokeStyle = mod.color;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    (ctx as any).roundRect?.(cx, cy, cw, ch, 20) ?? ctx.rect(cx, cy, cw, ch);
+    ctx.stroke();
+    if (slide.caption) {
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = "600 34px system-ui, sans-serif";
+      wrapText(ctx, slide.caption, cw)
+        .slice(0, 2)
+        .forEach((l, i) => ctx.fillText(l, cx, cy + ch + 22 + i * 42));
+    }
+  }
   const maxY = H - 110;
-  outer: for (const raw of slide.body.split("\n")) {
-    const text = raw.trim();
-    if (!text) {
-      y += lineH * 0.45;
+  // Ukuran huruf isi dikecilkan bertahap sampai seluruh teks muat (tidak terpotong "…")
+  type Row = { text: string; bullet: boolean; num: string | null; first: boolean; gap?: boolean };
+  const layout = (size: number) => {
+    ctx.font = `500 ${size}px system-ui, sans-serif`;
+    const rows: Row[] = [];
+    for (const raw of slide.body.split("\n")) {
+      const text = raw.trim();
+      if (!text) {
+        rows.push({ text: "", bullet: false, num: null, first: false, gap: true });
+        continue;
+      }
+      const bullet = /^[-•]\s+/.test(text);
+      const numbered = text.match(/^(\d+)[.)]\s+/);
+      const content = bullet ? text.replace(/^[-•]\s+/, "") : numbered ? text.slice(numbered[0].length) : text;
+      const indent = bullet || numbered ? Math.round(size * 1.3) : 0;
+      wrapText(ctx, content, textW - indent).forEach((l, i) => rows.push({ text: l, bullet, num: numbered ? numbered[1] : null, first: i === 0 }));
+    }
+    const lh = Math.round(size * 1.28);
+    const height = rows.reduce((h, r) => h + (r.gap ? lh * 0.45 : lh), 0);
+    return { rows, lh, height, size };
+  };
+  const sizes = hasImage ? [48, 44, 40, 36, 33] : [60, 54, 48, 44, 40];
+  let L = layout(sizes[0]);
+  for (const sz of sizes.slice(1)) {
+    if (y + L.height <= maxY) break;
+    L = layout(sz);
+  }
+  const indentOf = (r: Row) => (r.bullet || r.num ? Math.round(L.size * 1.3) : 0);
+  for (const r of L.rows) {
+    if (r.gap) {
+      y += L.lh * 0.45;
       continue;
     }
-    const bullet = /^[-•]\s+/.test(text);
-    const numbered = text.match(/^(\d+)[.)]\s+/);
-    const content = bullet ? text.replace(/^[-•]\s+/, "") : numbered ? text.slice(numbered[0].length) : text;
-    const indent = bullet || numbered ? 76 : 0;
-    const lines = wrapText(ctx, content, W - 140 - indent);
-    for (let i = 0; i < lines.length; i++) {
-      if (y + lineH > maxY) {
-        ctx.fillStyle = "#94a3b8";
-        ctx.fillText("…", 70, y - 10);
-        break outer;
-      }
-      if (i === 0 && bullet) {
-        ctx.fillStyle = mod.color;
-        ctx.beginPath();
-        ctx.arc(70 + 22, y + 34, 13, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      if (i === 0 && numbered) {
-        ctx.fillStyle = mod.color;
-        ctx.font = "800 60px system-ui, sans-serif";
-        ctx.fillText(numbered[1] + ".", 70, y);
-        ctx.font = "500 60px system-ui, sans-serif";
-      }
-      ctx.fillStyle = "#e2e8f0";
-      ctx.fillText(lines[i], 70 + indent, y);
-      y += lineH;
+    if (y + L.lh > maxY) {
+      ctx.fillStyle = "#94a3b8";
+      ctx.fillText("…", 70, y - 10);
+      break;
     }
+    if (r.first && r.bullet) {
+      ctx.fillStyle = mod.color;
+      ctx.beginPath();
+      ctx.arc(70 + L.size * 0.4, y + L.lh * 0.45, L.size * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (r.first && r.num) {
+      ctx.fillStyle = mod.color;
+      ctx.font = `800 ${L.size}px system-ui, sans-serif`;
+      ctx.fillText(r.num + ".", 70, y);
+      ctx.font = `500 ${L.size}px system-ui, sans-serif`;
+    }
+    ctx.fillStyle = "#e2e8f0";
+    ctx.fillText(r.text, 70 + indentOf(r), y);
+    y += L.lh;
   }
 
   // titik progres
@@ -126,6 +203,7 @@ function drawSlide(
     ctx.fill();
     dx += gap;
   }
+  return !hasImage || !!img;
 }
 
 function makeCoverTexture(mod: TeachingModule) {
@@ -401,10 +479,25 @@ export function ReadingCorner({
   }, []);
   useEffect(() => () => texture.dispose(), [texture]);
 
+  const [imgTick, setImgTick] = useState(0);
+  const waiting = useRef(false);
   useEffect(() => {
-    drawSlide(canvas, open, slideIndex, mods.length);
+    waiting.current = !drawSlide(canvas, open, slideIndex, mods.length);
     texture.needsUpdate = true;
-  }, [canvas, texture, open, slideIndex, mods.length]);
+  }, [canvas, texture, open, slideIndex, mods.length, imgTick]);
+  // gambar slide yang sedang dibuka belum siap → gambar ulang begitu siap
+  useFrame(() => {
+    if (!waiting.current) return;
+    const id = open?.slides[slideIndex]?.image;
+    if (!id || ready(illustration(id))) {
+      waiting.current = false;
+      setImgTick((t) => t + 1);
+    }
+  });
+  // muat semua ilustrasi lebih dulu supaya pindah slide langsung tampil
+  useEffect(() => {
+    for (const m of mods) for (const sl of m.slides) if (sl.image) illustration(sl.image);
+  }, [mods]);
 
   const shown = mods.slice(0, 6);
   const spacing = 0.42;

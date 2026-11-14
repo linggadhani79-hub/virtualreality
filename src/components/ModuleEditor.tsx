@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import {
+  ILLUSTRATIONS,
   MODULE_COLORS,
+  illustrationUrl,
   TeachingModule,
   getModules,
   loadModules,
@@ -176,6 +178,47 @@ export function ModuleEditor({ onClose }: { onClose: () => void }) {
                         onChange={(e) => update((d) => void (d[mi].slides[si].body = e.target.value))}
                       />
                     </label>
+                    <div className="flex gap-3 items-start">
+                      <div className="flex-1 flex flex-col gap-3">
+                        <label className="text-[11px] font-bold text-neutral-400">
+                          ILUSTRASI (dari model & foto lab; tampil di sisi kanan slide)
+                          <select
+                            id="input-slide-image"
+                            className={input + " mt-1"}
+                            value={slide.image ?? ""}
+                            onChange={(e) =>
+                              update((d) => {
+                                const sl = d[mi].slides[si];
+                                if (e.target.value) sl.image = e.target.value;
+                                else {
+                                  delete sl.image;
+                                  delete sl.caption;
+                                }
+                              })
+                            }
+                          >
+                            <option value="">Tanpa gambar</option>
+                            {ILLUSTRATIONS.map((il) => (
+                              <option key={il.id} value={il.id}>
+                                {il.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        {slide.image && (
+                          <label className="text-[11px] font-bold text-neutral-400">
+                            KETERANGAN GAMBAR
+                            <input
+                              id="input-slide-caption"
+                              className={input + " mt-1"}
+                              value={slide.caption ?? ""}
+                              onChange={(e) => update((d) => void (d[mi].slides[si].caption = e.target.value))}
+                            />
+                          </label>
+                        )}
+                      </div>
+                      {slide.image && <img src={illustrationUrl(slide.image)} alt="" className="w-40 h-[120px] object-cover rounded-lg border border-white/15" />}
+                    </div>
                   </>
                 )}
               </div>
