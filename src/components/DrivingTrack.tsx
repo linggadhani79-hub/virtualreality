@@ -393,7 +393,10 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
     const canvas = document.createElement("canvas");
     canvas.width = 512;
     canvas.height = 160;
+    canvas.getContext("2d", { willReadFrequently: true }); // kanvas biasa: lihat SolarPower.tsx
     const texture = new THREE.CanvasTexture(canvas);
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.LinearFilter;
     texture.colorSpace = THREE.SRGBColorSpace;
     return { canvas, texture };
   }, []);

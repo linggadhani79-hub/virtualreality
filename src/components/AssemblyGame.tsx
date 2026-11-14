@@ -472,6 +472,7 @@ export function AssemblyGame({
     const canvas = document.createElement("canvas");
     canvas.width = 1600;
     canvas.height = 720;
+    canvas.getContext("2d", { willReadFrequently: true }); // kanvas biasa: lihat SolarPower.tsx
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = 8;
