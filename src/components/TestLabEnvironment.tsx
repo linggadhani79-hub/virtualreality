@@ -8,6 +8,7 @@ import { LabBuilding } from "./LabBuilding";
 import { AssemblyGame } from "./AssemblyGame";
 import { EnergyRoom } from "./SolarPower";
 import { BatteryGame } from "./BatteryGame";
+import { CoolingSystem } from "./CoolingSystem";
 import { ParkingArea, PARKING_SOLIDS } from "./ParkingArea";
 import { DrivingTrack } from "./DrivingTrack";
 import { boxAt, worldBounds, type Box } from "../lib/worldBounds";
@@ -71,6 +72,8 @@ const SOLIDS: Box[] = [
   // game restorasi baterai: meja + papan
   { minX: 17.4, maxX: 20.2, minZ: 3.9, maxZ: 5.0 },
   { minX: 20.3, maxX: 21.4, minZ: 4.2, maxZ: 5.1 }, // papan hitung baterai
+  // stasiun pendingin baterai: meja + papan
+  { minX: 22.25, maxX: HALL.x1, minZ: -12.3, maxZ: -8.5 },
   // sudut energi surya: lemari baterai
   { minX: 14.4, maxX: 17.35, minZ: HALL.z0, maxZ: HALL.z0 + 0.66 },
   // game rakit: panggung, tiang derek, troli & meja komponen, konsol
@@ -504,6 +507,7 @@ export function TestLabEnvironment() {
   const txtChassis = useCanvasTexture(1024, 128, floorText("RANGKA & RODA EV", "rgba(125,211,252,0.95)"));
   const txtNonEv = useCanvasTexture(2048, 128, floorText("BENGKEL NON-EV · MESIN BENSIN", "rgba(253,186,116,0.95)"));
   const txtBattery = useCanvasTexture(1024, 128, floorText("RESTORASI BATERAI", "rgba(74,222,128,0.95)"));
+  const txtCooling = useCanvasTexture(1024, 128, floorText("PENDINGIN BATERAI", "rgba(56,189,248,0.95)"));
   const txtSolar = useCanvasTexture(1024, 128, floorText("ENERGI SURYA", "rgba(251,191,36,0.95)"));
   const txtGame = useCanvasTexture(1024, 128, floorText("GAME RAKIT MOBIL EV", "rgba(250,204,21,0.95)"));
   const compare = useCanvasTexture(1280, 900, drawComparePoster);
@@ -855,6 +859,10 @@ export function TestLabEnvironment() {
       {/* ----- Game restorasi baterai (depan sayap kanan) ----- */}
       <FloorDecal position={[18.8, 2.7]} size={[4.6, 0.55]} map={txtBattery} />
       <BatteryGame position={[18.8, 0, 4.4]} facing={Math.PI} />
+
+      {/* ----- Sistem pendingin baterai (antara sudut surya dan game rakit) ----- */}
+      <FloorDecal position={[21.25, -10.4]} size={[4.0, 0.5]} map={txtCooling} rotation={-Math.PI / 2} />
+      <CoolingSystem position={[22.9, 0, -10.4]} facing={-Math.PI / 2} />
 
       {/* ----- Game merakit mobil listrik (sayap kanan) ----- */}
       <FloorDecal position={[19, 0.6]} size={[5.6, 0.6]} map={txtGame} />

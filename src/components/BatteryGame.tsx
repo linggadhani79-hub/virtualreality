@@ -65,7 +65,7 @@ const btnGeometry = new THREE.ExtrudeGeometry(roundedRectShape(0.36, 0.15, 0.04)
   curveSegments: 8,
 });
 
-function Btn({ name, label, color, position, active, disabled, onPress }: { name: string; label: string; color: string; position: Vec3; active?: boolean; disabled?: boolean; onPress: () => void }) {
+export function Btn({ name, label, color, position, active, disabled, onPress, prefix = "Baterai_btn_" }: { name: string; label: string; color: string; position: Vec3; active?: boolean; disabled?: boolean; onPress: () => void; prefix?: string }) {
   const [hot, setHot] = useState(false);
   const texture = useMemo(() => {
     const c = document.createElement("canvas");
@@ -94,7 +94,7 @@ function Btn({ name, label, color, position, active, disabled, onPress }: { name
   return (
     <group position={position}>
       <mesh
-        name={`Baterai_btn_${name}`}
+        name={`${prefix}${name}`}
         geometry={btnGeometry}
         position={[0, 0, active ? -0.012 : 0]}
         scale={hot && !disabled ? 1.05 : 1}
@@ -118,7 +118,7 @@ function Btn({ name, label, color, position, active, disabled, onPress }: { name
 
 /* ------------------------------ papan & layar ------------------------------ */
 
-function useLiveCanvas(w: number, h: number) {
+export function useLiveCanvas(w: number, h: number) {
   const v = useMemo(() => {
     const c = document.createElement("canvas");
     c.width = w;
@@ -443,6 +443,9 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
       setReading({ text: "----", hint: `Probe merah di sel #${i + 1} (${t === "p" ? "+" : "−"}). Tempel probe hitam.` });
       return;
     }
+    // Di HP kutub (−) di belakang sering tertutup kutub (+): mengetuk kutub (+) yang sama lagi
+    // dianggap menempelkan probe hitam ke kutub (−) sel itu.
+    if (red.i === i && red.t === t) t = t === "p" ? "n" : "p";
     const first = red;
     live.current.red = null;
     setRed(null);
@@ -657,14 +660,15 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
               {/* kotak pilih kutub (lebih besar dari kutubnya, supaya mudah dibidik laser) */}
               <mesh
                 name={`Baterai_term_${i}_${t}`}
-                position={[0, 0.03, 0]}
+                position={[0, t === "p" ? 0.011 : 0.06, 0]}
                 userData={{ isInteractableMesh: true, isVRButton: true, onClick: () => touch(i, t) }}
                 onClick={(e) => {
                   e.stopPropagation();
                   touch(i, t);
                 }}
               >
-                <boxGeometry args={[0.1, 0.06, 0.06]} />
+                {/* kotak (+) rendah, kotak (−) tinggi: dari depan bagian atas kotak (−) tetap kelihatan */}
+                <boxGeometry args={t === "p" ? [0.1, 0.022, 0.05] : [0.1, 0.12, 0.065]} />
                 <meshBasicMaterial colorWrite={false} depthWrite={false} />
               </mesh>
               {/* probe yang sedang menempel */}
@@ -802,7 +806,7 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
           <meshBasicMaterial map={board.t} toneMapped={false} />
         </mesh>
         {[-1.2, 1.2].map((x) => (
-          <mesh key={x} position={[x, -BOARD_Y / 2 + 0.39, -0.03]} raycast={noRaycast}>
+          <mesh key={x} position={[x, -0.78 - (BOARD_Y - 0.78) / 2, -0.06]} raycast={noRaycast}>
             <cylinderGeometry args={[0.035, 0.04, BOARD_Y - 0.78, 16]} />
             <meshStandardMaterial color="#334155" metalness={0.7} roughness={0.35} />
           </mesh>

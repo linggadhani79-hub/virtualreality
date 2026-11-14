@@ -16,7 +16,9 @@ import { InfoSign, Scenery, StaticModel } from "./LabStations";
  *  - SPBU (pengisian bensin) berukuran nyata, petak parkir, dan mobil yang diparkir.
  *
  * Angka biaya adalah PERKIRAAN untuk bahan ajar (lihat ASSUMPTIONS); 1 m di lintasan dihitung
- * sebagai 100 m perjalanan supaya angkanya bergerak cukup cepat untuk diamati.
+ * sebagai 1 km perjalanan supaya isi tangki / baterai terlihat berkurang dalam satu giliran.
+ *  - Mobil bensin (tangki 40 L) mampir ke SPBU sebelum parkir: isi cepat, tetapi mahal.
+ *  - Mobil listrik (baterai 50 kWh) parkir di petak bertiang cas: mengisi lebih lama, lebih irit.
  */
 
 const noRaycast = () => null;
@@ -29,9 +31,9 @@ const X0 = PARKING.cx - GROUND_W / 2;
 const Z0 = PARKING.cz - GROUND_D / 2;
 
 const ASSUMPTIONS = {
-  scale: 100, // 1 m di lintasan = 100 m perjalanan
-  bensin: { lPer100: 8, rpPerL: 10000, co2PerL: 2.3 },
-  listrik: { kwhPer100: 15, rpPerKwh: 2466 },
+  scale: 1000, // 1 m di lintasan = 1 km perjalanan
+  bensin: { lPer100: 8, rpPerL: 10000, co2PerL: 2.3, tank: 40 },
+  listrik: { kwhPer100: 15, rpPerKwh: 2466, battery: 50, chargeKw: 7 },
 };
 const RP_KM_BENSIN = (ASSUMPTIONS.bensin.lPer100 / 100) * ASSUMPTIONS.bensin.rpPerL; // Rp 800 / km
 const RP_KM_LISTRIK = (ASSUMPTIONS.listrik.kwhPer100 / 100) * ASSUMPTIONS.listrik.rpPerKwh; // ± Rp 370 / km
@@ -191,7 +193,7 @@ function drawGround(ctx: CanvasRenderingContext2D, W: number, H: number) {
 
 /* ---------------- label meteran di atas mobil ---------------- */
 
-type Meter = { title: string; color: string; lines: string[] };
+type Meter = { title: string; color: string; lines: string[]; gauge?: { frac: number; label: string; color: string } };
 
 function drawMeter(canvas: HTMLCanvasElement, m: Meter) {
   const ctx = canvas.getContext("2d")!;
@@ -211,7 +213,45 @@ function drawMeter(canvas: HTMLCanvasElement, m: Meter) {
   ctx.fillText(m.title, 28, 22);
   ctx.fillStyle = "#ffffff";
   ctx.font = "700 40px system-ui, sans-serif";
-  m.lines.forEach((l, i) => ctx.fillText(l, 28, 84 + i * 50));
+  m.lines.forEach((l, i) => ctx.fillText(l, 28, 84 + i * 50, W - 56));
+  if (m.gauge) {
+    const y = 84 + m.lines.length * 50 + 8;
+    ctx.fillStyle = "#1e293b";
+    ctx.fillRect(28, y, W - 56, 44);
+    ctx.fillStyle = m.gauge.frac < 0.2 ? "#ef4444" : m.gauge.color;
+    ctx.fillRect(28, y, (W - 56) * Math.max(0, Math.min(1, m.gauge.frac)), 44);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "800 32px system-ui, sans-serif";
+    ctx.fillText(m.gauge.label, 40, y + 6, W - 80);
+  }
+}
+
+/* ---------------- layar pompa / tiang cas ---------------- */
+
+function drawScreen(canvas: HTMLCanvasElement, d: { title: string; color: string; big: string; sub: string; foot: string }) {
+  const ctx = canvas.getContext("2d")!;
+  const W = canvas.width;
+  const H = canvas.height;
+  ctx.fillStyle = "#0b1220";
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = d.color;
+  ctx.lineWidth = 8;
+  ctx.strokeRect(4, 4, W - 8, H - 8);
+  ctx.textBaseline = "top";
+  ctx.textAlign = "center";
+  ctx.fillStyle = d.color;
+  ctx.font = "900 38px system-ui, sans-serif";
+  ctx.fillText(d.title, W / 2, 18, W - 40);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "900 72px system-ui, sans-serif";
+  ctx.fillText(d.big, W / 2, 64, W - 40);
+  ctx.fillStyle = "#e2e8f0";
+  ctx.font = "700 28px system-ui, sans-serif";
+  ctx.fillText(d.sub, W / 2, 150, W - 30);
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "700 26px system-ui, sans-serif";
+  ctx.fillText(d.foot, W / 2, 196, W - 30);
+  ctx.textAlign = "left";
 }
 
 /* ---------------- papan perbandingan ---------------- */
@@ -264,8 +304,15 @@ function drawBoard(canvas: HTMLCanvasElement, km: number) {
   ctx.fillText(`Hemat ${rupiah(costB - costL)}  (±${Math.round((1 - RP_KM_LISTRIK / RP_KM_BENSIN) * 100)}% lebih murah)`, 44, 548);
   ctx.fillStyle = "#94a3b8";
   ctx.font = "500 26px system-ui, sans-serif";
-  const note = `Perkiraan: bensin ${ASSUMPTIONS.bensin.lPer100} L/100 km × Rp ${ASSUMPTIONS.bensin.rpPerL.toLocaleString("id-ID")}/L; listrik ${ASSUMPTIONS.listrik.kwhPer100} kWh/100 km × Rp ${ASSUMPTIONS.listrik.rpPerKwh.toLocaleString("id-ID")}/kWh. Emisi pembangkit listrik tidak dihitung.`;
-  wrapText(ctx, note, W - 88).forEach((l, i) => ctx.fillText(l, 44, 616 + i * 32));
+  const B = ASSUMPTIONS.bensin;
+  const E = ASSUMPTIONS.listrik;
+  ctx.fillStyle = "#e2e8f0";
+  ctx.font = "700 28px system-ui, sans-serif";
+  ctx.fillText(`Isi penuh: bensin ${B.tank} L = ${rupiah(B.tank * B.rpPerL)} (±5 menit, jarak ±${Math.round((B.tank / B.lPer100) * 100)} km)`, 44, 610, W - 88);
+  ctx.fillText(`listrik ${E.battery} kWh = ${rupiah(E.battery * E.rpPerKwh)} (AC ${E.chargeKw} kW ±${Math.round(E.battery / E.chargeKw)} jam, jarak ±${Math.round((E.battery / E.kwhPer100) * 100)} km)`, 44, 646, W - 88);
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "500 22px system-ui, sans-serif";
+  ctx.fillText(`Perkiraan: ${B.lPer100} L/100 km × Rp ${B.rpPerL.toLocaleString("id-ID")}/L · ${E.kwhPer100} kWh/100 km × Rp ${E.rpPerKwh.toLocaleString("id-ID")}/kWh · emisi pembangkit tidak dihitung.`, 44, 684, W - 88);
 }
 
 const resetGeometry = new THREE.ExtrudeGeometry(roundedRectShape(1.5, 0.42, 0.1), {
@@ -342,6 +389,22 @@ function exitCurve(bayX: number): Curve {
   ]);
 }
 
+/** Lajur SPBU di antara dua pulau pompa (lihat model spbu). Masuk dari lurusan utara (mobil
+ *  melaju ke timur), berhenti di pompa, keluar ke pelataran, lalu bergabung di lurusan timur. */
+const SPBU_LANE_X = -45.1;
+const SPBU_PUMP_Z = -0.6;
+const NORTH_Z = PARKING.cz - PARKING.hz;
+function spbuCurve(): Curve {
+  return polyline([
+    ...bezier([-52, NORTH_Z], [-47.6, NORTH_Z], [SPBU_LANE_X, NORTH_Z + 2], [SPBU_LANE_X, -5.5]),
+    ...bezier([SPBU_LANE_X, -5.5], [SPBU_LANE_X, -1.0], [SPBU_LANE_X, 1.5], [SPBU_LANE_X, 3.4]).slice(1),
+    ...bezier([SPBU_LANE_X, 3.4], [SPBU_LANE_X, 5.9], [-43, 6.3], [-38.8, 6.3]).slice(1),
+    ...bezier([-38.8, 6.3], [-35.2, 6.3], [EAST_X, 7.2], [EAST_X, JOIN_Z]).slice(1),
+  ]);
+}
+/** Tiang cas di sisi kanan tiap petak mobil listrik (dilihat dari belakang mobil). */
+const CHARGERS = BAYS.map((b, i) => ({ bay: i, x: b.x + BAY_W / 2, z: BAY_Z - 2.0 })).filter((c) => BAYS[c.bay].kind === "listrik");
+
 /** Jarak di sepanjang jalan lingkar untuk sebuah titik pada lurusan selatan / timur. */
 function loopS(path: LoopPath, x: number, z: number): number {
   let best = 0;
@@ -357,10 +420,12 @@ function loopS(path: LoopPath, x: number, z: number): number {
 }
 
 type CarState = {
-  mode: "parked" | "exiting" | "loop" | "entering";
+  mode: "parked" | "exiting" | "loop" | "entering" | "spbu";
   s: number; // jarak pada kurva yang sedang diikuti
   driven: number; // total jarak tempuh (untuk putaran roda)
   wantPark: boolean;
+  refueled: boolean; // mobil bensin sudah mampir SPBU pada giliran ini
+  fill: number; // detik berhenti di pompa (>0 = sedang mengisi)
 };
 
 export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: number; z1: number } }) {
@@ -385,10 +450,25 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
       s: car.pair === 0 ? (i === 0 ? 0 : 0.5) * path.length : 0,
       driven: 0,
       wantPark: false,
+      refueled: false,
+      fill: 0,
     })),
   );
+  // isi tangki (L) / baterai (kWh) tiap mobil
+  const energy = useRef<number[]>(FLEET.map((c) => (c.kind === "bensin" ? ASSUMPTIONS.bensin.tank : ASSUMPTIONS.listrik.battery)));
+  const lastFill = useRef<{ bensin: { amt: number; active: boolean }; listrik: { amt: number; active: boolean }[] }>({ bensin: { amt: 0, active: false }, listrik: CHARGERS.map(() => ({ amt: 0, active: false })) });
+  const spbu = useMemo(() => ({ curve: spbuCurve(), sIn: loopS(path, -52, NORTH_Z), sJoin: loopS(path, EAST_X, JOIN_Z) }), [path]);
+  const spbuPumpS = useMemo(() => {
+    let best = 0;
+    spbu.curve.pts.forEach((p, i) => {
+      if (Math.abs(p.z - SPBU_PUMP_Z) + Math.abs(p.x - SPBU_LANE_X) < Math.abs(spbu.curve.pts[best].z - SPBU_PUMP_Z) + Math.abs(spbu.curve.pts[best].x - SPBU_LANE_X)) best = i;
+    });
+    return spbu.curve.dist[best];
+  }, [spbu]);
+  const cableRefs = useRef<(THREE.Mesh | null)[]>([]);
   const fleet = useRef({ active: 0 as 0 | 1, phase: "drive" as "drive" | "return" | "depart", phaseDist: 0, departTimer: 0 });
   const travelled = useRef(0); // meter di lintasan
+  if (import.meta.env.DEV) (window as any).__parking = { states: states.current, energy: energy.current, lastFill: lastFill.current, fleet: fleet.current };
   const lastDraw = useRef(-1);
   const [hotReset, setHotReset] = useState(false);
 
@@ -419,6 +499,23 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
       }),
     [],
   );
+  const screens = useMemo(
+    () =>
+      // [0] layar pompa SPBU, [1..] layar tiang cas
+      [0, ...CHARGERS.map((_, k) => k + 1)].map(() => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 512;
+        canvas.height = 256;
+        canvas.getContext("2d", { willReadFrequently: true });
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.generateMipmaps = false;
+        texture.minFilter = THREE.LinearFilter;
+        texture.colorSpace = THREE.SRGBColorSpace;
+        return { canvas, texture };
+      }),
+    [],
+  );
+  useEffect(() => () => screens.forEach((x) => x.texture.dispose()), [screens]);
   const board = useMemo(() => {
     const canvas = document.createElement("canvas");
     canvas.width = 1280;
@@ -485,19 +582,55 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
     };
   }, []);
 
+  /** Mobil bensin / listrik yang sedang di jalan (untuk meteran). */
+  const onRoad = (kind: "bensin" | "listrik") => {
+    const i = FLEET.findIndex((c, k) => c.kind === kind && c.pair === fleet.current.active && states.current[k].mode !== "parked");
+    return i < 0 ? FLEET.findIndex((c) => c.kind === kind && c.pair === fleet.current.active) : i;
+  };
   const redraw = () => {
     const km = (travelled.current * ASSUMPTIONS.scale) / 1000;
+    const B = ASSUMPTIONS.bensin;
+    const E = ASSUMPTIONS.listrik;
+    const ib = onRoad("bensin");
+    const il = onRoad("listrik");
+    const fuel = energy.current[ib];
+    const kwh = energy.current[il];
+    const pumping = states.current[ib].fill > 0;
     drawMeter(meters[0].canvas, {
-      title: "MOBIL BENSIN",
+      title: pumping ? "MOBIL BENSIN · ISI DI SPBU" : "MOBIL BENSIN",
       color: "#f97316",
-      lines: [`${km.toFixed(1).replace(".", ",")} km  ·  ${rupiah(km * RP_KM_BENSIN)}`, `${(km * CO2_KM_BENSIN).toFixed(1).replace(".", ",")} kg CO₂ knalpot`],
+      lines: [`${km.toFixed(0)} km  ·  ${rupiah(km * RP_KM_BENSIN)}`, `${(km * CO2_KM_BENSIN).toFixed(0)} kg CO₂ knalpot`],
+      gauge: { frac: fuel / B.tank, label: `Tangki ${fuel.toFixed(1).replace(".", ",")} / ${B.tank} L  ·  sisa ±${Math.round((fuel / B.lPer100) * 100)} km`, color: "#f97316" },
     });
     drawMeter(meters[1].canvas, {
       title: "MOBIL LISTRIK",
       color: "#22c55e",
-      lines: [`${km.toFixed(1).replace(".", ",")} km  ·  ${rupiah(km * RP_KM_LISTRIK)}`, "0 kg CO₂ knalpot"],
+      lines: [`${km.toFixed(0)} km  ·  ${rupiah(km * RP_KM_LISTRIK)}`, "0 kg CO₂ knalpot"],
+      gauge: { frac: kwh / E.battery, label: `Baterai ${kwh.toFixed(1).replace(".", ",")} / ${E.battery} kWh  ·  sisa ±${Math.round((kwh / E.kwhPer100) * 100)} km`, color: "#22c55e" },
     });
     drawBoard(board.canvas, km);
+    // layar pompa SPBU
+    const lf = lastFill.current;
+    drawScreen(screens[0].canvas, {
+      title: lf.bensin.active ? "MENGISI BENSIN" : "POMPA BENSIN",
+      color: "#f97316",
+      big: `${lf.bensin.amt.toFixed(1).replace(".", ",")} L`,
+      sub: `${rupiah(lf.bensin.amt * B.rpPerL)}  ·  Rp ${B.rpPerL.toLocaleString("id-ID")}/L`,
+      foot: `Cepat: ±${Math.max(1, Math.round((lf.bensin.amt / 40) * 5))} menit`,
+    });
+    CHARGERS.forEach((c, k) => {
+      const car = FLEET.findIndex((f) => f.bay === c.bay);
+      const e = energy.current[car];
+      const x = lf.listrik[k];
+      drawScreen(screens[k + 1].canvas, {
+        title: x.active ? `MENGISI ${Math.round((e / E.battery) * 100)}%` : e >= E.battery - 0.05 ? "PENUH" : "SIAP",
+        color: "#22c55e",
+        big: `+${x.amt.toFixed(1).replace(".", ",")} kWh`,
+        sub: `${rupiah(x.amt * E.rpPerKwh)}  ·  Rp ${E.rpPerKwh.toLocaleString("id-ID")}/kWh`,
+        foot: `Lama: AC ${E.chargeKw} kW ±${(x.amt / E.chargeKw).toFixed(1).replace(".", ",")} jam`,
+      });
+    });
+    screens.forEach((x) => (x.texture.needsUpdate = true));
     meters[0].texture.needsUpdate = true;
     meters[1].texture.needsUpdate = true;
     board.texture.needsUpdate = true;
@@ -571,15 +704,53 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
         const before = ((st.s % L) + L) % L;
         st.s += step;
         const after = ((st.s % L) + L) % L;
-        // saatnya pulang: begitu melewati titik belok ke petaknya, pindah ke jalur masuk
-        const crossed = before <= c.sEnter ? after >= c.sEnter && after - before < L / 2 : after >= c.sEnter && after < before;
-        if (st.wantPark && crossed) {
+        // saatnya pulang: begitu melewati titik belok ke petaknya, pindah ke jalur masuk.
+        // Mobil bensin lebih dulu mampir ke SPBU.
+        const cross = (sx: number) => (before <= sx ? after >= sx && after - before < L / 2 : after >= sx && after < before);
+        if (st.wantPark && car.kind === "bensin" && !st.refueled && cross(spbu.sIn)) {
+          st.mode = "spbu";
+          st.s = 0;
+        } else if (st.wantPark && (car.kind === "listrik" || st.refueled) && cross(c.sEnter)) {
           st.mode = "entering";
           st.s = 0;
           st.wantPark = false;
+          st.refueled = false;
         }
         heading = samplePath(path, st.s, tmp);
         if (st.mode === "entering") heading = sampleCurve(c.enter, 0, tmp);
+        if (st.mode === "spbu") heading = sampleCurve(spbu.curve, 0, tmp);
+      } else if (st.mode === "spbu") {
+        const B = ASSUMPTIONS.bensin;
+        const lf = lastFill.current.bensin;
+        if (st.fill > 0) {
+          // berhenti di pompa: bensin mengalir cepat (±4,5 L per detik di simulasi)
+          const add = Math.min(B.tank - energy.current[i], 4.5 * delta);
+          energy.current[i] += add;
+          lf.amt += add;
+          st.fill += delta;
+          if (energy.current[i] >= B.tank - 0.01 && st.fill > 2.5) {
+            st.fill = 0;
+            lf.active = false;
+            st.s += 0.3;
+          }
+        } else {
+          const toPump = spbuPumpS - st.s;
+          const v = st.s < spbuPumpS ? Math.max(0.6, Math.min(SPEED, PARK_SPEED + Math.max(0, toPump) * 0.35)) : Math.min(SPEED, 1.2 + (st.s - spbuPumpS) * 0.45);
+          step = delta * v;
+          if (st.s < spbuPumpS && st.s + step >= spbuPumpS) {
+            step = spbuPumpS - st.s;
+            st.fill = 0.001;
+            lf.amt = 0;
+            lf.active = true;
+          }
+          st.s += step;
+        }
+        heading = sampleCurve(spbu.curve, st.s, tmp);
+        if (st.s >= spbu.curve.length) {
+          st.mode = "loop";
+          st.s = spbu.sJoin;
+          st.refueled = true;
+        }
       } else if (st.mode === "entering") {
         // melambat halus menjelang berhenti
         const left = c.enter.length - st.s;
@@ -604,6 +775,29 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
       }
       g.position.copy(tmp);
       g.rotation.y = heading;
+
+      // konsumsi energi sesuai jarak (1 m lintasan = 1 km)
+      if (step > 0) {
+        const km = (step * ASSUMPTIONS.scale) / 1000;
+        const per = car.kind === "bensin" ? ASSUMPTIONS.bensin.lPer100 / 100 : ASSUMPTIONS.listrik.kwhPer100 / 100;
+        const cap = car.kind === "bensin" ? ASSUMPTIONS.bensin.tank : ASSUMPTIONS.listrik.battery;
+        energy.current[i] = Math.max(cap * 0.05, energy.current[i] - km * per);
+      }
+      // mobil listrik yang parkir di petak bertiang cas: mengisi pelan (±0,5 kWh per detik di simulasi)
+      const ci = CHARGERS.findIndex((x) => x.bay === car.bay);
+      if (ci >= 0) {
+        const x = lastFill.current.listrik[ci];
+        const charging = st.mode === "parked" && energy.current[i] < ASSUMPTIONS.listrik.battery - 0.01;
+        if (charging) {
+          if (!x.active) x.amt = 0;
+          const add = Math.min(ASSUMPTIONS.listrik.battery - energy.current[i], 0.5 * delta);
+          energy.current[i] += add;
+          x.amt += add;
+        }
+        x.active = charging;
+        const cb = cableRefs.current[ci];
+        if (cb) cb.visible = st.mode === "parked";
+      }
 
       // roda menggelinding sesuai jarak tempuh
       if (step > 0) {
@@ -756,6 +950,65 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
 
       {/* SPBU */}
       <StaticModel model="spbu" size={STATION.size} position={[STATION.x, 0, STATION.z]} rotation={Math.PI / 2} lod={false} />
+      {/* layar pompa di atas pulau pompa (menghadap lajur & pemain dari timur) */}
+      <group position={[-43.0, 2.35, SPBU_PUMP_Z]} rotation={[0, Math.PI / 2, 0]}>
+        <mesh position={[0, 0, -0.03]} raycast={noRaycast}>
+          <boxGeometry args={[1.5, 0.78, 0.05]} />
+          <meshStandardMaterial color="#111827" />
+        </mesh>
+        <mesh raycast={noRaycast}>
+          <planeGeometry args={[1.42, 0.71]} />
+          <meshBasicMaterial map={screens[0].texture} toneMapped={false} />
+        </mesh>
+      </group>
+      <mesh position={[-43.0, 1.98, SPBU_PUMP_Z]} raycast={noRaycast}>
+        <cylinderGeometry args={[0.04, 0.04, 0.0001 + 0.05, 8]} />
+        <meshStandardMaterial color="#111827" />
+      </mesh>
+      {/* tiang cas di petak mobil listrik */}
+      {CHARGERS.map((c, k) => (
+        <group key={c.bay}>
+          <group position={[c.x, 0, c.z]}>
+            <mesh position={[0, 0.8, 0]} raycast={noRaycast}>
+              <boxGeometry args={[0.32, 1.6, 0.26]} />
+              <meshStandardMaterial color="#f8fafc" roughness={0.4} />
+            </mesh>
+            <mesh position={[0, 1.62, 0]} raycast={noRaycast}>
+              <boxGeometry args={[0.36, 0.06, 0.3]} />
+              <meshStandardMaterial color="#16a34a" emissive="#16a34a" emissiveIntensity={0.6} />
+            </mesh>
+            {/* layar menghadap selatan (ke arah pemain yang datang dari belakang mobil) */}
+            <group position={[0, 2.25, 0]}>
+              <mesh position={[0, 0, -0.03]} raycast={noRaycast}>
+                <boxGeometry args={[1.1, 0.58, 0.05]} />
+                <meshStandardMaterial color="#111827" />
+              </mesh>
+              <mesh raycast={noRaycast}>
+                <planeGeometry args={[1.04, 0.52]} />
+                <meshBasicMaterial map={screens[k + 1].texture} toneMapped={false} />
+              </mesh>
+              <mesh position={[0, 0, -0.06]} rotation={[0, Math.PI, 0]} raycast={noRaycast}>
+                <planeGeometry args={[1.04, 0.52]} />
+                <meshBasicMaterial map={screens[k + 1].texture} toneMapped={false} />
+              </mesh>
+            </group>
+            <mesh position={[0, 1.95, 0]} raycast={noRaycast}>
+              <cylinderGeometry args={[0.03, 0.03, 0.12, 8]} />
+              <meshStandardMaterial color="#111827" />
+            </mesh>
+          </group>
+          {/* kabel cas ke moncong mobil */}
+          <mesh
+            ref={(m) => {
+              cableRefs.current[k] = m;
+            }}
+            raycast={noRaycast}
+            geometry={chargeCable(c.x, c.z, BAYS[c.bay].x)}
+          >
+            <meshStandardMaterial color="#111827" roughness={0.6} />
+          </mesh>
+        </group>
+      ))}
       <InfoSign
         title="SPBU — Pengisian Bensin"
         subtitle="Mobil bermesin bakar"
@@ -765,7 +1018,7 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
         facts={[
           "Isi penuh ±5 menit, tetapi hanya 25–30% energi bensin menjadi gerak; sisanya panas.",
           "Setiap liter bensin yang dibakar menghasilkan ±2,3 kg CO₂ dari knalpot.",
-          "Mobil listrik mengisi daya lebih lama, tetapi bisa dilakukan di rumah saat diparkir.",
+          "Mobil listrik mengisi daya lebih lama (tiang cas di petak parkir), tetapi biayanya ±⅓ bensin.",
         ]}
       />
 
@@ -805,6 +1058,23 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
       />
     </group>
   );
+}
+
+const cableCache = new Map<string, THREE.TubeGeometry>();
+function chargeCable(px: number, pz: number, bayX: number) {
+  const key = `${px},${pz}`;
+  let g = cableCache.get(key);
+  if (!g) {
+    const pts = [
+      new THREE.Vector3(px, 1.2, pz + 0.14),
+      new THREE.Vector3(px - 0.15, 0.35, pz + 0.5),
+      new THREE.Vector3(bayX + 0.7, 0.45, pz + 0.95),
+      new THREE.Vector3(bayX + 0.55, 0.8, pz + 1.05),
+    ];
+    g = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.025, 8);
+    cableCache.set(key, g);
+  }
+  return g;
 }
 
 function ResetLabel() {
