@@ -56,6 +56,56 @@ export const ACTIVITIES: Activity[] = [
   { id: "kuis", title: "Evaluasi: kuis tanya-jawab", where: "Kios kuis di depan kiri", kind: "Evaluasi", cpmk: CPMK.map((c) => c.id), evidence: "Jawaban tiap soal dicatat per CPMK" },
 ];
 
+/**
+ * Rencana 16 pertemuan (RPS). `modules` = modul ajar yang dibaca (id di lib/modules.ts),
+ * `acts` = kegiatan lab (id di ACTIVITIES), `quizRounds` = jumlah ronde kuis minimal (UTS/UAS).
+ */
+export type Meeting = { no: number; topic: string; cpmk: string[]; modules: string[]; acts: string[]; quizRounds?: number; method: string };
+export const MEETINGS: Meeting[] = [
+  { no: 1, topic: "Kontrak belajar, CPL, dan pengenalan kendaraan listrik", cpmk: ["CPMK-2"], modules: ["pengenalan"], acts: [], method: "Baca modul, jelajah lab" },
+  { no: 2, topic: "K3 tegangan tinggi dan APD", cpmk: ["CPMK-1"], modules: ["k3"], acts: ["k3"], method: "Baca modul, kunjungi pos K3" },
+  { no: 3, topic: "Arsitektur dan komponen utama BEV", cpmk: ["CPMK-2"], modules: ["komponen"], acts: ["komponen"], method: "Baca modul, amati komponen" },
+  { no: 4, topic: "Baterai traksi: sel, seri/paralel, dan perhitungan kWh", cpmk: ["CPMK-4"], modules: ["baterai"], acts: [], method: "Baca modul, latihan hitung di papan baterai" },
+  { no: 5, topic: "BMS, penyeimbangan sel, dan praktik baterai", cpmk: ["CPMK-4"], modules: [], acts: ["baterai"], method: "Praktik di meja baterai" },
+  { no: 6, topic: "Manajemen termal: pendinginan baterai", cpmk: ["CPMK-4"], modules: ["termal"], acts: ["pendingin"], method: "Baca modul, simulasi 4 skenario" },
+  { no: 7, topic: "Motor listrik, inverter, dan gigi reduksi", cpmk: ["CPMK-2"], modules: ["penggerak"], acts: [], method: "Baca modul, amati motor & inverter" },
+  { no: 8, topic: "Ujian Tengah Semester (UTS)", cpmk: ["CPMK-1", "CPMK-2", "CPMK-4"], modules: [], acts: [], quizRounds: 1, method: "Kuis di kios (1 ronde)" },
+  { no: 9, topic: "Rem regeneratif: cara kerja dan alur energi", cpmk: ["CPMK-2"], modules: ["regen"], acts: [], method: "Baca modul, amati mobil di lintasan uji" },
+  { no: 10, topic: "Perbandingan EV dengan kendaraan bermesin bensin", cpmk: ["CPMK-3"], modules: ["perbandingan"], acts: ["pembanding"], method: "Baca modul, kunjungi bengkel pembanding" },
+  { no: 11, topic: "Pengisian daya AC/DC dan konektor", cpmk: ["CPMK-6"], modules: ["pengisian"], acts: ["pengisian"], method: "Baca modul, kunjungi zona pengisian" },
+  { no: 12, topic: "Energi surya dan penyimpanan energi", cpmk: ["CPMK-6"], modules: ["surya"], acts: [], method: "Baca modul, amati sudut energi surya" },
+  { no: 13, topic: "Analisis biaya energi dan emisi", cpmk: ["CPMK-6"], modules: ["biaya"], acts: ["pengisian"], method: "Baca modul, amati papan \"Boros mana?\"" },
+  { no: 14, topic: "Perakitan kendaraan listrik", cpmk: ["CPMK-5"], modules: [], acts: ["rakit"], method: "Game rakit mobil listrik" },
+  { no: 15, topic: "Perawatan dan diagnosis dasar EV", cpmk: ["CPMK-3", "CPMK-5"], modules: ["perawatan"], acts: [], method: "Baca modul, diskusi kasus" },
+  { no: 16, topic: "Ujian Akhir Semester (UAS)", cpmk: CPMK.map((c) => c.id), modules: [], acts: ["kuis"], quizRounds: 2, method: "Kuis di kios (ronde ke-2 atau lebih)" },
+];
+/** Judul modul untuk tampilan (id → judul singkat). */
+export const MODULE_TITLES: Record<string, string> = {
+  pengenalan: "Pengenalan Kendaraan Listrik",
+  k3: "K3 Tegangan Tinggi",
+  komponen: "Komponen Utama BEV",
+  baterai: "Baterai Traksi",
+  termal: "Pendinginan Baterai",
+  penggerak: "Motor Listrik & Inverter",
+  regen: "Rem Regeneratif",
+  perbandingan: "EV vs Mobil Bensin",
+  pengisian: "Pengisian Daya EV",
+  surya: "Energi Surya & Penyimpanan",
+  biaya: "Biaya Energi & Emisi",
+  perawatan: "Perakitan, Perawatan & Diagnosis",
+};
+
+/** Status satu pertemuan untuk seorang siswa: butir yang sudah / belum dikerjakan. */
+export function meetingStatus(s: Student, m: Meeting) {
+  const items = [
+    ...m.modules.map((id) => ({ label: `Modul: ${MODULE_TITLES[id] ?? id}`, done: !!s.acts[`modul:${id}`]?.done })),
+    ...m.acts.map((id) => ({ label: ACTIVITIES.find((a) => a.id === id)?.title ?? id, done: !!s.acts[id]?.done })),
+    ...(m.quizRounds ? [{ label: `Kuis ${m.quizRounds} ronde`, done: s.quizRounds >= m.quizRounds }] : []),
+  ];
+  const n = items.filter((i) => i.done).length;
+  return { items, done: items.length > 0 && n === items.length, started: n > 0 };
+}
+
 /** CPMK tiap soal di bank soal kios kuis (urutan sama dengan `QUESTIONS` di LabStations.tsx). */
 export const QUIZ_CPMK: number[] = [
   2, 2, 1, 2, 6, 4, 2, 1, 5, 6, // 0–9 soal dasar
@@ -65,6 +115,7 @@ export const QUIZ_CPMK: number[] = [
   6, 6, 6, 6, 6, // 28–32 tenaga surya
   4, 4, 4, 4, 4, 4, // 33–38 baterai
   1, 1, 1, 1, // 39–42 K3
+  2, 2, 4, 6, 5, 5, // 43–48 materi tambahan
 ];
 export const quizCpmk = (q: number) => `CPMK-${QUIZ_CPMK[q] ?? 2}`;
 
@@ -130,6 +181,11 @@ export function recordActivity(id: string, score = 100) {
     ...st,
     acts: { ...st.acts, [id]: { done: true, score: Math.max(cur?.score ?? 0, s), attempts: (cur?.attempts ?? 0) + 1, at: Date.now() } },
   }));
+}
+/** Modul ajar dibaca sampai slide terakhir: dicatat per modul + kegiatan umum "modul". */
+export function recordModule(moduleId: string) {
+  if (!activeStudent().acts[`modul:${moduleId}`]?.done) recordActivity(`modul:${moduleId}`, 100);
+  recordVisit("modul");
 }
 /** Kunjungan zona: hanya dicatat pertama kali. */
 export function recordVisit(id: string) {

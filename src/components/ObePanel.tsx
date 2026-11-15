@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import {
   ACTIVITIES,
   COURSE,
+  MEETINGS,
+  meetingStatus,
   CPL,
   CPMK,
   addStudent,
@@ -22,9 +24,10 @@ import {
 
 export const openObePanel = () => window.dispatchEvent(new Event("obe-open"));
 
-type Tab = "alur" | "cpl" | "hasil" | "siswa";
+type Tab = "alur" | "rps" | "cpl" | "hasil" | "siswa";
 const TABS: [Tab, string][] = [
   ["alur", "Alur Belajar"],
+  ["rps", "16 Pertemuan"],
   ["cpl", "CPL & CPMK"],
   ["hasil", "Hasil Evaluasi"],
   ["siswa", "Siswa & Rekap"],
@@ -49,6 +52,11 @@ ${CPL.map((c, i) => `<tr><td>${c.id}</td><td>${esc(c.text)}</td><td>${r.cpl[i].s
 ${CPMK.map((c, i) => `<tr><td>${c.id}<br><small>${c.cpl}</small></td><td>${esc(c.text)}</td><td>${r.cpmk[i].quiz === null ? "-" : Math.round(r.cpmk[i].quiz!)}</td><td>${r.cpmk[i].activity === null ? "-" : Math.round(r.cpmk[i].activity!)}</td><td>${r.cpmk[i].score}</td><td>${r.cpmk[i].pass ? "Tuntas" : "Belum"}</td></tr>`).join("")}</table>
 <h2>Urutan kegiatan belajar</h2><table><tr><th>#</th><th>Kegiatan</th><th>Jenis</th><th>CPMK</th><th>Nilai</th><th>Percobaan</th></tr>
 ${ACTIVITIES.map((a, i) => `<tr><td>${i + 1}</td><td>${esc(a.title)}</td><td>${a.kind}</td><td>${a.cpmk.length > 3 ? "Semua" : a.cpmk.join(", ")}</td><td>${s.acts[a.id]?.done ? s.acts[a.id].score : "-"}</td><td>${s.acts[a.id]?.attempts ?? 0}</td></tr>`).join("")}</table>
+<h2>Rencana 16 pertemuan</h2><table><tr><th>Ke</th><th>Pokok bahasan</th><th>CPMK</th><th>Kegiatan</th><th>Status</th></tr>
+${MEETINGS.map((m) => {
+  const st = meetingStatus(s, m);
+  return `<tr><td>${m.no}</td><td>${esc(m.topic)}</td><td>${m.cpmk.length > 3 ? "Semua" : m.cpmk.join(", ")}</td><td>${esc(m.method)}</td><td>${st.done ? "Selesai" : st.started ? "Sebagian" : "Belum"}</td></tr>`;
+}).join("")}</table>
 <p class="sum">Nilai akhir: <b>${r.total}</b> · ${r.pass ? "Semua CPL tercapai" : "Belum semua CPL tercapai"} (batas tuntas ${COURSE.pass}). Nilai CPMK = ${COURSE.weight.quiz * 100}% kuis + ${COURSE.weight.activity * 100}% kegiatan.</p></section>`;
     })
     .join("");
@@ -132,6 +140,41 @@ export function ObePanel() {
                       <div className="text-right shrink-0">
                         <p className={`font-black text-base ${rec?.done ? "text-emerald-300" : "text-slate-600"}`}>{rec?.done ? rec.score : "—"}</p>
                         {rec?.done && <p className="text-[10px] text-slate-500">{rec.attempts}× dicoba</p>}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          )}
+
+          {tab === "rps" && (
+            <div>
+              <p className="text-slate-300 mb-3">
+                Rencana pembelajaran satu semester (16 pertemuan, termasuk UTS dan UAS). Tanda centang muncul bila modul sudah dibaca sampai slide terakhir dan kegiatannya sudah dikerjakan.
+              </p>
+              <ol className="space-y-2">
+                {MEETINGS.map((m) => {
+                  const st = meetingStatus(student, m);
+                  const exam = !!m.quizRounds;
+                  return (
+                    <li key={m.no} className={`flex gap-3 rounded-2xl border p-3 ${exam ? "border-amber-400/40 bg-amber-400/5" : "border-white/10 bg-white/[0.03]"}`}>
+                      <span className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-black text-sm ${st.done ? "bg-emerald-500 text-white" : st.started ? "bg-amber-500 text-slate-950" : "bg-slate-700 text-slate-300"}`}>{st.done ? "✓" : m.no}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-extrabold">
+                          Pertemuan {m.no}: {m.topic}
+                        </p>
+                        <p className="text-slate-400 text-xs">
+                          {m.cpmk.length > 3 ? "Semua CPMK" : m.cpmk.join(", ")} · {m.method}
+                        </p>
+                        <ul className="mt-1 flex flex-wrap gap-1.5">
+                          {st.items.map((it) => (
+                            <li key={it.label} className={`text-[11px] px-2 py-0.5 rounded-full border ${it.done ? "border-emerald-400/50 text-emerald-200 bg-emerald-400/10" : "border-white/15 text-slate-400"}`}>
+                              {it.done ? "✓ " : ""}
+                              {it.label}
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     </li>
                   );
