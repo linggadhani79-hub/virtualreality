@@ -40,7 +40,14 @@ type StepDef = {
   /** ukuran kotak pilih */
   pick: Vec3;
   color: string;
+  /** modul elektronik buatan sendiri (tanpa model GLB): ukuran badan + tulisan di tutupnya */
+  box?: { size: Vec3; text: string; kind?: "reducer" };
 };
+
+/** Meja modul e-Axle 8-in-1 di belakang panggung (sisi −Z); X tiap modul. */
+const BENCH_Z = -3.05;
+const BENCH_Y = 0.92;
+const benchX = (k: number) => -1.8 + k * 0.72;
 
 const STEPS: StepDef[] = [
   {
@@ -70,10 +77,34 @@ const STEPS: StepDef[] = [
     color: "#22c55e",
   },
   {
+    id: "bms",
+    label: "BMS",
+    done: "BMS menempel di paket baterai: memantau tegangan, arus, dan suhu tiap sel serta memutus arus bila tidak aman.",
+    early: "BMS memantau sel baterai, jadi paket baterainya harus terpasang dulu.",
+    start: [benchX(2), BENCH_Y, BENCH_Z],
+    end: [-0.3, 0.635, 0],
+    lift: 1.0,
+    pick: [0.5, 0.25, 0.4],
+    color: "#a3e635",
+    box: { size: [0.42, 0.06, 0.26], text: "BMS" },
+  },
+  {
+    id: "reducer",
+    label: "Reducer",
+    done: "Reducer (gigi reduksi + diferensial) dibaut di poros roda belakang: menurunkan putaran motor ±10 kali dan melipatgandakan torsi.",
+    early: "Selesaikan dulu paket baterai beserta BMS-nya, baru unit penggerak di poros roda.",
+    start: [benchX(4), BENCH_Y, BENCH_Z],
+    end: [1.36, 0.4, -0.38],
+    lift: 1.1,
+    pick: [0.45, 0.4, 0.4],
+    color: "#94a3b8",
+    box: { size: [0.26, 0.3, 0.2], text: "REDUCER", kind: "reducer" },
+  },
+  {
     id: "motor",
     label: "Motor listrik",
-    done: "Motor dipasang di poros roda: tenaganya langsung memutar roda tanpa poros kopel.",
-    early: "Pasang baterai dulu; motor dipasang setelah sumber energinya ada di rangka.",
+    done: "Motor dibaut ke rumah reducer: tenaganya diteruskan lewat gigi reduksi ke roda.",
+    early: "Motor dibaut ke rumah reducer, jadi reducer harus terpasang dulu.",
     model: "motor-listrik",
     size: 0.5,
     start: [-1.3, 0.92, 3.5],
@@ -97,10 +128,58 @@ const STEPS: StepDef[] = [
     color: "#a78bfa",
   },
   {
+    id: "pdu",
+    label: "PDU",
+    done: "PDU dipasang di ujung baterai: relai utama, pra-isi, dan sekring membagi arus tegangan tinggi ke inverter, OBC, dan DC-DC.",
+    early: "PDU membagi listrik ke inverter, OBC, dan DC-DC; pasang setelah unit penggerak (reducer, motor, inverter) lengkap.",
+    start: [benchX(5), BENCH_Y, BENCH_Z],
+    end: [0.4, 0.715, 0],
+    lift: 1.0,
+    pick: [0.45, 0.3, 0.4],
+    color: "#ef4444",
+    box: { size: [0.3, 0.12, 0.26], text: "PDU" },
+  },
+  {
+    id: "obc",
+    label: "OBC",
+    done: "OBC dipasang di depan dan disambung ke PDU: mengubah listrik AC dari charger menjadi DC untuk mengisi baterai.",
+    early: "OBC mendapat jalur ke baterai lewat PDU, jadi PDU harus terpasang dulu.",
+    start: [benchX(0), BENCH_Y, BENCH_Z],
+    end: [-1.0, 0.63, 0.28],
+    lift: 1.1,
+    pick: [0.45, 0.3, 0.4],
+    color: "#c084fc",
+    box: { size: [0.34, 0.12, 0.3], text: "OBC" },
+  },
+  {
+    id: "dcdc",
+    label: "DC-DC",
+    done: "DC-DC menurunkan tegangan tinggi menjadi 12 V untuk lampu, layar, dan pengisian aki 12 V.",
+    early: "DC-DC juga mengambil listrik dari PDU; pasang setelah PDU dan OBC.",
+    start: [benchX(3), BENCH_Y, BENCH_Z],
+    end: [-1.0, 0.63, -0.28],
+    lift: 1.1,
+    pick: [0.45, 0.3, 0.4],
+    color: "#f472b6",
+    box: { size: [0.3, 0.1, 0.26], text: "DC-DC" },
+  },
+  {
+    id: "vcu",
+    label: "VCU",
+    done: "VCU, otak kendaraan, dipasang di depan kabin: membaca pedal lalu memerintah inverter, BMS, dan modul lain lewat jaringan CAN.",
+    early: "VCU mengendalikan semua modul; pasang setelah modul daya (PDU, OBC, DC-DC) terpasang.",
+    start: [benchX(1), BENCH_Y, BENCH_Z],
+    end: [-0.75, 0.635, 0],
+    lift: 1.0,
+    pick: [0.4, 0.25, 0.35],
+    color: "#2dd4bf",
+    box: { size: [0.24, 0.05, 0.18], text: "VCU" },
+  },
+  {
     id: "kabel",
     label: "Kabel tegangan tinggi",
-    done: "Kabel oranye menghubungkan baterai → inverter → motor. Di mobil asli hanya teknisi ber-APD yang boleh memasangnya.",
-    early: "Kabel baru bisa disambung bila baterai, motor, dan inverter sudah terpasang.",
+    done: "Kabel oranye menghubungkan baterai → PDU → inverter → motor, juga PDU → OBC dan DC-DC. Di mobil asli hanya teknisi ber-APD yang boleh memasangnya.",
+    early: "Kabel disambung paling akhir sebelum bodi, setelah semua modul (sampai VCU) terpasang.",
     start: [3.7, 0.66, 3.0],
     end: [0, 0, 0],
     lift: 1.0,
@@ -155,43 +234,45 @@ function drawScreen(
   ctx.textAlign = "left";
 
   // daftar langkah
-  const colW = (W - 112) / 2;
+  const COLS = 3;
+  const ROW = 74;
+  const colW = (W - 112) / COLS;
   STEPS.forEach((step, i) => {
-    const x = 56 + (i % 2) * colW;
-    const y = 138 + Math.floor(i / 2) * 96;
+    const x = 56 + (i % COLS) * colW;
+    const y = 132 + Math.floor(i / COLS) * ROW;
     const state = i < st.done ? "done" : i === st.done ? "next" : "todo";
     ctx.fillStyle = state === "done" ? "#166534" : state === "next" ? "#1d4ed8" : "#1e293b";
     ctx.beginPath();
-    (ctx as any).roundRect?.(x, y, colW - 24, 78, 18) ?? ctx.rect(x, y, colW - 24, 78);
+    (ctx as any).roundRect?.(x, y, colW - 18, ROW - 12, 16) ?? ctx.rect(x, y, colW - 18, ROW - 12);
     ctx.fill();
     ctx.fillStyle = "rgba(255,255,255,0.18)";
     ctx.beginPath();
-    ctx.arc(x + 44, y + 39, 26, 0, Math.PI * 2);
+    ctx.arc(x + 36, y + 31, 22, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
-    ctx.font = "900 34px system-ui, sans-serif";
+    ctx.font = "900 28px system-ui, sans-serif";
     if (state === "done") {
       // centang digambar vektor (bukan emoji)
       ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 7;
+      ctx.lineWidth = 6;
       ctx.lineCap = "round";
       ctx.beginPath();
-      ctx.moveTo(x + 31, y + 40);
-      ctx.lineTo(x + 41, y + 51);
-      ctx.lineTo(x + 58, y + 28);
+      ctx.moveTo(x + 25, y + 32);
+      ctx.lineTo(x + 33, y + 41);
+      ctx.lineTo(x + 47, y + 22);
       ctx.stroke();
     } else {
-      ctx.fillText(String(i + 1), x + 44, y + 21);
+      ctx.fillText(String(i + 1), x + 36, y + 16);
     }
     ctx.textAlign = "left";
-    ctx.font = `${state === "todo" ? 600 : 800} 38px system-ui, sans-serif`;
+    ctx.font = `${state === "todo" ? 600 : 800} 32px system-ui, sans-serif`;
     ctx.fillStyle = state === "todo" ? "#94a3b8" : "#ffffff";
-    ctx.fillText(step.label, x + 88, y + 19, colW - 130);
+    ctx.fillText(step.label, x + 70, y + 15, colW - 100);
   });
 
   // pesan
-  const my = 448;
+  const my = 440;
   ctx.fillStyle = st.tone === "good" ? "rgba(22,101,52,0.55)" : st.tone === "bad" ? "rgba(153,27,27,0.6)" : "rgba(30,41,59,0.8)";
   ctx.beginPath();
   (ctx as any).roundRect?.(56, my, W - 112, H - my - 44, 22) ?? ctx.rect(56, my, W - 112, H - my - 44);
@@ -351,6 +432,21 @@ const cableGeometries = [
     ),
   ),
 ];
+// PDU (di atas tutup baterai rangka, y ±0,64–0,71) → OBC dan DC-DC di depan, menyusur di atas tutup
+for (const z of [0.28, -0.28]) {
+  cableGeometries.push(
+    tube(
+      [
+        [0.25, 0.76, z * 0.35],
+        [0.12, 0.72, z],
+        [-0.6, 0.67, z],
+        [-0.81, 0.67, z],
+      ],
+      0.014,
+      0.05,
+    ),
+  );
+}
 // konektor (soket di ujung kabel) dan klem pengikat kabel
 const plugGeometry = new THREE.CylinderGeometry(0.032, 0.032, 0.06, 16).rotateZ(Math.PI / 2);
 const phasePlug = new THREE.CylinderGeometry(0.022, 0.022, 0.04, 14).rotateX(Math.PI / 2);
@@ -365,6 +461,90 @@ const CABLE_CLAMPS: { p: [number, number, number]; r: [number, number, number] }
 ];
 
 const coilGeometry = new THREE.TorusGeometry(0.24, 0.035, 10, 32);
+const benchTop = new RoundedBoxGeometry(4.4, 0.06, 0.56, 3, 0.025);
+
+const moduleGeoms = new Map<string, THREE.BufferGeometry>();
+function moduleGeom(size: Vec3) {
+  const k = size.join(",");
+  let g = moduleGeoms.get(k);
+  if (!g) {
+    g = new RoundedBoxGeometry(size[0], size[1], size[2], 2, Math.min(size[0], size[1], size[2]) * 0.18);
+    moduleGeoms.set(k, g);
+  }
+  return g;
+}
+const moduleLabels = new Map<string, THREE.CanvasTexture>();
+function moduleLabel(text: string, color: string) {
+  let t = moduleLabels.get(text);
+  if (!t) {
+    const c = document.createElement("canvas");
+    c.width = 256;
+    c.height = 128;
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(0, 0, 256, 128);
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, 256, 16);
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "900 52px system-ui, sans-serif";
+    ctx.fillText(text, 128, 74, 236);
+    t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    moduleLabels.set(text, t);
+  }
+  return t;
+}
+const portGeometry = new THREE.CylinderGeometry(0.016, 0.016, 0.03, 12).rotateZ(Math.PI / 2);
+const shaftGeometry = new THREE.CylinderGeometry(0.035, 0.035, 0.12, 16).rotateX(Math.PI / 2);
+
+/** Modul elektronik (badan aluminium, tutup berlabel, soket) atau rumah reducer dengan poros. */
+function ModuleBox({ size, text, color, kind }: { size: Vec3; text: string; color: string; kind?: "reducer" }) {
+  const [w, h, d] = size;
+  return (
+    <group position={[0, h / 2, 0]}>
+      <mesh geometry={moduleGeom(size)} raycast={noRaycast}>
+        <meshStandardMaterial color={kind === "reducer" ? "#64748b" : "#cbd5e1"} metalness={0.7} roughness={0.35} />
+      </mesh>
+      <mesh position={[0, h / 2 + 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
+        <planeGeometry args={[w * 0.86, Math.min(d * 0.8, w * 0.43)]} />
+        <meshBasicMaterial map={moduleLabel(text, color)} toneMapped={false} />
+      </mesh>
+      {kind === "reducer" ? (
+        // poros keluar ke roda kiri & kanan + sirip pendingin
+        <>
+          {[-1, 1].map((sd) => (
+            <mesh key={sd} geometry={shaftGeometry} position={[0, -h * 0.15, sd * (d / 2 + 0.05)]} raycast={noRaycast}>
+              <meshStandardMaterial color="#334155" metalness={0.85} roughness={0.3} />
+            </mesh>
+          ))}
+          {[-0.06, 0, 0.06].map((y) => (
+            <mesh key={y} position={[w / 2 + 0.006, y, 0]} raycast={noRaycast}>
+              <boxGeometry args={[0.012, 0.02, d * 0.8]} />
+              <meshStandardMaterial color="#475569" metalness={0.7} roughness={0.4} />
+            </mesh>
+          ))}
+        </>
+      ) : (
+        // soket oranye (tegangan tinggi) dan hitam (sinyal) di sisi modul
+        <>
+          <mesh geometry={portGeometry} position={[w / 2 + 0.012, 0, d * 0.22]} raycast={noRaycast}>
+            <meshStandardMaterial color="#f97316" roughness={0.5} />
+          </mesh>
+          <mesh geometry={portGeometry} position={[w / 2 + 0.012, 0, -d * 0.22]} raycast={noRaycast}>
+            <meshStandardMaterial color="#111827" roughness={0.5} />
+          </mesh>
+          <mesh position={[0, 0, d / 2 + 0.002]} raycast={noRaycast}>
+            <boxGeometry args={[w * 0.9, Math.max(0.012, h * 0.18), 0.004]} />
+            <meshBasicMaterial color={color} toneMapped={false} />
+          </mesh>
+        </>
+      )}
+    </group>
+  );
+}
 
 const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
@@ -401,6 +581,28 @@ export function AssemblyGame({
   const tags = useMemo(() => STEPS.map((st, i) => makeTagTexture(i + 1, st.label, st.color)), []);
   useEffect(() => () => tags.forEach((t) => t.dispose()), [tags]);
   const tagRefs = useRef<(THREE.Mesh | null)[]>([]);
+  const benchSign = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = 1024;
+    c.height = 128;
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "rgba(11,18,32,0.95)";
+    ctx.beginPath();
+    (ctx as any).roundRect?.(4, 4, 1016, 120, 30) ?? ctx.rect(4, 4, 1016, 120);
+    ctx.fill();
+    ctx.strokeStyle = "#2dd4bf";
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "900 50px system-ui, sans-serif";
+    ctx.fillText("MEJA MODUL e-AXLE 8-in-1", 512, 66, 980);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }, []);
+  useEffect(() => () => benchSign.dispose(), [benchSign]);
   const help = useMemo(() => {
     const c = document.createElement("canvas");
     c.width = 1024;
@@ -425,9 +627,9 @@ export function AssemblyGame({
       "    dipasang lebih dulu. Mulai dari dasar mobil.",
       "3. Benar: komponen terbang ke tempatnya.",
       "    Salah: komponen bergoyang, coba yang lain.",
-      "4. Enam komponen terpasang = mobil selesai.",
+      `4. ${STEPS.length} komponen (lengkap e-Axle 8-in-1) = selesai.`,
       "PETUNJUK: panah kuning menunjuk komponen berikutnya.",
-      "Skor & langkah ada di layar dinding kanan.",
+      "Modul kecil ada di meja belakang panggung.",
     ];
     lines.forEach((l, i) => {
       ctx.fillStyle = i >= 6 ? "#67e8f9" : "#e2e8f0";
@@ -595,7 +797,7 @@ export function AssemblyGame({
       finishedAt.current = state.clock.elapsedTime;
       const sec = Math.floor(finishedAt.current - (startedAt.current ?? finishedAt.current));
       const stars = mistakes === 0 ? "Sempurna" : mistakes <= 2 ? "Bagus" : "Selesai";
-      recordActivity("rakit", 100 - mistakes * 10);
+      recordActivity("rakit", 100 - mistakes * 6);
       setMessage({
         text: `${stars}! Mobil listrik selesai dirakit dalam ${fmtTime(sec)} dengan ${mistakes} kali salah pilih. Tekan ULANGI untuk mencoba lagi.`,
         tone: "good",
@@ -793,6 +995,30 @@ export function AssemblyGame({
         </group>
       ))}
 
+      {/* meja modul e-Axle 8-in-1 (BMS, reducer, PDU, OBC, DC-DC, VCU) di belakang panggung */}
+      <group position={[0, 0, BENCH_Z]}>
+        <mesh geometry={benchTop} position={[0, BENCH_Y - 0.03, 0]} raycast={noRaycast}>
+          <meshStandardMaterial color="#334155" metalness={0.55} roughness={0.45} />
+        </mesh>
+        {[-2.05, 2.05].map((x) =>
+          [-0.22, 0.22].map((z) => (
+            <mesh key={`${x}:${z}`} position={[x, (BENCH_Y - 0.06) / 2, z]} raycast={noRaycast}>
+              <boxGeometry args={[0.06, BENCH_Y - 0.06, 0.06]} />
+              <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.3} />
+            </mesh>
+          )),
+        )}
+        <mesh position={[0, 0.25, 0]} raycast={noRaycast}>
+          <boxGeometry args={[4.1, 0.03, 0.44]} />
+          <meshStandardMaterial color="#1e293b" metalness={0.5} roughness={0.5} />
+        </mesh>
+        {/* papan judul di belakang meja */}
+        <mesh position={[0, BENCH_Y + 0.55, -0.27]} raycast={noRaycast}>
+          <planeGeometry args={[2.4, 0.3]} />
+          <meshBasicMaterial map={benchSign} transparent toneMapped={false} />
+        </mesh>
+      </group>
+
       {/* ---------- Komponen ---------- */}
       <group ref={partsRef}>
       {STEPS.map((step, i) => (
@@ -804,6 +1030,7 @@ export function AssemblyGame({
           position={step.start}
         >
           {step.model && objects[step.id] && <primitive object={objects[step.id]} />}
+          {step.box && <ModuleBox size={step.box.size} text={step.box.text} color={step.color} kind={step.box.kind} />}
           {step.id === "kabel" && (
             <>
               {/* gulungan di meja → berubah menjadi kabel terpasang */}
