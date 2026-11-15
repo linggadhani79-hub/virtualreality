@@ -5,6 +5,7 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import { wrapText } from "../lib/glb";
 import { playVRClickSound } from "../lib/vrAudio";
 import { Btn, useLiveCanvas } from "./BatteryGame";
+import { recordActivity } from "../lib/obe";
 
 /**
  * Stasiun "Sistem Pendingin Baterai" (thermal management).
@@ -265,6 +266,7 @@ const BLADE_DX = 0.05;
 
 export function CoolingSystem({ position, facing = 0 }: { position: Vec3; facing?: number }) {
   const [mode, setMode] = useState<Mode>("santai");
+  const tried = useRef(new Set<Mode>(["santai"]));
   const modeRef = useRef<Mode>("santai");
   const sim = useRef<Sim>({ tb: 26, tin: 25, tout: 27, pump: 0.2, fan: 0, chiller: false, heater: false, heat: 0.6, amb: 30, cool: 0.6 });
 
@@ -371,6 +373,9 @@ export function CoolingSystem({ position, facing = 0 }: { position: Vec3; facing
     playVRClickSound();
     modeRef.current = m;
     setMode(m);
+    // OBE: kegiatan tuntas bila keempat skenario sudah dicoba
+    tried.current.add(m);
+    recordActivity("pendingin", (tried.current.size / 4) * 100);
   };
 
   // --- tata letak (lokal): paket kiri, modul termal tengah, radiator kanan ---

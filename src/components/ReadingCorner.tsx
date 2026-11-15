@@ -5,6 +5,7 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import { roundedRectShape, wrapText } from "../lib/glb";
 import { TeachingModule, getModules, illustrationUrl, loadModules, subscribeModules } from "../lib/modules";
 import { playVRClickSound } from "../lib/vrAudio";
+import { recordModule } from "../lib/obe";
 
 /**
  * Pojok Baca: meja dengan buku-buku modul ajar. Memilih sebuah buku membukanya sebagai
@@ -459,6 +460,7 @@ export function ReadingCorner({
   const [mods, setMods] = useState<TeachingModule[]>(getModules);
   const [openId, setOpenId] = useState<string | null>(null);
   const [slide, setSlide] = useState(0);
+  const [shelf, setShelf] = useState(0);
 
   useEffect(() => {
     loadModules().then(setMods);
@@ -499,7 +501,10 @@ export function ReadingCorner({
     for (const m of mods) for (const sl of m.slides) if (sl.image) illustration(sl.image);
   }, [mods]);
 
-  const shown = mods.slice(0, 6);
+  // meja memuat 6 buku; modul lain ada di "rak" berikutnya (tombol RAK)
+  const shelves = Math.max(1, Math.ceil(mods.length / 6));
+  const shelfIndex = Math.min(shelf, shelves - 1);
+  const shown = mods.slice(shelfIndex * 6, shelfIndex * 6 + 6);
   const spacing = 0.42;
 
   return (
@@ -566,7 +571,7 @@ export function ReadingCorner({
             label="◀ SEBELUM"
             color="#0369a1"
             disabled={!open || slideIndex === 0}
-            position={[-0.54, 0, 0]}
+            position={[-0.81, 0, 0]}
             onPress={() => {
               playVRClickSound();
               setSlide(slideIndex - 1);
@@ -576,7 +581,7 @@ export function ReadingCorner({
             label="TUTUP"
             color="#b45309"
             disabled={!open}
-            position={[0, 0, 0]}
+            position={[-0.27, 0, 0]}
             onPress={() => {
               playVRClickSound();
               setOpenId(null);
@@ -586,10 +591,22 @@ export function ReadingCorner({
             label="LANJUT ▶"
             color="#15803d"
             disabled={!open || slideIndex >= open.slides.length - 1}
-            position={[0.54, 0, 0]}
+            position={[0.27, 0, 0]}
             onPress={() => {
               playVRClickSound();
               setSlide(slideIndex + 1);
+              if (open && slideIndex + 1 >= open.slides.length - 1) recordModule(open.id);
+            }}
+          />
+          <NavButton
+            label={`RAK ${shelfIndex + 1}/${shelves}`}
+            color="#6d28d9"
+            disabled={shelves < 2}
+            position={[0.81, 0, 0]}
+            onPress={() => {
+              playVRClickSound();
+              setOpenId(null);
+              setShelf((shelfIndex + 1) % shelves);
             }}
           />
         </group>

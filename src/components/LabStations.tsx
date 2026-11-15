@@ -12,6 +12,7 @@ import { playVRClickSound } from "../lib/vrAudio";
  *  - QuizStation  : kios tanya-jawab interaktif (bisa dijawab dengan mouse, laser Quest, atau tatapan)
  */
 
+import { quizCpmk, recordQuiz, recordQuizRound } from "../lib/obe";
 const noRaycast = () => null;
 
 function useCanvasTexture(width: number, height: number) {
@@ -362,7 +363,7 @@ export function StaticModel({
 /*  Kios tanya-jawab                                                   */
 /* ------------------------------------------------------------------ */
 
-type Question = { q: string; options: string[]; answer: number; why: string };
+type Question = { q: string; options: string[]; answer: number; why: string; id?: number };
 
 const QUESTIONS: Question[] = [
   {
@@ -489,6 +490,13 @@ const QUESTIONS: Question[] = [
   { q: "Setelah service plug dilepas, teknisi harus menunggu ±10 menit karena…", options: ["Kapasitor inverter masih bermuatan", "Menunggu ban dingin", "Menunggu pelanggan", "Agar lampu mati"], answer: 0, why: "Kapasitor perlu waktu untuk membuang muatannya; pastikan 0 V dengan pengukuran." },
   { q: "Sarung tangan isolasi kelas 0 tahan sampai tegangan kerja…", options: ["1000 V", "12 V", "220 V saja", "100 kV"], answer: 0, why: "Kelas 0 dipakai untuk tegangan kerja hingga 1000 V AC / 1500 V DC." },
   { q: "Jika menemukan korban tersengat listrik yang masih menempel, langkah pertama adalah…", options: ["Putuskan sumber listrik / pakai tongkat isolasi", "Langsung tarik tangannya", "Siram air", "Tinggalkan"], answer: 0, why: "Menyentuh korban yang masih teraliri listrik membuat penolong ikut tersengat." },
+  // materi tambahan: rem regeneratif, termal, biaya, perakitan
+  { q: "Saat rem regeneratif bekerja, arah aliran energinya adalah…", options: ["Roda → motor → inverter → baterai", "Baterai → inverter → motor → roda", "Charger → baterai → roda", "Rem cakram → baterai"], answer: 0, why: "Motor menjadi generator: energi gerak roda diubah menjadi listrik dan disimpan ke baterai." },
+  { q: "Mengapa rem regeneratif dikurangi saat baterai hampir penuh?", options: ["Baterai tidak bisa menerima arus pengisian lagi", "Motor terlalu dingin", "Ban menjadi licin", "Inverter mati"], answer: 0, why: "BMS membatasi arus masuk ke baterai yang penuh; kekurangannya ditutup rem cakram." },
+  { q: "Pada pengisian DC cepat, komponen yang membantu mendinginkan baterai selain radiator adalah…", options: ["Chiller yang terhubung ke sistem AC", "Knalpot", "Busi", "Alternator"], answer: 0, why: "Panas saat fast charging sangat besar, sehingga chiller ikut mendinginkan cairan baterai." },
+  { q: "Mobil listrik memakai 15 kWh per 100 km dengan tarif Rp 2.466/kWh. Biaya per km kira-kira…", options: ["± Rp 370", "± Rp 800", "± Rp 2.466", "± Rp 37"], answer: 0, why: "15 kWh : 100 km × Rp 2.466 ≈ Rp 370 per km." },
+  { q: "Urutan perakitan yang benar adalah…", options: ["Rangka → baterai → motor → inverter → kabel → bodi", "Bodi → baterai → rangka → motor", "Motor → bodi → rangka → baterai", "Kabel → bodi → rangka → inverter"], answer: 0, why: "Komponen dipasang dari dasar (rangka) ke atas; bodi diturunkan paling akhir." },
+  { q: "Bodi mobil diturunkan ke rangka dengan alat…", options: ["Derek gantri dengan katrol dan sabuk angkat", "Dongkrak botol", "Kunci momen", "Multimeter"], answer: 0, why: "Bodi yang berat diangkat dan diturunkan perlahan memakai derek dan sabuk angkat." },
 ];
 
 const BTN_W = 1.02;
@@ -602,8 +610,15 @@ function shuffle<T>(a: T[]): T[] {
   return r;
 }
 function makeRound(): Question[] {
-  return shuffle(QUESTIONS)
-    .slice(0, ROUND_SIZE)
+  // OBE: tiap ronde memuat minimal satu soal dari setiap CPMK, sisanya acak
+  const all = shuffle(QUESTIONS.map((q, id) => ({ ...q, id })));
+  const first: typeof all = [];
+  for (let c = 1; c <= 6; c++) {
+    const q = all.find((x) => quizCpmk(x.id) === `CPMK-${c}`);
+    if (q) first.push(q);
+  }
+  const rest = all.filter((q) => !first.includes(q));
+  return shuffle([...first, ...rest.slice(0, ROUND_SIZE - first.length)])
     .map((q) => {
       const order = shuffle(q.options.map((_, i) => i));
       return { ...q, options: order.map((i) => q.options[i]), answer: order.indexOf(q.answer) };
@@ -711,6 +726,7 @@ export function QuizStation({
     playVRClickSound();
     setPicked(i);
     if (i === question.answer) setScore((s) => s + 1);
+    if (question.id !== undefined) recordQuiz(question.id, i === question.answer);
   };
 
   const next = () => {
@@ -726,6 +742,7 @@ export function QuizStation({
     if (picked === null) return;
     if (index + 1 >= total) {
       setFinished(true);
+      recordQuizRound((score / total) * 100);
     } else {
       setIndex(index + 1);
       setPicked(null);

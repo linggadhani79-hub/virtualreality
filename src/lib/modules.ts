@@ -41,12 +41,29 @@ export const ILLUSTRATIONS: { id: string; label: string }[] = [
   { id: "bengkel-non-ev", label: "Bengkel pembanding non-EV" },
   { id: "apd", label: "Lemari APD tegangan tinggi" },
   { id: "game-rakit", label: "Game rakit mobil listrik" },
+  { id: "derek-rakit", label: "Derek gantri di game rakit" },
+  { id: "praktik-baterai", label: "Meja praktik baterai" },
+  { id: "pendingin-baterai", label: "Stasiun pendingin baterai" },
+  { id: "uji-boros", label: "Area uji boros (parkir & SPBU)" },
+  { id: "rem-regeneratif", label: "Diagram rem regeneratif" },
 ];
 export const illustrationUrl = (id: string) => `/lab/ilustrasi/${id}.webp`;
-export type TeachingModule = { id: string; title: string; color: string; slides: Slide[] };
+export type TeachingModule = {
+  id: string;
+  title: string;
+  color: string;
+  slides: Slide[];
+};
 
 const KEY = "ev_modules_v1";
-export const MODULE_COLORS = ["#0ea5e9", "#22c55e", "#f97316", "#a855f7", "#ef4444", "#eab308"];
+export const MODULE_COLORS = [
+  "#0ea5e9",
+  "#22c55e",
+  "#f97316",
+  "#a855f7",
+  "#ef4444",
+  "#eab308",
+];
 
 export const DEFAULT_MODULES: TeachingModule[] = [
   {
@@ -235,7 +252,7 @@ export const DEFAULT_MODULES: TeachingModule[] = [
       },
       {
         title: "Prosedur sebelum bekerja",
-        body: "1. Pakai APD lengkap\n2. Matikan kendaraan dan simpan kunci jauh dari mobil\n3. Lepas service plug / MSD\n4. Tunggu ±10 menit sampai kapasitor kosong\n5. Ukur dengan multimeter dan pastikan 0 V\n6. Pasang tanda \"SEDANG DIKERJAKAN\"",
+        body: '1. Pakai APD lengkap\n2. Matikan kendaraan dan simpan kunci jauh dari mobil\n3. Lepas service plug / MSD\n4. Tunggu ±10 menit sampai kapasitor kosong\n5. Ukur dengan multimeter dan pastikan 0 V\n6. Pasang tanda "SEDANG DIKERJAKAN"',
         image: "baterai",
         caption: "Baterai traksi tetap bertegangan walau mobil mati",
       },
@@ -244,6 +261,188 @@ export const DEFAULT_MODULES: TeachingModule[] = [
         body: "- Jangan sentuh korban yang masih terhubung listrik\n- Putuskan sumber listrik, gunakan tongkat isolasi\n- Kebakaran baterai: APAR yang sesuai dan air dalam jumlah besar, jauhi asap beracun\n- Hubungi petugas dan laporkan kejadian",
         image: "apd",
         caption: "Kenali letak APD dan APAR sebelum bekerja",
+      },
+    ],
+  },
+  {
+    id: "baterai",
+    title: "Baterai Traksi: Sel, Rangkaian, dan kWh",
+    color: MODULE_COLORS[0],
+    slides: [
+      {
+        title: "Dari sel menjadi paket",
+        body: "Paket baterai traksi tersusun bertingkat.\n- Sel: satuan terkecil, ±3,2 V (LFP) atau ±3,7 V (NMC)\n- Modul: beberapa sel dirangkai dan dijepit jadi satu\n- Paket: gabungan modul + BMS + pendingin + pelindung\nPaket 400 V berisi sekitar 100 sel seri.",
+        image: "baterai",
+        caption: "Paket baterai traksi di lab",
+      },
+      {
+        title: "Rangkaian seri dan paralel",
+        body: "Cara merangkai menentukan tegangan dan kapasitas.\n- SERI: tegangan dijumlah, kapasitas (Ah) tetap\n- PARALEL: kapasitas dijumlah, tegangan tetap\n- 4S2P = 4 kelompok seri, tiap kelompok 2 sel paralel\nContoh sel 3,7 V 3 Ah dirangkai 4S2P: 14,8 V dan 6 Ah.",
+        image: "praktik-baterai",
+        caption: "Meja praktik baterai: ukur, ganti, rangkai, las",
+      },
+      {
+        title: "Menghitung energi (kWh)",
+        body: "Energi = tegangan x kapasitas.\n- Wh = V x Ah, lalu kWh = Wh : 1000\n- Contoh 4S2P: 14,8 V x 6 Ah = 88,8 Wh\n- Paket mobil 350 V x 150 Ah = 52,5 kWh\nJarak tempuh kira-kira = kWh paket : konsumsi (kWh per km).",
+      },
+      {
+        title: "BMS dan penyeimbangan sel",
+        body: "Battery Management System menjaga tiap sel tetap aman.\n- Memantau tegangan, arus, dan suhu tiap sel\n- Memutus arus bila terlalu penuh, terlalu kosong, atau terlalu panas\n- Balancing: menyamakan tegangan antarsel agar kapasitas paket terpakai penuh\nSel yang tegangannya jauh berbeda atau hambatan dalamnya tinggi harus diganti.",
+      },
+      {
+        title: "Menyambung sel: las titik",
+        body: "Sel tidak disolder langsung karena panasnya merusak sel.\n- Busbar nikel dilas titik ke kutub sel\n- Pulsa arus besar sangat singkat, sel tidak sempat panas\n- Sebelum paralel, tegangan sel disamakan dulu\nCoba urutannya di meja praktik baterai.",
+        image: "praktik-baterai",
+        caption: "Praktik: ukur → ganti → seimbangkan → rangkai → las",
+      },
+    ],
+  },
+  {
+    id: "termal",
+    title: "Pendinginan Baterai",
+    color: MODULE_COLORS[1],
+    slides: [
+      {
+        title: "Mengapa suhu penting",
+        body: "Baterai lithium bekerja paling baik pada 20–40 °C.\n- Terlalu panas: sel cepat menua, risiko thermal runaway\n- Terlalu dingin: daya turun dan pengisian harus diperlambat\n- Beda suhu antarsel sebaiknya di bawah ±5 °C",
+        image: "pendingin-baterai",
+        caption: "Stasiun pendingin baterai di lab",
+      },
+      {
+        title: "Pendingin cair dan pelat dingin",
+        body: "Kebanyakan EV modern memakai pendingin cair.\n- Cairan mengalir di pelat dingin di bawah sel\n- Pompa listrik mengedarkan cairan\n- Radiator dan kipas membuang panas ke udara\n- Sel blade tersusun rapat sehingga pelat dingin menyentuh semua sel",
+        image: "pendingin-baterai",
+        caption: "Sel blade di atas pelat dingin, modul termal, radiator",
+      },
+      {
+        title: "Chiller dan pemanas PTC",
+        body: "Saat radiator tidak cukup, sistem AC ikut membantu.\n- Chiller: penukar panas ke rangkaian AC, dipakai saat fast charging atau cuaca panas\n- Pemanas PTC: menghangatkan baterai saat dingin\n- Katup mengatur jalur: radiator, chiller, atau pemanas",
+      },
+      {
+        title: "Empat keadaan kerja",
+        body: "Cobakan di stasiun pendingin baterai.\n- Santai: panas kecil, pompa pelan\n- Ngebut: arus besar, radiator dan kipas bekerja\n- Fast charging: panas paling besar, chiller menyala\n- Cuaca dingin: pemanas menaikkan suhu sebelum mengisi",
+      },
+    ],
+  },
+  {
+    id: "penggerak",
+    title: "Motor Listrik & Inverter",
+    color: MODULE_COLORS[2],
+    slides: [
+      {
+        title: "Bagian motor listrik",
+        body: "Motor listrik EV sederhana: hanya satu bagian yang berputar.\n- Stator: bagian diam berisi lilitan tembaga\n- Rotor: bagian berputar, bermagnet permanen (PMSM) atau sangkar (induksi)\n- Sensor posisi (resolver) memberi tahu inverter posisi rotor",
+        image: "motor-listrik",
+        caption: "Motor listrik / e-axle di lab",
+      },
+      {
+        title: "Medan putar 3 fasa",
+        body: "Tiga arus bolak-balik yang berbeda fasa 120° menghasilkan medan magnet berputar di stator.\n- Rotor ikut terseret medan putar\n- Frekuensi arus menentukan kecepatan putar\n- Besar arus menentukan torsi\nTorsi besar tersedia sejak 0 rpm, sehingga EV tidak butuh gigi percepatan.",
+      },
+      {
+        title: "Inverter",
+        body: "Inverter mengubah DC baterai menjadi AC 3 fasa.\n- Enam saklar daya (IGBT atau SiC MOSFET) membuka-tutup ribuan kali per detik\n- Lebar pulsa (PWM) diatur agar arus motor berbentuk sinus\n- Kapasitor besar di dalamnya masih bermuatan setelah mobil dimatikan",
+        image: "inverter",
+        caption: "Inverter & elektronika daya",
+      },
+      {
+        title: "Gigi reduksi dan e-axle",
+        body: "Motor berputar sangat cepat (sampai ±16.000 rpm).\n- Gigi reduksi satu tingkat menurunkan putaran dan menaikkan torsi ke roda\n- Diferensial membagi putaran roda kiri dan kanan\n- Motor + inverter + gigi dalam satu rumah disebut e-axle",
+        image: "sasis-ev",
+        caption: "Rangka EV: unit penggerak di poros roda",
+      },
+    ],
+  },
+  {
+    id: "regen",
+    title: "Rem Regeneratif",
+    color: MODULE_COLORS[3],
+    slides: [
+      {
+        title: "Apa itu rem regeneratif",
+        body: "Saat pedal gas dilepas atau rem diinjak, motor listrik berubah menjadi generator.\n- Roda memutar motor, bukan sebaliknya\n- Energi gerak diubah menjadi listrik dan disimpan ke baterai\n- Mobil melambat tanpa menggesek kampas rem",
+        image: "rem-regeneratif",
+        caption: "Alur energi saat melaju dan saat mengerem",
+      },
+      {
+        title: "Cara kerjanya langkah demi langkah",
+        body: "1. Pengemudi melepas gas / menginjak rem\n2. Pengendali meminta torsi negatif dari motor\n3. Inverter mengatur arus sehingga medan stator tertinggal dari rotor\n4. Motor menghasilkan listrik AC 3 fasa\n5. Inverter menyearahkannya menjadi DC\n6. BMS mengizinkan arus masuk dan baterai terisi",
+        image: "rem-regeneratif",
+        caption: "Motor → inverter → baterai",
+      },
+      {
+        title: "Peran inverter dan BMS",
+        body: "Inverter bekerja dua arah.\n- Melaju: DC baterai → AC motor\n- Mengerem: AC motor → DC baterai\nBMS membatasi arus regeneratif.\n- Baterai hampir penuh atau sangat dingin: regeneratif dikurangi\n- Kekurangannya ditutup rem cakram secara otomatis",
+        image: "inverter",
+        caption: "Inverter: jalan dua arah bagi energi",
+      },
+      {
+        title: "Rem gabungan (blended braking)",
+        body: "Rem cakram tetap ada.\n- Pengereman ringan sampai sedang: sebagian besar regeneratif\n- Pengereman keras atau darurat: rem cakram ikut bekerja penuh\n- Di kecepatan sangat rendah regeneratif melemah, rem cakram menghentikan mobil\nKarena itu kampas rem EV jauh lebih awet.",
+        image: "rem",
+        caption: "Rem cakram & kaliper tetap dipakai",
+      },
+      {
+        title: "Berapa energi yang kembali",
+        body: "Tidak semua energi kembali.\n- Efisiensi roda → baterai sekitar 60–70 %\n- Di dalam kota bisa menambah jarak tempuh ±10–25 %\n- Di jalan tol manfaatnya kecil karena jarang mengerem\nAmati mobil di lintasan uji: lampu rem menyala dan status berubah menjadi REGEN saat melambat.",
+        image: "rem-regeneratif",
+        caption: "Lihat rambu REM REGENERATIF di lintasan uji",
+      },
+    ],
+  },
+  {
+    id: "biaya",
+    title: "Biaya Energi & Emisi",
+    color: MODULE_COLORS[4],
+    slides: [
+      {
+        title: "Menghitung biaya per km",
+        body: "Bandingkan dengan satuan yang sama: rupiah per km.\n- Bensin: (liter per 100 km : 100) x harga per liter\n- Listrik: (kWh per 100 km : 100) x tarif per kWh\nContoh di lab: bensin 8 L/100 km x Rp 10.000 = Rp 800/km; listrik 15 kWh/100 km x Rp 2.466 = ±Rp 370/km.",
+        image: "uji-boros",
+        caption: "Area uji boros: bensin vs listrik",
+      },
+      {
+        title: "Waktu isi dan kapasitas",
+        body: "Tangki dan baterai diisi dengan cara berbeda.\n- Bensin 40 L: penuh dalam ±5 menit\n- Baterai 50 kWh di AC 7 kW: ±7 jam; di DC cepat: ±30–40 menit sampai 80 %\n- EV biasa diisi saat parkir (malam hari), bukan menunggu kosong",
+        image: "uji-boros",
+        caption: "SPBU dan tiang cas di area parkir",
+      },
+      {
+        title: "Efisiensi energi",
+        body: "Dari energi yang dibeli, berapa yang menjadi gerak?\n- Mesin bensin: ±25–30 %, sisanya panas\n- Motor listrik + inverter: ±85–90 %\n- Rem regeneratif mengembalikan sebagian energi saat melambat",
+      },
+      {
+        title: "Emisi",
+        body: "Mobil bensin mengeluarkan ±2,3 kg CO2 per liter bensin.\n- EV tidak punya knalpot, tetapi listriknya bisa berasal dari pembangkit berbahan bakar fosil\n- Emisi EV turun bila listriknya dari surya, air, atau angin\n- Mengisi dari panel surya lab adalah contoh energi bersih",
+        image: "stasiun-surya",
+        caption: "Stasiun pengisian tenaga surya",
+      },
+    ],
+  },
+  {
+    id: "perawatan",
+    title: "Perakitan, Perawatan & Diagnosis EV",
+    color: MODULE_COLORS[5],
+    slides: [
+      {
+        title: "Urutan perakitan",
+        body: "Komponen dipasang dari dasar ke atas.\n1. Rangka & roda\n2. Baterai traksi di lantai rangka\n3. Motor listrik di poros\n4. Inverter di atas motor\n5. Kabel tegangan tinggi (oranye)\n6. Bodi diturunkan paling akhir dengan derek",
+        image: "derek-rakit",
+        caption: "Derek gantri di game rakit mobil listrik",
+      },
+      {
+        title: "Perawatan berkala EV",
+        body: "Lebih sedikit daripada mobil bensin, tetapi tetap ada.\n- Cairan pendingin baterai dan inverter\n- Minyak rem dan kampas (jarang aus)\n- Ban, suspensi, dan filter kabin\n- Oli gigi reduksi sesuai jadwal pabrik\nTidak ada: oli mesin, busi, filter udara mesin, knalpot.",
+      },
+      {
+        title: "Diagnosis dasar",
+        body: "Mulai dari yang aman dan mudah.\n- Baca kode gangguan (DTC) dengan alat pindai\n- Periksa aki 12 V: banyak gangguan EV berawal dari sini\n- Lihat data BMS: tegangan dan suhu tiap sel\n- Uji tahanan isolasi sebelum menyentuh sistem tegangan tinggi",
+      },
+      {
+        title: "Selalu ingat K3",
+        body: 'Sebelum membuka komponen tegangan tinggi.\n- Pakai APD: sarung tangan isolasi, pelindung wajah\n- Lepas service plug dan tunggu ±10 menit\n- Ukur dan pastikan tegangan sudah nol\n- Pasang tanda "sedang dikerjakan"',
+        image: "apd",
+        caption: "Lemari APD tegangan tinggi",
       },
     ],
   },
@@ -258,13 +457,19 @@ function isValid(data: unknown): data is TeachingModule[] {
         typeof m.id === "string" &&
         typeof m.title === "string" &&
         Array.isArray(m.slides) &&
-        m.slides.every((s: any) => s && typeof s.title === "string" && typeof s.body === "string"),
+        m.slides.every(
+          (s: any) =>
+            s && typeof s.title === "string" && typeof s.body === "string",
+        ),
     )
   );
 }
 
 function withColors(mods: TeachingModule[]): TeachingModule[] {
-  return mods.map((m, i) => ({ ...m, color: m.color || MODULE_COLORS[i % MODULE_COLORS.length] }));
+  return mods.map((m, i) => ({
+    ...m,
+    color: m.color || MODULE_COLORS[i % MODULE_COLORS.length],
+  }));
 }
 
 let current: TeachingModule[] = DEFAULT_MODULES;
@@ -280,13 +485,18 @@ export function loadModules(): Promise<TeachingModule[]> {
     loaded = (async () => {
       try {
         const local = await idbGet(KEY);
-        if (isValid(local) && local.length) return (current = withColors(local));
+        if (isValid(local) && local.length)
+          return (current = withColors(local));
       } catch {}
       try {
         const res = await fetch("/lab/modul.json", { cache: "no-cache" });
-        if (res.ok && (res.headers.get("content-type") || "").includes("json")) {
+        if (
+          res.ok &&
+          (res.headers.get("content-type") || "").includes("json")
+        ) {
           const bundled = await res.json();
-          if (isValid(bundled) && bundled.length) return (current = withColors(bundled));
+          if (isValid(bundled) && bundled.length)
+            return (current = withColors(bundled));
         }
       } catch {}
       return (current = DEFAULT_MODULES);
@@ -312,7 +522,9 @@ export async function resetModules() {
   await loadModules();
 }
 
-export function subscribeModules(listener: (mods: TeachingModule[]) => void): () => void {
+export function subscribeModules(
+  listener: (mods: TeachingModule[]) => void,
+): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
