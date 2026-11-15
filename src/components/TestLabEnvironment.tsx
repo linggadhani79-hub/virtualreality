@@ -9,6 +9,7 @@ import { AssemblyGame } from "./AssemblyGame";
 import { EnergyRoom } from "./SolarPower";
 import { BatteryGame } from "./BatteryGame";
 import { CoolingSystem } from "./CoolingSystem";
+import { ObeBoard, ObeTracker } from "./ObeBoard";
 import { ParkingArea, PARKING_SOLIDS } from "./ParkingArea";
 import { DrivingTrack } from "./DrivingTrack";
 import { boxAt, worldBounds, type Box } from "../lib/worldBounds";
@@ -871,6 +872,9 @@ export function TestLabEnvironment() {
       {/* Tanya jawab (dinding depan kiri) */}
       <FloorDecal position={[-9.5, 2.6]} size={[3.6, 0.5]} map={txtQuiz} rotation={Math.PI} />
       <QuizStation position={[-9.5, 0, 5.2]} facing={Math.PI} />
+      {/* OBE: papan alur pembelajaran + nilai CPMK siswa aktif, dan pencatat kunjungan zona */}
+      <ObeBoard position={[-6.75, 2.5, HALL.z1 - 0.08]} rotation={Math.PI} />
+      <ObeTracker />
 
       {/* Pojok baca (dinding depan kanan) */}
       <FloorDecal position={[9.5, 2.05]} size={[3.4, 0.5]} map={txtRead} rotation={Math.PI} />

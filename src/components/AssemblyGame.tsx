@@ -5,6 +5,7 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import { disableRaycast, fitModel, loadGlb, roundedRectShape, wrapText } from "../lib/glb";
 import { modelUrl, qualityTier } from "../lib/quality";
 import { playVRClickSound, playVRHoverSound } from "../lib/vrAudio";
+import { recordActivity } from "../lib/obe";
 
 /**
  * Game "Rakit Mobil Listrik".
@@ -288,7 +289,12 @@ function GameButton({ label, color, position, onPress }: { label: string; color:
 
 const platformGeometry = new RoundedBoxGeometry(5.6, PLATFORM_Y, 2.8, 6, 0.055);
 const standTop = new RoundedBoxGeometry(1, 0.06, 1, 6, 0.029);
-const postGeometry = new THREE.CylinderGeometry(0.09, 0.11, 4.3, 16);
+/** Derek gantri: tinggi kaki, tinggi palang angkat saat menganggur, panjang sabuk angkat. */
+const CRANE_TOP = 5.2;
+const RIG_UP = 4.65;
+const RIG_DROP = 1.3;
+const postGeometry = new RoundedBoxGeometry(0.18, CRANE_TOP, 0.18, 2, 0.03);
+const hoistGeometry = new RoundedBoxGeometry(0.42, 0.34, 0.4, 3, 0.05);
 const hintGeometry = new THREE.ConeGeometry(0.16, 0.34, 20);
 /**
  * Jalur kabel dengan tikungan membulat: garis lurus antar-titik, tiap sudut diganti lengkung
@@ -386,6 +392,8 @@ export function AssemblyGame({
   const groups = useRef<(THREE.Group | null)[]>([]);
   const hintRef = useRef<THREE.Mesh>(null);
   const partsRef = useRef<THREE.Group>(null);
+  const rigRef = useRef<THREE.Group>(null);
+  const chainRef = useRef<THREE.Mesh>(null);
   const bodyWheels = useRef<THREE.Object3D[]>([]);
   const rootRef = useRef<THREE.Group>(null);
   const shake = useRef<{ index: number; t: number }>({ index: -1, t: 0 });
@@ -531,6 +539,23 @@ export function AssemblyGame({
       const g = groups.current[i];
       if (g) g.visible = !landed;
     }
+    // derek: palang angkat menempel di bodi selama bodi belum duduk, lalu naik lagi
+    const body = groups.current[STEPS.length - 1];
+    const rig = rigRef.current;
+    if (rig && body) {
+      const attached = !landed;
+      const target = attached ? body.position.y + RIG_DROP + 0.65 : RIG_UP;
+      if (attached && Math.abs(rig.position.y - target) < 0.08) rig.position.y = target;
+      else rig.position.y = THREE.MathUtils.damp(rig.position.y, target, attached ? 14 : 2.2, delta);
+      rig.position.x = attached ? body.position.x : 0;
+      const chain = chainRef.current;
+      if (chain) {
+        const top = CRANE_TOP - 0.05;
+        const bottom = rig.position.y + 0.3;
+        chain.scale.y = Math.max(0.01, top - bottom);
+        chain.position.set(rig.position.x, (top + bottom) / 2, 0);
+      }
+    }
     // label nama selalu menghadap pemain
     for (const tag of tagRefs.current) if (tag) tag.quaternion.copy(state.camera.quaternion);
     if (hintRef.current) {
@@ -570,6 +595,7 @@ export function AssemblyGame({
       finishedAt.current = state.clock.elapsedTime;
       const sec = Math.floor(finishedAt.current - (startedAt.current ?? finishedAt.current));
       const stars = mistakes === 0 ? "Sempurna" : mistakes <= 2 ? "Bagus" : "Selesai";
+      recordActivity("rakit", 100 - mistakes * 10);
       setMessage({
         text: `${stars}! Mobil listrik selesai dirakit dalam ${fmtTime(sec)} dengan ${mistakes} kali salah pilih. Tekan ULANGI untuk mencoba lagi.`,
         tone: "good",
@@ -606,24 +632,118 @@ export function AssemblyGame({
         </mesh>
       ))}
 
-      {/* ---------- Derek gantung untuk bodi ---------- */}
+      {/* ---------- Derek gantri (gantry crane) untuk bodi ---------- */}
+      {/* empat kaki baja kotak + pelat tapak berbaut */}
       {[-2.95, 2.95].map((x) =>
         [-1.75, 1.75].map((z) => (
-          <mesh key={`${x}:${z}`} geometry={postGeometry} position={[x, 2.15, z]} raycast={noRaycast}>
-            <meshStandardMaterial color="#facc15" metalness={0.4} roughness={0.5} />
-          </mesh>
+          <group key={`${x}:${z}`} position={[x, 0, z]}>
+            <mesh geometry={postGeometry} position={[0, CRANE_TOP / 2, 0]} raycast={noRaycast}>
+              <meshStandardMaterial color="#facc15" metalness={0.4} roughness={0.5} />
+            </mesh>
+            <mesh position={[0, 0.015, 0]} raycast={noRaycast}>
+              <boxGeometry args={[0.44, 0.03, 0.44]} />
+              <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.45} />
+            </mesh>
+            {/* pita peringatan hitam di kaki */}
+            {[0.5, 0.8].map((y) => (
+              <mesh key={y} position={[0, y, 0]} raycast={noRaycast}>
+                <boxGeometry args={[0.19, 0.12, 0.19]} />
+                <meshStandardMaterial color="#111827" roughness={0.6} />
+              </mesh>
+            ))}
+            {/* penguat siku ke balok lintasan */}
+            <mesh position={[-Math.sign(x) * 0.36, CRANE_TOP - 0.36, 0]} rotation={[0, 0, Math.sign(x) * (Math.PI / 4)]} raycast={noRaycast}>
+              <boxGeometry args={[0.08, 1.02, 0.08]} />
+              <meshStandardMaterial color="#facc15" metalness={0.4} roughness={0.5} />
+            </mesh>
+          </group>
         )),
       )}
-      {[-1.75, 1.75].map((z) => (
-        <mesh key={z} position={[0, 4.3, z]} rotation={[0, 0, Math.PI / 2]} raycast={noRaycast}>
-          <capsuleGeometry args={[0.1, 6.0, 6, 14]} />
+      {/* pengikat kepala kaki (arah Z) */}
+      {[-2.95, 2.95].map((x) => (
+        <mesh key={x} position={[x, CRANE_TOP - 0.1, 0]} raycast={noRaycast}>
+          <boxGeometry args={[0.14, 0.2, 3.5]} />
           <meshStandardMaterial color="#facc15" metalness={0.4} roughness={0.5} />
         </mesh>
       ))}
-      <mesh position={[0, 4.42, 0]} rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast}>
-        <capsuleGeometry args={[0.09, 3.6, 6, 14]} />
-        <meshStandardMaterial color="#334155" metalness={0.7} roughness={0.4} />
+      {/* dua balok lintasan profil I (arah X) */}
+      {[-1.75, 1.75].map((z) => (
+        <group key={z} position={[0, CRANE_TOP + 0.13, z]}>
+          <mesh raycast={noRaycast}>
+            <boxGeometry args={[6.3, 0.26, 0.07]} />
+            <meshStandardMaterial color="#facc15" metalness={0.4} roughness={0.5} />
+          </mesh>
+          {[-0.13, 0.13].map((y) => (
+            <mesh key={y} position={[0, y, 0]} raycast={noRaycast}>
+              <boxGeometry args={[6.3, 0.035, 0.24]} />
+              <meshStandardMaterial color="#facc15" metalness={0.4} roughness={0.5} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+      {/* jembatan derek (arah Z) dengan roda ujung + katrol listrik */}
+      <group position={[0, CRANE_TOP + 0.44, 0]}>
+        <mesh raycast={noRaycast}>
+          <boxGeometry args={[0.08, 0.3, 3.9]} />
+          <meshStandardMaterial color="#eab308" metalness={0.45} roughness={0.5} />
+        </mesh>
+        {[-0.15, 0.15].map((y) => (
+          <mesh key={y} position={[0, y, 0]} raycast={noRaycast}>
+            <boxGeometry args={[0.26, 0.035, 3.9]} />
+            <meshStandardMaterial color="#eab308" metalness={0.45} roughness={0.5} />
+          </mesh>
+        ))}
+        {[-1.75, 1.75].map((z) => (
+          <mesh key={z} position={[0, -0.1, z]} raycast={noRaycast}>
+            <boxGeometry args={[0.62, 0.16, 0.3]} />
+            <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.4} />
+          </mesh>
+        ))}
+        {/* katrol: rumah motor + tromol */}
+        <mesh geometry={hoistGeometry} position={[0, -0.36, 0]} raycast={noRaycast}>
+          <meshStandardMaterial color="#ea580c" metalness={0.4} roughness={0.5} />
+        </mesh>
+        <mesh position={[0, -0.36, 0.3]} rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast}>
+          <cylinderGeometry args={[0.13, 0.13, 0.2, 18]} />
+          <meshStandardMaterial color="#334155" metalness={0.75} roughness={0.35} />
+        </mesh>
+      </group>
+      {/* rantai katrol (panjangnya mengikuti turun-naiknya bodi) */}
+      <mesh ref={chainRef} position={[0, CRANE_TOP, 0]} raycast={noRaycast}>
+        <cylinderGeometry args={[0.018, 0.018, 1, 8]} />
+        <meshStandardMaterial color="#94a3b8" metalness={0.85} roughness={0.3} />
       </mesh>
+      {/* palang angkat + empat sabuk yang mengait lengkung roda bodi */}
+      <group ref={rigRef} position={[0, RIG_UP, 0]}>
+        <mesh position={[0, 0.2, 0]} raycast={noRaycast}>
+          <boxGeometry args={[0.13, 0.26, 0.1]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.4} />
+        </mesh>
+        <mesh position={[0, 0.02, 0]} raycast={noRaycast}>
+          <boxGeometry args={[3.0, 0.12, 0.12]} />
+          <meshStandardMaterial color="#facc15" metalness={0.4} roughness={0.5} />
+        </mesh>
+        {[-1.36, 1.36].map((x) => (
+          <group key={x} position={[x, 0, 0]}>
+            <mesh raycast={noRaycast}>
+              <boxGeometry args={[0.09, 0.09, 2.24]} />
+              <meshStandardMaterial color="#facc15" metalness={0.4} roughness={0.5} />
+            </mesh>
+            {[-1.09, 1.09].map((z) => (
+              <group key={z} position={[0, 0, z]}>
+                <mesh position={[0, -RIG_DROP / 2, 0]} raycast={noRaycast}>
+                  <boxGeometry args={[0.05, RIG_DROP, 0.014]} />
+                  <meshStandardMaterial color="#f97316" roughness={0.8} />
+                </mesh>
+                <mesh position={[0, -RIG_DROP, -Math.sign(z) * 0.05]} raycast={noRaycast}>
+                  <boxGeometry args={[0.16, 0.05, 0.16]} />
+                  <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.5} />
+                </mesh>
+              </group>
+            ))}
+          </group>
+        ))}
+      </group>
 
       {/* ---------- Dudukan komponen ---------- */}
       {/* troli baterai */}
@@ -746,15 +866,6 @@ export function AssemblyGame({
         </group>
       ))}
       </group>
-      {/* tali derek bodi */}
-      {done < STEPS.length &&
-        [-1.2, 1.2].map((x) => (
-          <mesh key={x} position={[x, 4.3 - (4.3 - 2.7 - 1.25) / 2, 0]} raycast={noRaycast}>
-            <cylinderGeometry args={[0.012, 0.012, 4.3 - 2.7 - 1.25, 6]} />
-            <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.3} />
-          </mesh>
-        ))}
-
       {/* panah petunjuk */}
       <mesh ref={hintRef} geometry={hintGeometry} rotation={[Math.PI, 0, 0]} visible={false} raycast={noRaycast}>
         <meshBasicMaterial color="#facc15" toneMapped={false} />

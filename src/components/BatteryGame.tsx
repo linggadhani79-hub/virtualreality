@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { roundedRectShape, wrapText } from "../lib/glb";
 import { playVRClickSound, playVRHoverSound } from "../lib/vrAudio";
+import { recordActivity } from "../lib/obe";
 
 /**
  * Game "Restorasi Baterai".
@@ -428,6 +429,7 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
     if (next.size >= N * 2) {
       live.current.step = "done";
       setStep("done");
+      recordActivity("baterai", 100 - mistakes * 8);
       setMsg({ text: "Semua titik terlas rapi: arus listrik mengalir lewat busbar, bukan lewat tumpukan solder yang memanaskan sel. Baterai pulih! Tekan ULANGI untuk paket baru.", tone: "good" });
     } else {
       setMsg({ text: `Las titik: ${next.size} / ${N * 2}. Pulsa arus besar sesaat melelehkan busbar nikel ke kutub sel tanpa memanaskan sel terlalu lama.`, tone: "info" });

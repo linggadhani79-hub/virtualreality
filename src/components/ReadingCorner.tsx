@@ -5,6 +5,7 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import { roundedRectShape, wrapText } from "../lib/glb";
 import { TeachingModule, getModules, illustrationUrl, loadModules, subscribeModules } from "../lib/modules";
 import { playVRClickSound } from "../lib/vrAudio";
+import { recordActivity } from "../lib/obe";
 
 /**
  * Pojok Baca: meja dengan buku-buku modul ajar. Memilih sebuah buku membukanya sebagai
@@ -590,6 +591,7 @@ export function ReadingCorner({
             onPress={() => {
               playVRClickSound();
               setSlide(slideIndex + 1);
+              if (open && slideIndex + 1 >= open.slides.length - 1) recordActivity("modul", 100);
             }}
           />
         </group>

@@ -12,6 +12,7 @@ import { playVRClickSound } from "../lib/vrAudio";
  *  - QuizStation  : kios tanya-jawab interaktif (bisa dijawab dengan mouse, laser Quest, atau tatapan)
  */
 
+import { quizCpmk, recordQuiz, recordQuizRound } from "../lib/obe";
 const noRaycast = () => null;
 
 function useCanvasTexture(width: number, height: number) {
@@ -362,7 +363,7 @@ export function StaticModel({
 /*  Kios tanya-jawab                                                   */
 /* ------------------------------------------------------------------ */
 
-type Question = { q: string; options: string[]; answer: number; why: string };
+type Question = { q: string; options: string[]; answer: number; why: string; id?: number };
 
 const QUESTIONS: Question[] = [
   {
@@ -602,8 +603,15 @@ function shuffle<T>(a: T[]): T[] {
   return r;
 }
 function makeRound(): Question[] {
-  return shuffle(QUESTIONS)
-    .slice(0, ROUND_SIZE)
+  // OBE: tiap ronde memuat minimal satu soal dari setiap CPMK, sisanya acak
+  const all = shuffle(QUESTIONS.map((q, id) => ({ ...q, id })));
+  const first: typeof all = [];
+  for (let c = 1; c <= 6; c++) {
+    const q = all.find((x) => quizCpmk(x.id) === `CPMK-${c}`);
+    if (q) first.push(q);
+  }
+  const rest = all.filter((q) => !first.includes(q));
+  return shuffle([...first, ...rest.slice(0, ROUND_SIZE - first.length)])
     .map((q) => {
       const order = shuffle(q.options.map((_, i) => i));
       return { ...q, options: order.map((i) => q.options[i]), answer: order.indexOf(q.answer) };
@@ -711,6 +719,7 @@ export function QuizStation({
     playVRClickSound();
     setPicked(i);
     if (i === question.answer) setScore((s) => s + 1);
+    if (question.id !== undefined) recordQuiz(question.id, i === question.answer);
   };
 
   const next = () => {
@@ -726,6 +735,7 @@ export function QuizStation({
     if (picked === null) return;
     if (index + 1 >= total) {
       setFinished(true);
+      recordQuizRound((score / total) * 100);
     } else {
       setIndex(index + 1);
       setPicked(null);

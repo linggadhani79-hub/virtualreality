@@ -416,6 +416,14 @@ function spbuCurve(): Curve {
     ...bezier([-38.8, 6.3], [-35.2, 6.3], [EAST_X, 7.2], [EAST_X, JOIN_Z]).slice(1),
   ]);
 }
+/** Tinggi lantai beton SPBU (model `spbu`) di atas aspal, dengan tanjakan landai di tepinya. */
+const PAD = { x0: STATION.x - 6.6, x1: STATION.x + 6.6, z0: STATION.z - 5.85, z1: STATION.z + 5.85, h: 0.235, ramp: 0.9 };
+function padHeight(x: number, z: number) {
+  const d = Math.min(x - PAD.x0, PAD.x1 - x, z - PAD.z0, PAD.z1 - z);
+  if (d <= -PAD.ramp) return 0;
+  const t = Math.min(1, (d + PAD.ramp) / PAD.ramp);
+  return PAD.h * t * t * (3 - 2 * t);
+}
 /** Tiang cas di sisi kanan tiap petak mobil listrik (dilihat dari belakang mobil). */
 const CHARGERS = BAYS.map((b, i) => ({ bay: i, x: b.x + BAY_W / 2, z: BAY_Z - 2.0 })).filter((c) => BAYS[c.bay].kind === "listrik");
 
@@ -789,7 +797,15 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
         heading = Math.PI; // menghadap utara (-Z)
       }
       g.position.copy(tmp);
+      g.rotation.order = "YXZ";
       g.rotation.y = heading;
+      // lantai SPBU lebih tinggi dari aspal: mobil naik ke atasnya (roda tidak tenggelam)
+      const sin = Math.sin(heading);
+      const cos = Math.cos(heading);
+      const hf = padHeight(tmp.x + sin * 1.3, tmp.z + cos * 1.3);
+      const hr = padHeight(tmp.x - sin * 1.3, tmp.z - cos * 1.3);
+      g.position.y = (hf + hr) / 2;
+      g.rotation.x = -Math.atan2(hf - hr, 2.6);
 
       // konsumsi energi sesuai jarak (1 m lintasan = 1 km)
       if (step > 0) {

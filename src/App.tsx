@@ -28,6 +28,7 @@ import { VROptimizer } from "./components/VROptimizer";
 import { WebXRControllerManager } from "./components/WebXRControllerManager";
 import { EVEntranceScreen } from "./components/EVEntranceScreen";
 import { HomeScreen } from "./components/HomeScreen";
+import { ObePanel, openObePanel } from "./components/ObePanel";
 import { GuardianBoundary } from "./components/GuardianBoundary";
 import { TRIAL_NO_AUTH, LOCAL_ONLY } from "./lib/appConfig";
 import { clampToWorld } from "./lib/worldBounds";
@@ -878,6 +879,7 @@ function AdaptiveUI({
               {isAdmin && (
                 <MobileChip id="m-btn-module" icon="📖" label="Modul" title="Modul Ajar Digital" onClick={onOpenModuleEditor} />
               )}
+              <MobileChip id="m-btn-obe" icon="🎯" label="Capaian" title="CPL, alur belajar, dan hasil evaluasi" onClick={openObePanel} />
               <MobileChip id="m-btn-input" icon="⌨" label="Tombol" title="Ganti ke kontrol keyboard" onClick={() => setMobileMode(false)} />
             </div>
 
@@ -980,6 +982,19 @@ function AdaptiveUI({
                 </span>
               </button>
 
+              <button
+                id="btn-open-obe"
+                className="w-full flex items-center justify-between bg-emerald-950/80 hover:bg-emerald-900 active:scale-95 text-xs font-bold py-2.5 px-3 rounded-xl transition-all border border-emerald-500/40 text-left text-white shadow-lg cursor-pointer"
+                onClick={openObePanel}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="text-base">🎯</span>
+                  <span>Capaian (CPL & Nilai)</span>
+                </div>
+                <span className="text-[10px] bg-emerald-500/30 text-emerald-100 px-2 py-0.5 rounded font-mono font-bold border border-emerald-400/30">
+                  OBE
+                </span>
+              </button>
               {isAdmin && (
                 <button
                   id="btn-open-module-editor"
@@ -2475,6 +2490,7 @@ export default function App() {
         </div>
       )}
 
+      <ObePanel />
       {LOCAL_ONLY && appState === "select_mode" && (
         <HomeScreen
           onStart={() => {
