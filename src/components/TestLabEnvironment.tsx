@@ -79,6 +79,7 @@ const SOLIDS: Box[] = [
   { minX: 14.4, maxX: 17.35, minZ: HALL.z0, maxZ: HALL.z0 + 0.66 },
   // game rakit: panggung, tiang derek, troli & meja komponen, konsol
   { minX: 16.2, maxX: 21.8, minZ: -7.0, maxZ: -4.2 },
+  { minX: 16.7, maxX: 21.3, minZ: -8.95, maxZ: -8.35 }, // meja modul e-Axle 8-in-1
   boxAt(16.05, -7.35, 0.15),
   boxAt(21.95, -7.35, 0.15),
   boxAt(16.05, -3.85, 0.15),

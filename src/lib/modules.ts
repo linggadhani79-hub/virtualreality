@@ -431,7 +431,7 @@ export const DEFAULT_MODULES: TeachingModule[] = [
     slides: [
       {
         title: "Urutan perakitan",
-        body: "Komponen dipasang dari dasar ke atas.\n1. Rangka & roda\n2. Baterai traksi di lantai rangka\n3. Motor listrik di poros\n4. Inverter di atas motor\n5. Kabel tegangan tinggi (oranye)\n6. Bodi diturunkan paling akhir dengan derek",
+        body: "Komponen dipasang dari dasar ke atas (12 langkah, lengkap e-Axle 8-in-1).\n1. Rangka & roda → 2. Baterai → 3. BMS\n4. Reducer → 5. Motor → 6. Inverter\n7. PDU → 8. OBC → 9. DC-DC → 10. VCU\n11. Kabel tegangan tinggi (oranye)\n12. Bodi diturunkan paling akhir dengan derek gantri",
         image: "derek-rakit",
         caption: "Derek gantri di game rakit mobil listrik",
       },
