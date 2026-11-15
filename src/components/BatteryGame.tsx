@@ -26,7 +26,7 @@ type Vec3 = [number, number, number];
 const N = 8;
 const CELL_NOM = 3.7; // V
 const CELL_AH = 3; // Ah
-const SPACING = 0.15;
+const SPACING = 0.2; // cukup renggang supaya kutub tiap sel mudah dibidik di HP
 const TOP = 0.76; // tinggi permukaan meja (rendah: nyaman dipakai berdiri maupun duduk)
 const BOARD_Y = 1.95; // pusat papan informasi
 const CELL_H = 0.2;
@@ -367,6 +367,9 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
   const [red, setRed] = useState<{ i: number; t: "p" | "n" } | null>(null);
   const [reading, setReading] = useState({ text: "----", hint: "Tempel probe merah lalu hitam" });
   const [selected, setSelected] = useState<number | null>(null);
+  // sel yang sedang dibidik: dua tombol besar (+)/(−) melayang di atasnya
+  const [focus, setFocus] = useState<number | null>(null);
+  const padRef = useRef<THREE.Group>(null);
   const selRef = useRef<number | null>(null);
   const [config, setConfig] = useState<ConfigId | null>(null);
   const [mistakes, setMistakes] = useState(0);
@@ -375,7 +378,7 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
   const sparks = useRef<{ p: THREE.Vector3; t: number }[]>([]);
   const sparkMesh = useRef<THREE.Mesh>(null);
   const [msg, setMsg] = useState<{ text: string; tone: "info" | "good" | "bad" }>({
-    text: "Pilih mode V, lalu tempel probe: klik kutub (+) merah sebuah sel, kemudian kutub (−) hitam sel yang sama.",
+    text: "Pilih mode V, ketuk sebuah sel, lalu tekan tombol (+) MERAH kemudian (−) HITAM yang muncul di atasnya (atau klik langsung kutubnya).",
     tone: "info",
   });
 
@@ -431,8 +434,14 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
     }
   };
 
+  const aim = (i: number) => {
+    playVRHoverSound();
+    setFocus(i);
+  };
+
   /* ---- probe ---- */
   const touch = (i: number, t: "p" | "n") => {
+    setFocus(i);
     if (live.current.step === "weld") return weld(i, t);
     const { step, mode, red, cells } = live.current;
     if (step !== "measure" && step !== "replace") return;
@@ -583,7 +592,8 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
       setWelded(new Set());
     balancing.current = null;
     setReading({ text: "----", hint: "Tempel probe merah lalu hitam" });
-    setMsg({ text: "Paket baterai baru. Pilih mode V, lalu tempel probe ke kutub (+) dan (−) tiap sel.", tone: "info" });
+    setFocus(null);
+    setMsg({ text: "Paket baterai baru. Pilih mode V, ketuk sel, lalu tekan (+) MERAH kemudian (−) HITAM.", tone: "info" });
   };
 
   /* ---- penanda sel terpilih ---- */
@@ -634,7 +644,7 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
       </mesh>
       {/* alas karet isolasi */}
       <mesh position={[0, TOP + 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
-        <planeGeometry args={[1.5, 0.5]} />
+        <planeGeometry args={[1.75, 0.5]} />
         <meshStandardMaterial color="#7f1d1d" roughness={0.9} />
       </mesh>
       {[-1.25, 1.25].map((x) =>
@@ -650,7 +660,20 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
       {cells.map((c, i) => (
         <group key={i} position={[cellX(i), TOP, 0]}>
           <mesh geometry={cellGeometry} position={[0, CELL_H / 2, 0]} raycast={noRaycast}>
-            <meshStandardMaterial color={c.replaced ? "#16a34a" : c.flagged ? "#b91c1c" : "#1d4ed8"} roughness={0.45} metalness={0.2} />
+            <meshStandardMaterial color={c.replaced ? "#16a34a" : c.flagged ? "#b91c1c" : "#1d4ed8"} emissive="#60a5fa" emissiveIntensity={focus === i ? 0.35 : 0} roughness={0.45} metalness={0.2} />
+          </mesh>
+          {/* badan sel: ketuk untuk membidik sel ini (memunculkan tombol probe besar) */}
+          <mesh
+            name={`Baterai_cell_${i}`}
+            position={[0, CELL_H / 2, 0]}
+            userData={{ isInteractableMesh: true, isVRButton: true, onClick: () => aim(i) }}
+            onClick={(e) => {
+              e.stopPropagation();
+              aim(i);
+            }}
+          >
+            <boxGeometry args={[0.17, CELL_H, 0.16]} />
+            <meshBasicMaterial colorWrite={false} depthWrite={false} />
           </mesh>
           {(["p", "n"] as const).map((t) => (
             <group key={t} position={[0, CELL_H, t === "p" ? TERM_Z : -TERM_Z]}>
@@ -668,7 +691,7 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
                 }}
               >
                 {/* kotak (+) rendah, kotak (−) tinggi: dari depan bagian atas kotak (−) tetap kelihatan */}
-                <boxGeometry args={t === "p" ? [0.1, 0.022, 0.05] : [0.1, 0.12, 0.065]} />
+                <boxGeometry args={t === "p" ? [0.16, 0.022, 0.05] : [0.16, 0.12, 0.065]} />
                 <meshBasicMaterial colorWrite={false} depthWrite={false} />
               </mesh>
               {/* probe yang sedang menempel */}
@@ -739,6 +762,30 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
           ))}
         </group>
       </group>
+      {/* tombol probe besar di atas sel yang dibidik */}
+      {focus !== null && (step === "measure" || step === "replace" || step === "weld") && (
+        <group ref={padRef} position={[cellX(focus), TOP + CELL_H + 0.17, 0.06]} rotation={[-0.55, 0, 0]}>
+          <group scale={0.62}>
+            {(["p", "n"] as const).map((t, k) => {
+              const done = step === "weld" && welded.has(`${focus}${t}`);
+              const label = step === "weld" ? `LAS (${t === "p" ? "+" : "−"})` : t === "p" ? "(+) MERAH" : "(−) HITAM";
+              return (
+                <Btn
+                  key={t}
+                  prefix="Baterai_pad_"
+                  name={t}
+                  label={label}
+                  color={t === "p" ? "#dc2626" : "#1f2937"}
+                  position={[k === 0 ? -0.2 : 0.2, 0, 0]}
+                  active={!!red && red.i === focus && red.t === t}
+                  disabled={done}
+                  onPress={() => touch(focus, t)}
+                />
+              );
+            })}
+          </group>
+        </group>
+      )}
       {/* penanda sel terpilih */}
       <mesh ref={marker} rotation={[Math.PI, 0, 0]} visible={false} raycast={noRaycast}>
         <coneGeometry args={[0.03, 0.06, 16]} />
