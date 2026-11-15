@@ -26,7 +26,7 @@ type Vec3 = [number, number, number];
 const N = 8;
 const CELL_NOM = 3.7; // V
 const CELL_AH = 3; // Ah
-const SPACING = 0.2; // cukup renggang supaya kutub tiap sel mudah dibidik di HP
+const SPACING = 0.26; // cukup renggang supaya kutub tiap sel mudah dibidik di HP
 const TOP = 0.76; // tinggi permukaan meja (rendah: nyaman dipakai berdiri maupun duduk)
 const BOARD_Y = 1.95; // pusat papan informasi
 const CELL_H = 0.2;
@@ -644,7 +644,7 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
       </mesh>
       {/* alas karet isolasi */}
       <mesh position={[0, TOP + 0.001, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
-        <planeGeometry args={[1.75, 0.5]} />
+        <planeGeometry args={[2.15, 0.5]} />
         <meshStandardMaterial color="#7f1d1d" roughness={0.9} />
       </mesh>
       {[-1.25, 1.25].map((x) =>
@@ -672,7 +672,7 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
               aim(i);
             }}
           >
-            <boxGeometry args={[0.17, CELL_H, 0.16]} />
+            <boxGeometry args={[0.22, CELL_H, 0.16]} />
             <meshBasicMaterial colorWrite={false} depthWrite={false} />
           </mesh>
           {(["p", "n"] as const).map((t) => (
@@ -691,7 +691,7 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
                 }}
               >
                 {/* kotak (+) rendah, kotak (−) tinggi: dari depan bagian atas kotak (−) tetap kelihatan */}
-                <boxGeometry args={t === "p" ? [0.16, 0.022, 0.05] : [0.16, 0.12, 0.065]} />
+                <boxGeometry args={t === "p" ? [0.2, 0.022, 0.05] : [0.2, 0.12, 0.065]} />
                 <meshBasicMaterial colorWrite={false} depthWrite={false} />
               </mesh>
               {/* probe yang sedang menempel */}
@@ -736,7 +736,7 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
         <meshBasicMaterial color="#fef08a" transparent toneMapped={false} depthWrite={false} />
       </mesh>
       {/* mesin las titik (spot welder) */}
-      <group position={[-1.12, TOP, -0.22]}>
+      <group position={[-1.2, TOP, -0.26]}>
         <mesh geometry={welderBody} position={[0, 0.11, 0]} raycast={noRaycast}>
           <meshStandardMaterial color="#1d4ed8" roughness={0.45} metalness={0.3} />
         </mesh>
@@ -803,7 +803,7 @@ export function BatteryGame({ position, facing = 0 }: { position: Vec3; facing?:
       ))}
 
       {/* ---- multimeter ---- */}
-      <group position={[0.95, TOP, -0.12]} rotation={[0, -0.25, 0]}>
+      <group position={[1.17, TOP, -0.16]} rotation={[0, -0.25, 0]}>
         <mesh geometry={meterGeometry} position={[0, 0.02, 0]} raycast={noRaycast}>
           <meshStandardMaterial color="#facc15" roughness={0.5} />
         </mesh>
