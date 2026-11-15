@@ -15,6 +15,9 @@ dilanggar (tanpa database, aset ditanam, tanpa unggah/unduh, langsung pakai, des
   Saklar di `src/lib/appConfig.ts`: `LOCAL_ONLY`, `TRIAL_NO_AUTH`.
 - **Offline**: plugin `offlinePrecache` di `vite.config.ts` menulis `dist/precache-manifest.json`;
   `public/sw.js` menyimpan semua berkas saat pertama dibuka (hanya tingkat kualitas perangkat itu).
+  Manifest memuat sidik isi (`hashes`) tiap berkas; simpanan `evlab-data` TIDAK dibuang tiap versi,
+  hanya berkas yang isinya berubah yang diunduh ulang (hemat kuota). Beranda menampilkan
+  kemajuan simpanan offline (`#home-offline-status`). Jangan kembali ke nama simpanan per versi.
 - **APK** (`android/`) adalah Trusted Web Activity: pembungkus yang membuka alamat web. WebXR tidak
   jalan di WebView, jadi aset tidak bisa benar-benar berada di dalam APK; offline dicapai lewat
   service worker (butuh internet sekali saat pertama dibuka).

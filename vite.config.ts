@@ -26,10 +26,17 @@ function offlinePrecache(): Plugin {
       };
       walk(dist);
       const list = files.filter((f) => !skip.test(f)).map((f) => (f === 'index.html' ? '/' : '/' + f)).sort();
-      const hash = crypto.createHash('sha1');
-      for (const f of list) hash.update(f + fs.statSync(path.join(dist, f === '/' ? 'index.html' : f.slice(1))).size);
-      const version = hash.digest('hex').slice(0, 12);
-      fs.writeFileSync(path.join(dist, 'precache-manifest.json'), JSON.stringify({version, files: list}));
+      // Sidik isi tiap berkas: service worker hanya mengunduh ulang berkas yang isinya berubah,
+      // jadi pembaruan aplikasi tidak menguras kuota dengan mengunduh ulang semua model 3D.
+      const hashes: Record<string, string> = {};
+      const all = crypto.createHash('sha1');
+      for (const f of list) {
+        const h = crypto.createHash('sha1').update(fs.readFileSync(path.join(dist, f === '/' ? 'index.html' : f.slice(1)))).digest('hex').slice(0, 16);
+        hashes[f] = h;
+        all.update(f + h);
+      }
+      const version = all.digest('hex').slice(0, 12);
+      fs.writeFileSync(path.join(dist, 'precache-manifest.json'), JSON.stringify({version, files: list, hashes}));
       // Versi ditulis ke sw.js agar browser memasang service worker baru setiap ada build baru
       const swPath = path.join(dist, 'sw.js');
       if (fs.existsSync(swPath)) {
