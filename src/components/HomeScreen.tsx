@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * Beranda aplikasi (mode lokal): satu tombol untuk masuk lab + tombol Kebijakan Privasi.
@@ -15,6 +15,7 @@ const FEATURES: { title: string; desc: string; path: string }[] = [
 
 export function HomeScreen({ onStart }: { onStart: () => void }) {
   const [privacy, setPrivacy] = useState(false);
+  const offline = useOfflineStatus();
 
   return (
     <div className="fixed inset-0 z-[9000] overflow-y-auto pointer-events-auto text-white" style={{ background: "radial-gradient(1200px 700px at 20% -10%, #12305c 0%, #0b1220 55%, #060a14 100%)" }}>
@@ -65,6 +66,11 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
             </button>
           </div>
           <p className="mt-2.5 text-[11px] sm:text-xs text-slate-400">Tanpa login · tanpa internet setelah dibuka pertama kali</p>
+          {offline && (
+            <p id="home-offline-status" className={`mt-1 text-[11px] sm:text-xs font-bold ${offline.ready ? "text-emerald-300" : "text-amber-300"}`}>
+              {offline.ready ? "✓ Siap dipakai tanpa internet" : `Menyimpan untuk offline… ${Math.round((offline.done / Math.max(1, offline.total)) * 100)}% — biarkan terbuka sebentar`}
+            </p>
+          )}
 
           {/* HP mendatar (layar pendek): kartu fitur disembunyikan agar tidak perlu menggulir */}
           <div className="mt-5 sm:mt-9 grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 [@media(max-height:520px)]:hidden">
@@ -101,4 +107,30 @@ export function HomeScreen({ onStart }: { onStart: () => void }) {
       )}
     </div>
   );
+}
+
+/** Kemajuan penyimpanan offline dari service worker (public/sw.js). */
+function useOfflineStatus() {
+  const [st, setSt] = useState<{ done: number; total: number; ready: boolean } | null>(() => {
+    try {
+      return localStorage.getItem("evlab_offline_ready") === "1" ? { done: 1, total: 1, ready: true } : null;
+    } catch {
+      return null;
+    }
+  });
+  useEffect(() => {
+    const sw = navigator.serviceWorker;
+    if (!sw) return;
+    const on = (e: MessageEvent) => {
+      if (e.data?.type !== "offline-progress") return;
+      const ready = e.data.done >= e.data.total;
+      setSt({ done: e.data.done, total: e.data.total, ready });
+      try {
+        localStorage.setItem("evlab_offline_ready", ready ? "1" : "0");
+      } catch {}
+    };
+    sw.addEventListener("message", on);
+    return () => sw.removeEventListener("message", on);
+  }, []);
+  return st;
 }
