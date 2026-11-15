@@ -497,6 +497,11 @@ const QUESTIONS: Question[] = [
   { q: "Mobil listrik memakai 15 kWh per 100 km dengan tarif Rp 2.466/kWh. Biaya per km kira-kira…", options: ["± Rp 370", "± Rp 800", "± Rp 2.466", "± Rp 37"], answer: 0, why: "15 kWh : 100 km × Rp 2.466 ≈ Rp 370 per km." },
   { q: "Urutan perakitan yang benar adalah…", options: ["Rangka → baterai → motor → inverter → kabel → bodi", "Bodi → baterai → rangka → motor", "Motor → bodi → rangka → baterai", "Kabel → bodi → rangka → inverter"], answer: 0, why: "Komponen dipasang dari dasar (rangka) ke atas; bodi diturunkan paling akhir." },
   { q: "Bodi mobil diturunkan ke rangka dengan alat…", options: ["Derek gantri dengan katrol dan sabuk angkat", "Dongkrak botol", "Kunci momen", "Multimeter"], answer: 0, why: "Bodi yang berat diangkat dan diturunkan perlahan memakai derek dan sabuk angkat." },
+  // e-Axle 8-in-1: PDU, VCU, integrasi
+  { q: "Pada e-Axle 8-in-1, komponen yang termasuk kelompok KENDALI adalah…", options: ["VCU dan BMS", "Motor dan reducer", "OBC dan DC-DC", "Ban dan velg"], answer: 0, why: "VCU dan BMS mengatur kerja sistem lewat sinyal; motor, inverter, dan reducer adalah penggerak." },
+  { q: "Fungsi PDU (Power Distribution Unit) adalah…", options: ["Membagi dan mengamankan arus tegangan tinggi ke tiap komponen", "Mengisi aki 12 V", "Mengubah DC menjadi AC 3 fasa", "Menurunkan putaran motor"], answer: 0, why: "PDU berisi relai utama, pra-isi, dan sekring yang membagi arus baterai ke inverter, OBC, DC-DC, AC, dan pemanas." },
+  { q: "VCU memerintah inverter untuk memberi torsi negatif saat…", options: ["Pengemudi melepas gas atau menginjak rem (regeneratif)", "Mobil diparkir", "Baterai sedang diisi AC", "Lampu dinyalakan"], answer: 0, why: "Torsi negatif membuat motor menjadi generator dan mengisi baterai." },
+  { q: "Keuntungan utama menyatukan delapan modul dalam satu e-Axle adalah…", options: ["Lebih ringan, ringkas, dan kabel tegangan tinggi lebih pendek", "Perbaikan selalu lebih murah", "Tidak perlu pendingin", "Baterai menjadi lebih besar"], answer: 0, why: "Integrasi mengurangi bobot, ukuran, dan kabel; kekurangannya perbaikan bisa berarti mengganti satu unit besar." },
 ];
 
 const BTN_W = 1.02;

@@ -36,7 +36,7 @@ export const CPL: Cpl[] = [
 
 export const CPMK: Cpmk[] = [
   { id: "CPMK-1", cpl: "CPL-1", text: "Menjelaskan bahaya tegangan tinggi dan menerapkan APD serta urutan kerja aman.", indicator: "Menyebutkan APD, langkah pemutusan tegangan, dan tindakan darurat dengan benar." },
-  { id: "CPMK-2", cpl: "CPL-2", text: "Menjelaskan fungsi baterai traksi, motor listrik, inverter, DC-DC converter, dan alur energinya.", indicator: "Mengidentifikasi komponen dan arah aliran energi saat melaju dan saat mengerem." },
+  { id: "CPMK-2", cpl: "CPL-2", text: "Menjelaskan fungsi baterai traksi, motor listrik, inverter, reducer, OBC, DC-DC, PDU, VCU, BMS (e-Axle 8-in-1), dan alur energinya.", indicator: "Mengidentifikasi komponen dan arah aliran energi saat melaju dan saat mengerem." },
   { id: "CPMK-3", cpl: "CPL-2", text: "Membandingkan konstruksi dan efisiensi kendaraan listrik dengan kendaraan bermesin bensin.", indicator: "Menjelaskan perbedaan komponen, perawatan, dan efisiensi kedua jenis kendaraan." },
   { id: "CPMK-4", cpl: "CPL-3", text: "Memeriksa sel baterai, menghitung rangkaian seri/paralel, menyeimbangkan sel, dan menjelaskan pendinginannya.", indicator: "Mengukur tegangan sel, mengganti sel rusak, merangkai sesuai target, dan memilih mode pendinginan." },
   { id: "CPMK-5", cpl: "CPL-3", text: "Merakit komponen kendaraan listrik sesuai urutan perakitan yang benar.", indicator: "Menyusun rangka, baterai, motor, inverter, kabel, dan bodi dengan urutan tepat." },
@@ -68,7 +68,7 @@ export const MEETINGS: Meeting[] = [
   { no: 4, topic: "Baterai traksi: sel, seri/paralel, dan perhitungan kWh", cpmk: ["CPMK-4"], modules: ["baterai"], acts: [], method: "Baca modul, latihan hitung di papan baterai" },
   { no: 5, topic: "BMS, penyeimbangan sel, dan praktik baterai", cpmk: ["CPMK-4"], modules: [], acts: ["baterai"], method: "Praktik di meja baterai" },
   { no: 6, topic: "Manajemen termal: pendinginan baterai", cpmk: ["CPMK-4"], modules: ["termal"], acts: ["pendingin"], method: "Baca modul, simulasi 4 skenario" },
-  { no: 7, topic: "Motor listrik, inverter, dan gigi reduksi", cpmk: ["CPMK-2"], modules: ["penggerak"], acts: [], method: "Baca modul, amati motor & inverter" },
+  { no: 7, topic: "Motor listrik, inverter, reducer, dan e-Axle 8-in-1 (PDU, VCU)", cpmk: ["CPMK-2"], modules: ["penggerak"], acts: [], method: "Baca modul, amati motor & inverter" },
   { no: 8, topic: "Ujian Tengah Semester (UTS)", cpmk: ["CPMK-1", "CPMK-2", "CPMK-4"], modules: [], acts: [], quizRounds: 1, method: "Kuis di kios (1 ronde)" },
   { no: 9, topic: "Rem regeneratif: cara kerja dan alur energi", cpmk: ["CPMK-2"], modules: ["regen"], acts: [], method: "Baca modul, amati mobil di lintasan uji" },
   { no: 10, topic: "Perbandingan EV dengan kendaraan bermesin bensin", cpmk: ["CPMK-3"], modules: ["perbandingan"], acts: ["pembanding"], method: "Baca modul, kunjungi bengkel pembanding" },
@@ -86,7 +86,7 @@ export const MODULE_TITLES: Record<string, string> = {
   komponen: "Komponen Utama BEV",
   baterai: "Baterai Traksi",
   termal: "Pendinginan Baterai",
-  penggerak: "Motor Listrik & Inverter",
+  penggerak: "Motor, Inverter & e-Axle 8-in-1",
   regen: "Rem Regeneratif",
   perbandingan: "EV vs Mobil Bensin",
   pengisian: "Pengisian Daya EV",
@@ -116,6 +116,7 @@ export const QUIZ_CPMK: number[] = [
   4, 4, 4, 4, 4, 4, // 33–38 baterai
   1, 1, 1, 1, // 39–42 K3
   2, 2, 4, 6, 5, 5, // 43–48 materi tambahan
+  2, 2, 2, 2, // 49–52 e-Axle 8-in-1
 ];
 export const quizCpmk = (q: number) => `CPMK-${QUIZ_CPMK[q] ?? 2}`;
 
