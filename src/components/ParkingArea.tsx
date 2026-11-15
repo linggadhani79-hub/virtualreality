@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { disableRaycast, fitModel, loadGlb, roundedRectShape, wrapText } from "../lib/glb";
 import { modelUrl } from "../lib/quality";
 import { playVRClickSound } from "../lib/vrAudio";
@@ -22,12 +23,18 @@ import { InfoSign, Scenery, StaticModel } from "./LabStations";
  */
 
 const noRaycast = () => null;
+const portRay = new THREE.Raycaster();
+const _v = new THREE.Vector3();
+const _dir = new THREE.Vector3();
 
 /** Pusat area (X, Z) dan ukuran jalan lingkar (garis tengah): setengah lebar, setengah panjang, jari-jari sudut. */
 export const PARKING = { cx: -47.5, cz: 5, hx: 14, hz: 15, r: 6, road: 5 };
-const GROUND_W = PARKING.hx * 2 + PARKING.road; // 27 m (X)
+const GROUND_W = PARKING.hx * 2 + PARKING.road; // 33 m (X)
 const GROUND_D = PARKING.hz * 2 + PARKING.road; // 29 m (Z)
 const X0 = PARKING.cx - GROUND_W / 2;
+/** Simpang ke lintasan uji: tepi aspal parkir (xPark) ke tepi aspal lintasan (xTrack), setengah
+ *  lebar jalur `hw`, jari-jari lengkung mulut simpang `r`. Bidang teksturnya w × d meter. */
+const JUNCTION = { xPark: X0 + GROUND_W, xTrack: X0 + GROUND_W + 3, hw: 2.6, r: 1.4, x0: X0 + GROUND_W - 0.5, w: 4, d: 8 };
 const Z0 = PARKING.cz - GROUND_D / 2;
 
 const ASSUMPTIONS = {
@@ -117,28 +124,34 @@ function drawGround(ctx: CanvasRenderingContext2D, W: number, H: number) {
   const ppm = W / GROUND_W;
   const X = (x: number) => (x - X0) * ppm;
   const Z = (z: number) => (z - Z0) * ppm;
-  ctx.fillStyle = "#2f3136";
-  ctx.fillRect(0, 0, W, H);
-  let seed = 23;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  for (let i = 0; i < 16000; i++) {
-    const v = 36 + Math.floor(rnd() * 50);
-    ctx.fillStyle = `rgba(${v},${v},${v + 5},0.55)`;
-    ctx.fillRect(rnd() * W, rnd() * H, 1.6, 1.6);
-  }
-
-  // jalan lingkar: pita lebih gelap + garis tepi putih + garis tengah putus-putus kuning
+  // Tepi aspal mengikuti lengkung jalan (sudutnya bening), supaya tidak ada sudut aspal yang
+  // menonjol keluar tikungan. Warna dasar sama dengan lintasan uji agar sambungannya tidak belang.
   const { cx, cz, hx, hz, r, road } = PARKING;
+  ctx.clearRect(0, 0, W, H);
+  ctx.beginPath();
+  (ctx as any).roundRect(0, 0, W, H, (r + road / 2) * ppm);
+  ctx.fillStyle = "#2a2c30";
+  ctx.fill();
+  ctx.save();
+  ctx.clip();
   const ring = (inset: number) => {
     const rr = Math.max(0.1, r - inset);
     ctx.beginPath();
     (ctx as any).roundRect(X(cx - hx + inset), Z(cz - hz + inset), (hx - inset) * 2 * ppm, (hz - inset) * 2 * ppm, rr * ppm);
   };
   ctx.lineJoin = "round";
+  // jalan lingkar: sedikit lebih gelap (bekas lintasan ban), lalu butiran aspal di atas semuanya
   ring(0);
-  ctx.strokeStyle = "#232529";
-  ctx.lineWidth = road * ppm;
+  ctx.strokeStyle = "rgba(0,0,0,0.09)";
+  ctx.lineWidth = (road - 0.5) * ppm;
   ctx.stroke();
+  let seed = 23;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 22000; i++) {
+    const v = 34 + Math.floor(rnd() * 44);
+    ctx.fillStyle = `rgba(${v},${v},${v + 4},0.6)`;
+    ctx.fillRect(rnd() * W, rnd() * H, 1.6, 1.6);
+  }
   for (const inset of [-road / 2 + 0.15, road / 2 - 0.15]) {
     ring(inset);
     ctx.strokeStyle = "#f1f5f9";
@@ -189,6 +202,7 @@ function drawGround(ctx: CanvasRenderingContext2D, W: number, H: number) {
   ctx.strokeStyle = "#facc15";
   ctx.lineWidth = 0.14 * ppm;
   ctx.strokeRect(X(STATION.x - sw / 2), Z(STATION.z - sd / 2), sw * ppm, sd * ppm);
+  ctx.restore();
 }
 
 /* ---------------- label meteran di atas mobil ---------------- */
@@ -465,7 +479,8 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
     });
     return spbu.curve.dist[best];
   }, [spbu]);
-  const cableRefs = useRef<(THREE.Mesh | null)[]>([]);
+  const plugRefs = useRef<(THREE.Group | null)[]>([]);
+  const holsterRefs = useRef<(THREE.Group | null)[]>([]);
   const fleet = useRef({ active: 0 as 0 | 1, phase: "drive" as "drive" | "return" | "depart", phaseDist: 0, departTimer: 0 });
   const travelled = useRef(0); // meter di lintasan
   if (import.meta.env.DEV) (window as any).__parking = { states: states.current, energy: energy.current, lastFill: lastFill.current, fleet: fleet.current };
@@ -795,8 +810,32 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
           x.amt += add;
         }
         x.active = charging;
-        const cb = cableRefs.current[ci];
-        if (cb) cb.visible = st.mode === "parked";
+        // konektor baru dicolokkan setelah model mobilnya selesai dimuat
+        const parked = st.mode === "parked" && !!carObjects[i];
+        const plug = plugRefs.current[ci];
+        const holster = holsterRefs.current[ci];
+        if (holster) holster.visible = !parked;
+        if (plug) {
+          plug.visible = parked;
+          // sekali per mobil: cari sisi bodi di titik lubang cas supaya konektor menempel pas
+          const carGroup = carRefs.current[i];
+          if (parked && carGroup && carObjects[i] && !plug.userData.fitted) {
+            plug.userData.fitted = true;
+            const c = CHARGERS[ci];
+            portRay.set(_v.set(c.x, PORT.y, PORT.z), _dir.set(-1, 0, 0));
+            portRay.far = 1.4;
+            const hits: THREE.Intersection[] = [];
+            carGroup.updateWorldMatrix(true, true);
+            carGroup.traverse((o) => {
+              if ((o as THREE.Mesh).isMesh) THREE.Mesh.prototype.raycast.call(o, portRay, hits);
+            });
+            if (hits.length) {
+              const tipX = Math.min(...hits.map((h) => c.x - h.distance)) - 0.02;
+              (plug.children[0] as THREE.Mesh).geometry = plugCable(c.x, c.z, tipX);
+              plug.children[1].position.x = tipX;
+            }
+          }
+        }
       }
 
       // roda menggelinding sesuai jarak tempuh
@@ -831,35 +870,68 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
   };
 
   const junction = useMemo(() => {
+    // Mulut simpang melebar dengan lengkung (jari-jari JUNCTION.r) di keempat sudut, seperti simpang
+    // jalan sungguhan. Di luar bentuk itu teksturnya bening, jadi rumput tetap terlihat.
     const c = document.createElement("canvas");
-    c.width = 256;
-    c.height = 320;
+    const ppm = 64;
+    c.width = JUNCTION.w * ppm;
+    c.height = JUNCTION.d * ppm;
     const ctx = c.getContext("2d")!;
+    const { r, hw, w, d } = JUNCTION;
+    const xa = (JUNCTION.xPark - JUNCTION.x0) * ppm; // tepi aspal parkir
+    const xb = (JUNCTION.xTrack - JUNCTION.x0) * ppm; // tepi aspal lintasan uji
+    const zc = (d / 2) * ppm;
+    const R = r * ppm;
+    const shape = (grow: number) => {
+      // badan simpang + empat lengkung cekung; `grow` menggeser tepi (untuk garis putih)
+      const rr = R + grow;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(xa, 0);
+      ctx.arc(xa + R, zc - hw * ppm - R, rr, Math.PI, Math.PI / 2, true);
+      ctx.arc(xb - R, zc - hw * ppm - R, rr, Math.PI / 2, 0, true);
+      ctx.lineTo(w * ppm, 0);
+      ctx.lineTo(w * ppm, d * ppm);
+      ctx.lineTo(xb, d * ppm);
+      ctx.arc(xb - R, zc + hw * ppm + R, rr, 0, -Math.PI / 2, true);
+      ctx.arc(xa + R, zc + hw * ppm + R, rr, -Math.PI / 2, Math.PI, true);
+      ctx.lineTo(0, d * ppm);
+      ctx.closePath();
+    };
+    shape(0);
     ctx.fillStyle = "#2a2c30";
-    ctx.fillRect(0, 0, 256, 320);
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
     let seed = 23;
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-    for (let i = 0; i < 5200; i++) {
+    for (let i = 0; i < (5200 * c.width * c.height) / (256 * 320); i++) {
       const v = 34 + Math.floor(rnd() * 44);
       ctx.fillStyle = `rgba(${v},${v},${v + 4},0.6)`;
-      ctx.fillRect(rnd() * 256, rnd() * 320, 1.6, 1.6);
+      ctx.fillRect(rnd() * c.width, rnd() * c.height, 1.6, 1.6);
     }
-    // garis tepi di dua sisi simpang, melengkung keluar di kedua ujung (mulut simpang melebar)
+    // garis tepi putih mengikuti lengkung, menyambung ke garis tepi kedua jalan
     ctx.strokeStyle = "#f1f5f9";
-    ctx.lineWidth = 8;
-    ctx.lineCap = "round";
-    for (const y of [16, 304]) {
-      const out = y < 160 ? -1 : 1;
+    ctx.lineWidth = 0.13 * ppm;
+    const edge = 0.15 * ppm;
+    for (const sgn of [-1, 1]) {
+      const zk = zc + sgn * (hw * ppm + R);
       ctx.beginPath();
-      ctx.moveTo(4, y + out * 14);
-      ctx.quadraticCurveTo(22, y, 46, y);
-      ctx.lineTo(210, y);
-      ctx.quadraticCurveTo(234, y, 252, y + out * 14);
+      if (sgn < 0) {
+        ctx.arc(xa + R, zk, R + edge, Math.PI, Math.PI / 2, true);
+        ctx.arc(xb - R, zk, R + edge, Math.PI / 2, 0, true);
+      } else {
+        ctx.arc(xa + R, zk, R + edge, Math.PI, Math.PI * 1.5, false);
+        ctx.arc(xb - R, zk, R + edge, Math.PI * 1.5, Math.PI * 2, false);
+      }
       ctx.stroke();
     }
-    // garis henti sebelum masuk lintasan uji
+    // garis henti sebelum masuk lintasan uji + garis tengah pendek
     ctx.fillStyle = "#f1f5f9";
-    ctx.fillRect(196, 168, 10, 122);
+    ctx.fillRect(xb - 0.75 * ppm, zc + 0.12 * ppm, 0.3 * ppm, (hw - 0.45) * ppm);
+    ctx.fillStyle = "#facc15";
+    ctx.fillRect(xa + 0.5 * ppm, zc - 0.05 * ppm, xb - xa - 1.6 * ppm, 0.1 * ppm);
+    ctx.restore();
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 8;
@@ -872,13 +944,13 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
       {/* tanah beraspal + sambungan ke lintasan uji */}
       <mesh position={[PARKING.cx, 0.02, PARKING.cz]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
         <planeGeometry args={[GROUND_W, GROUND_D]} />
-        <meshStandardMaterial map={ground} roughness={0.95} metalness={0.02} />
+        <meshStandardMaterial map={ground} roughness={0.95} metalness={0.02} alphaTest={0.5} />
       </mesh>
       {/* Persimpangan ke lintasan uji: aspal bertekstur sama, bergaris tepi sendiri, dan menutup
           garis tepi kedua jalan di mulut simpang supaya sambungannya tidak terpotong garis putih. */}
-      <mesh position={[X0 + GROUND_W + 1.45, 0.046, PARKING.cz]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
-        <planeGeometry args={[4.3, 5.4]} />
-        <meshStandardMaterial map={junction} roughness={0.95} metalness={0} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
+      <mesh position={[JUNCTION.x0 + JUNCTION.w / 2, 0.046, PARKING.cz]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
+        <planeGeometry args={[JUNCTION.w, JUNCTION.d]} />
+        <meshStandardMaterial map={junction} roughness={0.95} metalness={0} alphaTest={0.5} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
       </mesh>
 
       {/* armada: sepasang berjalan, sepasang parkir, bergantian */}
@@ -969,44 +1041,77 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
       {CHARGERS.map((c, k) => (
         <group key={c.bay}>
           <group position={[c.x, 0, c.z]}>
-            <mesh position={[0, 0.8, 0]} raycast={noRaycast}>
-              <boxGeometry args={[0.32, 1.6, 0.26]} />
-              <meshStandardMaterial color="#f8fafc" roughness={0.4} />
+            {/* alas beton + badan membulat */}
+            <mesh geometry={chargerPlinth} position={[0, 0.05, 0]} raycast={noRaycast}>
+              <meshStandardMaterial color="#9ca3af" roughness={0.9} />
             </mesh>
-            <mesh position={[0, 1.62, 0]} raycast={noRaycast}>
-              <boxGeometry args={[0.36, 0.06, 0.3]} />
-              <meshStandardMaterial color="#16a34a" emissive="#16a34a" emissiveIntensity={0.6} />
+            <mesh geometry={chargerBody} position={[0, 0.83, 0]} raycast={noRaycast}>
+              <meshStandardMaterial color="#f1f5f9" roughness={0.35} metalness={0.1} />
             </mesh>
-            {/* layar menghadap selatan (ke arah pemain yang datang dari belakang mobil) */}
-            <group position={[0, 2.25, 0]}>
-              <mesh position={[0, 0, -0.03]} raycast={noRaycast}>
-                <boxGeometry args={[1.1, 0.58, 0.05]} />
-                <meshStandardMaterial color="#111827" />
+            <mesh geometry={chargerCap} position={[0, 1.575, 0]} raycast={noRaycast}>
+              <meshStandardMaterial color="#16a34a" emissive="#16a34a" emissiveIntensity={0.7} roughness={0.4} />
+            </mesh>
+            {/* muka depan (menghadap pemain): kaca gelap, layar kecil, lampu status, soket */}
+            <mesh position={[0, 1.08, 0.131]} raycast={noRaycast}>
+              <boxGeometry args={[0.27, 0.74, 0.012]} />
+              <meshStandardMaterial color="#0b1220" roughness={0.15} metalness={0.6} />
+            </mesh>
+            <mesh position={[0, 1.3, 0.139]} raycast={noRaycast}>
+              <planeGeometry args={[0.24, 0.12]} />
+              <meshBasicMaterial map={screens[k + 1].texture} toneMapped={false} />
+            </mesh>
+            {[-0.155, 0.155].map((x) => (
+              <mesh key={x} position={[x, 0.86, 0.131]} raycast={noRaycast}>
+                <boxGeometry args={[0.018, 1.2, 0.012]} />
+                <meshBasicMaterial color="#22c55e" toneMapped={false} />
               </mesh>
-              <mesh raycast={noRaycast}>
-                <planeGeometry args={[1.04, 0.52]} />
+            ))}
+            <mesh position={[0, 0.95, 0.145]} rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast}>
+              <cylinderGeometry args={[0.055, 0.055, 0.03, 16]} />
+              <meshStandardMaterial color="#1f2937" roughness={0.5} />
+            </mesh>
+            {/* layar besar di atas tiang (terbaca dari jauh), dua muka */}
+            <mesh position={[0, 1.8, -0.06]} raycast={noRaycast}>
+              <boxGeometry args={[0.09, 0.42, 0.06]} />
+              <meshStandardMaterial color="#cbd5e1" metalness={0.6} roughness={0.35} />
+            </mesh>
+            <group position={[0, 2.28, -0.06]}>
+              <mesh geometry={chargerHead} raycast={noRaycast}>
+                <meshStandardMaterial color="#111827" roughness={0.4} metalness={0.4} />
+              </mesh>
+              <mesh position={[0, 0, 0.037]} raycast={noRaycast}>
+                <planeGeometry args={[1.06, 0.53]} />
                 <meshBasicMaterial map={screens[k + 1].texture} toneMapped={false} />
               </mesh>
-              <mesh position={[0, 0, -0.06]} rotation={[0, Math.PI, 0]} raycast={noRaycast}>
-                <planeGeometry args={[1.04, 0.52]} />
+              <mesh position={[0, 0, -0.037]} rotation={[0, Math.PI, 0]} raycast={noRaycast}>
+                <planeGeometry args={[1.06, 0.53]} />
                 <meshBasicMaterial map={screens[k + 1].texture} toneMapped={false} />
               </mesh>
             </group>
-            <mesh position={[0, 1.95, 0]} raycast={noRaycast}>
-              <cylinderGeometry args={[0.03, 0.03, 0.12, 8]} />
-              <meshStandardMaterial color="#111827" />
-            </mesh>
+            {/* konektor tergantung di tiang saat tidak ada mobil yang mengisi */}
+            <group
+              ref={(g) => {
+                holsterRefs.current[k] = g;
+              }}
+            >
+              <mesh geometry={holsterCable} raycast={noRaycast}>
+                <meshStandardMaterial color="#111827" roughness={0.6} />
+              </mesh>
+              <ChargeGun position={[0, 0.95, 0.15]} rotation={-Math.PI / 2} />
+            </group>
           </group>
-          {/* kabel cas ke moncong mobil */}
-          <mesh
-            ref={(m) => {
-              cableRefs.current[k] = m;
+          {/* saat mobil parkir: kabel dari tiang ke lubang cas di spatbor depan mobil */}
+          <group
+            visible={false}
+            ref={(g) => {
+              plugRefs.current[k] = g;
             }}
-            raycast={noRaycast}
-            geometry={chargeCable(c.x, c.z, BAYS[c.bay].x)}
           >
-            <meshStandardMaterial color="#111827" roughness={0.6} />
-          </mesh>
+            <mesh raycast={noRaycast} geometry={plugCable(c.x, c.z, BAYS[c.bay].x + PORT.side)}>
+              <meshStandardMaterial color="#111827" roughness={0.6} />
+            </mesh>
+            <ChargeGun position={[BAYS[c.bay].x + PORT.side, PORT.y, PORT.z]} rotation={0} />
+          </group>
         </group>
       ))}
       <InfoSign
@@ -1060,18 +1165,60 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
   );
 }
 
+/* ---------------- tiang cas ---------------- */
+
+/** Lubang cas di spatbor depan kanan mobil (di belakang lengkung roda): tinggi, posisi Z, dan
+ *  perkiraan jarak sisi bodi dari tengah petak (dipertepat dengan menembak sinar ke bodi mobil). */
+const PORT = { y: 0.9, z: BAY_Z - 0.62, side: 0.95 };
+
+const chargerPlinth = new RoundedBoxGeometry(0.6, 0.1, 0.46, 2, 0.02);
+const chargerBody = new RoundedBoxGeometry(0.36, 1.46, 0.26, 3, 0.05);
+const chargerCap = new RoundedBoxGeometry(0.38, 0.07, 0.28, 2, 0.03);
+const chargerHead = new RoundedBoxGeometry(1.14, 0.62, 0.074, 3, 0.03);
+const gunBarrel = new THREE.CylinderGeometry(0.034, 0.03, 0.17, 14).rotateZ(Math.PI / 2).translate(0.085, 0, 0);
+const gunHandle = new RoundedBoxGeometry(0.05, 0.15, 0.046, 2, 0.018).rotateZ(-0.35).translate(0.175, -0.06, 0);
+/** Kabel menggantung di muka tiang (koordinat lokal tiang) saat konektor disimpan. */
+const holsterCable = new THREE.TubeGeometry(
+  new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0.11, 0.62, 0.13),
+    new THREE.Vector3(0.12, 0.42, 0.2),
+    new THREE.Vector3(0.05, 0.26, 0.25),
+    new THREE.Vector3(-0.03, 0.5, 0.3),
+    new THREE.Vector3(-0.045, 0.82, 0.325),
+  ]),
+  24,
+  0.02,
+  8,
+);
+
+/** Konektor cas; titik asal = ujung yang masuk ke lubang cas, badannya memanjang ke +X lokal. */
+function ChargeGun({ position, rotation }: { position: [number, number, number]; rotation: number }) {
+  return (
+    <group name="Parking_gun" position={position} rotation={[0, rotation, 0]}>
+      <mesh geometry={gunBarrel} raycast={noRaycast}>
+        <meshStandardMaterial color="#1f2937" roughness={0.45} />
+      </mesh>
+      <mesh geometry={gunHandle} raycast={noRaycast}>
+        <meshStandardMaterial color="#16a34a" roughness={0.5} />
+      </mesh>
+    </group>
+  );
+}
+
 const cableCache = new Map<string, THREE.TubeGeometry>();
-function chargeCable(px: number, pz: number, bayX: number) {
-  const key = `${px},${pz}`;
+/** Kabel dari soket tiang, melandai ke lantai, lalu naik ke gagang konektor di sisi mobil. */
+function plugCable(px: number, pz: number, tipX: number) {
+  const key = `${px},${pz},${tipX.toFixed(3)}`;
   let g = cableCache.get(key);
   if (!g) {
     const pts = [
-      new THREE.Vector3(px, 1.2, pz + 0.14),
-      new THREE.Vector3(px - 0.15, 0.35, pz + 0.5),
-      new THREE.Vector3(bayX + 0.7, 0.45, pz + 0.95),
-      new THREE.Vector3(bayX + 0.55, 0.8, pz + 1.05),
+      new THREE.Vector3(px + 0.11, 0.62, pz + 0.13),
+      new THREE.Vector3(px + 0.12, 0.3, pz + 0.3),
+      new THREE.Vector3(px + 0.02, 0.07, pz + 0.7),
+      new THREE.Vector3(tipX + 0.3, 0.2, PORT.z - 0.12),
+      new THREE.Vector3(tipX + 0.215, PORT.y - 0.13, PORT.z),
     ];
-    g = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.025, 8);
+    g = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 28, 0.02, 8);
     cableCache.set(key, g);
   }
   return g;

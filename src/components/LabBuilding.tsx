@@ -93,6 +93,41 @@ function drawPavers(ctx: CanvasRenderingContext2D, w: number, h: number) {
     }
 }
 
+/** Plafon kanopi: panel aluminium bersambung + dua baris lampu tanam. */
+function drawSoffit(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  ctx.fillStyle = "#dde3ea";
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = "#b6bec9";
+  ctx.lineWidth = 2;
+  for (let x = 0; x <= w; x += w / 12) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.moveTo(0, h / 2);
+  ctx.lineTo(w, h / 2);
+  ctx.stroke();
+  for (const y of [h * 0.27, h * 0.73])
+    for (let i = 0; i < 6; i++) {
+      const x = (w / 6) * (i + 0.5);
+      const g = ctx.createRadialGradient(x, y, 2, x, y, 30);
+      g.addColorStop(0, "#ffffff");
+      g.addColorStop(0.35, "#fff7d6");
+      g.addColorStop(1, "rgba(255,247,214,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(x - 30, y - 30, 60, 60);
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(x, y, 9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+}
+
+const pillarShaft = new RoundedBoxGeometry(0.28, 4.42, 0.28, 3, 0.05);
+const pillarBase = new RoundedBoxGeometry(0.5, 0.42, 0.5, 2, 0.04);
+const collarGeometry = new THREE.CylinderGeometry(0.31, 0.31, 1, 24);
 const columnGeometry = new THREE.CylinderGeometry(0.36, 0.36, 1, 20);
 const bollardGeometry = new THREE.CapsuleGeometry(0.09, 0.62, 4, 14);
 
@@ -106,6 +141,7 @@ export function LabBuilding({ hall }: { hall: Hall }) {
   const roofTex = useDrawn(256, 8, drawRoof, [D / 4, 1]);
   const signTex = useDrawn(2048, 208, drawEntranceSign);
   const paverTex = useDrawn(256, 256, drawPavers, [5, 6]);
+  const soffitTex = useDrawn(1024, 256, drawSoffit);
 
   // Tanah: ubin dari aset lantai taman, disambung bercermin
   const ground = useMemo(() => {
@@ -131,7 +167,7 @@ export function LabBuilding({ hall }: { hall: Hall }) {
     return new THREE.ShapeGeometry(s, 32);
   }, []);
   const fascia = useMemo(() => new RoundedBoxGeometry(0.5, 0.42, D + 1.9, 3, 0.12), [D]);
-  const canopy = useMemo(() => new RoundedBoxGeometry(12, 0.24, 3.0, 3, 0.1), []);
+  const canopy = useMemo(() => new RoundedBoxGeometry(12.5, 0.18, 3.4, 3, 0.08), []);
   useEffect(
     () => () => {
       roof.dispose();
@@ -234,25 +270,79 @@ export function LabBuilding({ hall }: { hall: Hall }) {
           </mesh>
         </group>
       ))}
-      {/* kusen pintu membulat */}
+      {/* kusen pintu membulat + cincin baja di kaki dan kepala */}
       {[-5.2, 5.2].map((x) => (
-        <mesh key={x} geometry={columnGeometry} position={[x, 2.4, hall.z1 + T]} scale={[0.75, 4.8, 0.75]} raycast={noRaycast}>
+        <group key={x} position={[x, 0, hall.z1 + T]}>
+          <mesh geometry={columnGeometry} position={[0, 2.4, 0]} scale={[0.75, 4.8, 0.75]} raycast={noRaycast}>
+            <meshStandardMaterial color="#1e3a8a" metalness={0.5} roughness={0.4} />
+          </mesh>
+          {[0.2, 4.62].map((y, i) => (
+            <mesh key={y} geometry={collarGeometry} position={[0, y, 0]} scale={[1, i ? 0.22 : 0.4, 1]} raycast={noRaycast}>
+              <meshStandardMaterial color="#cbd5e1" metalness={0.85} roughness={0.28} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+      {/* ambang pintu baja: sambungan lantai dalam dengan paving luar */}
+      <mesh position={[0, 0.012, hall.z1 + T / 2]} raycast={noRaycast}>
+        <boxGeometry args={[10, 0.024, T + 0.16]} />
+        <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.35} />
+      </mesh>
+      {/* kanopi: dek biru, lis aluminium bergaris lampu sian, plafon berlampu tanam */}
+      <group position={[0, 0, hall.z1 + T + 1.7]}>
+        <mesh geometry={canopy} position={[0, 5.0, 0]} raycast={noRaycast}>
           <meshStandardMaterial color="#1e3a8a" metalness={0.5} roughness={0.4} />
         </mesh>
-      ))}
-      {/* kanopi + tiang */}
-      <mesh geometry={canopy} position={[0, 4.95, hall.z1 + T + 1.5]} raycast={noRaycast}>
-        <meshStandardMaterial color="#1e3a8a" metalness={0.5} roughness={0.4} />
-      </mesh>
-      <mesh position={[0, 4.82, hall.z1 + T + 1.5]} rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast}>
-        <planeGeometry args={[11.4, 2.6]} />
-        <meshBasicMaterial color="#f8fafc" toneMapped={false} />
-      </mesh>
-      {[-5.6, 5.6].map((x) => (
-        <mesh key={x} position={[x, 2.42, hall.z1 + T + 2.75]} raycast={noRaycast}>
-          <cylinderGeometry args={[0.11, 0.13, 4.84, 16]} />
-          <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.3} />
+        <mesh position={[0, 4.94, 1.7]} raycast={noRaycast}>
+          <boxGeometry args={[12.56, 0.32, 0.08]} />
+          <meshStandardMaterial color="#e2e8f0" metalness={0.7} roughness={0.3} />
         </mesh>
+        <mesh position={[0, 4.94, 1.745]} raycast={noRaycast}>
+          <boxGeometry args={[12.3, 0.05, 0.012]} />
+          <meshBasicMaterial color="#22d3ee" toneMapped={false} />
+        </mesh>
+        {[-6.25, 6.25].map((x) => (
+          <mesh key={x} position={[x, 4.94, 0]} raycast={noRaycast}>
+            <boxGeometry args={[0.08, 0.32, 3.4]} />
+            <meshStandardMaterial color="#e2e8f0" metalness={0.7} roughness={0.3} />
+          </mesh>
+        ))}
+        <mesh position={[0, 4.895, 0]} rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast}>
+          <planeGeometry args={[12.4, 3.36]} />
+          <meshBasicMaterial map={soffitTex} toneMapped={false} />
+        </mesh>
+        {/* batang tarik dari dinding ke tepi depan kanopi */}
+        {[-5.95, 5.95].map((x) => (
+          <group key={x}>
+            <mesh position={[x, 5.87, 0]} rotation={[2.0225, 0, 0]} raycast={noRaycast}>
+              <cylinderGeometry args={[0.035, 0.035, 3.78, 10]} />
+              <meshStandardMaterial color="#cbd5e1" metalness={0.85} roughness={0.3} />
+            </mesh>
+            <mesh position={[x, 6.7, -1.66]} raycast={noRaycast}>
+              <boxGeometry args={[0.2, 0.26, 0.06]} />
+              <meshStandardMaterial color="#475569" metalness={0.7} roughness={0.4} />
+            </mesh>
+          </group>
+        ))}
+      </group>
+      {/* tiang kanopi: alas beton, batang aluminium membulat bergaris lampu, kepala biru */}
+      {[-5.6, 5.6].map((x) => (
+        <group key={x} position={[x, 0, hall.z1 + T + 2.75]}>
+          <mesh geometry={pillarBase} position={[0, 0.21, 0]} raycast={noRaycast}>
+            <meshStandardMaterial color="#64748b" roughness={0.85} />
+          </mesh>
+          <mesh geometry={pillarShaft} position={[0, 2.63, 0]} raycast={noRaycast}>
+            <meshStandardMaterial color="#e2e8f0" metalness={0.65} roughness={0.32} />
+          </mesh>
+          <mesh position={[0, 2.5, 0.142]} raycast={noRaycast}>
+            <boxGeometry args={[0.05, 3.4, 0.01]} />
+            <meshBasicMaterial color="#22d3ee" toneMapped={false} />
+          </mesh>
+          <mesh position={[0, 4.84, 0]} raycast={noRaycast}>
+            <boxGeometry args={[0.42, 0.1, 0.42]} />
+            <meshStandardMaterial color="#1e3a8a" metalness={0.5} roughness={0.4} />
+          </mesh>
+        </group>
       ))}
       {/* papan nama */}
       <mesh position={[0, 5.95, hall.z1 + T + 0.02]} raycast={noRaycast}>
