@@ -88,8 +88,8 @@ const SOLIDS: Box[] = [
   boxAt(22.7, -2.6, 0.45),
   boxAt(19, -1.0, 0.8, 0.25),
   // luar gedung: tiang kanopi, lampu taman, stasiun surya, batang pohon
-  boxAt(-5.6, 9.05, 0.13),
-  boxAt(5.6, 9.05, 0.13),
+  boxAt(-5.6, 9.05, 0.25),
+  boxAt(5.6, 9.05, 0.25),
   boxAt(-6.9, 13.5, 0.15),
   boxAt(6.9, 13.5, 0.15),
   { minX: 39.6, maxX: 43.0, minZ: -6.2, maxZ: 2.2 },

@@ -184,13 +184,69 @@ const coneGeometry = new THREE.LatheGeometry(
   18,
 );
 const poleGeometry = new THREE.CapsuleGeometry(0.06, 0.9, 4, 12);
+/**
+ * Polisi tidur karet: ruas kuning-hitam berselang, punggung melengkung landai, kedua ujung
+ * meruncing ke aspal. Satu geometri berwarna per titik (satu draw call per polisi tidur).
+ */
+const BUMP = { len: ROAD_W - 0.5, half: 0.28, h: 0.075, seg: 0.5 };
 const bumpGeometry = (() => {
-  const g = new THREE.CylinderGeometry(0.22, 0.22, ROAD_W - 0.5, 16, 1, false, 0, Math.PI);
-  g.rotateZ(Math.PI / 2);
-  g.rotateX(-Math.PI / 2);
-  g.scale(1, 0.45, 1);
+  const pos: number[] = [];
+  const col: number[] = [];
+  const yellow = new THREE.Color("#facc15");
+  const black = new THREE.Color("#16181d");
+  const ARC = 8;
+  // penampang di posisi x: setengah elips, mengecil di ujung
+  const ring = (x: number) => {
+    const edge = BUMP.len / 2 - Math.abs(x);
+    const k = Math.min(1, 0.25 + (edge / 0.3) * 0.75);
+    return Array.from({ length: ARC + 1 }, (_, i) => {
+      const a = (i / ARC) * Math.PI;
+      return [x, Math.sin(a) * BUMP.h * k, Math.cos(a) * BUMP.half * (0.55 + 0.45 * k)] as [number, number, number];
+    });
+  };
+  const cuts: number[] = [-BUMP.len / 2, -BUMP.len / 2 + 0.3];
+  for (let x = -BUMP.len / 2 + 0.3 + BUMP.seg; x < BUMP.len / 2 - 0.3 - 0.01; x += BUMP.seg) cuts.push(x);
+  cuts.push(BUMP.len / 2 - 0.3, BUMP.len / 2);
+  for (let j = 0; j < cuts.length - 1; j++) {
+    const a = ring(cuts[j]);
+    const b = ring(cuts[j + 1]);
+    const c = j % 2 ? yellow : black;
+    for (let i = 0; i < ARC; i++) {
+      for (const v of [a[i], b[i], a[i + 1], a[i + 1], b[i], b[i + 1]]) {
+        pos.push(...v);
+        col.push(c.r, c.g, c.b);
+      }
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  g.computeVertexNormals();
   return g;
 })();
+
+/** Marka "gigi hiu" (segitiga putih) di aspal sebelum polisi tidur. */
+function makeTeethTexture() {
+  const c = document.createElement("canvas");
+  c.width = 512;
+  c.height = 64;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#f1f5f9";
+  const n = 9;
+  const w = c.width / n;
+  for (let i = 0; i < n; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i * w + w * 0.14, 60);
+    ctx.lineTo(i * w + w * 0.86, 60);
+    ctx.lineTo(i * w + w * 0.5, 4);
+    ctx.closePath();
+    ctx.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
 
 export function DrivingTrack({ loop }: { loop: Loop }) {
   const path = useMemo(() => buildCenterline(loop), [loop]);
@@ -331,6 +387,9 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
     [path], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const bumpPlaces = useMemo(() => bumps.map((b) => place(b, 0)), [path]); // eslint-disable-line react-hooks/exhaustive-deps
+  const teethPlaces = useMemo(() => bumps.map((b) => place(b - 1.25, 0)), [path]); // eslint-disable-line react-hooks/exhaustive-deps
+  const teethTex = useMemo(makeTeethTexture, []);
+  useEffect(() => () => teethTex.dispose(), [teethTex]);
   const zebra = useMemo(() => place(zebraS, 0), [path]); // eslint-disable-line react-hooks/exhaustive-deps
   const station = useMemo(() => place(chargeS, -(ROAD_W / 2 + 3.2)), [path]); // eslint-disable-line react-hooks/exhaustive-deps
   const bay = useMemo(() => place(chargeS, PULL - 0.2), [path]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -604,7 +663,13 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
       {/* ----- 4. Polisi tidur ----- */}
       {bumpPlaces.map((b, i) => (
         <mesh key={i} geometry={bumpGeometry} position={[b.p.x, 0.012, b.p.z]} rotation={[0, b.heading, 0]} raycast={noRaycast}>
-          <meshStandardMaterial color={i % 2 ? "#facc15" : "#111827"} roughness={0.7} />
+          <meshStandardMaterial vertexColors roughness={0.75} />
+        </mesh>
+      ))}
+      {teethPlaces.map((b, i) => (
+        <mesh key={i} position={[b.p.x, 0.02, b.p.z]} rotation={[-Math.PI / 2, 0, b.heading]} raycast={noRaycast}>
+          <planeGeometry args={[ROAD_W - 0.9, 0.6]} />
+          <meshBasicMaterial map={teethTex} transparent depthWrite={false} toneMapped={false} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
         </mesh>
       ))}
       <RoadSign {...signAt(bumps[0] - 7)} lines={["PELAN", "Polisi tidur"]} bg="#f59e0b" fg="#111827" />
