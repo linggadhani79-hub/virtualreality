@@ -46,6 +46,7 @@ export const ILLUSTRATIONS: { id: string; label: string }[] = [
   { id: "pendingin-baterai", label: "Stasiun pendingin baterai" },
   { id: "uji-boros", label: "Area uji boros (parkir & SPBU)" },
   { id: "rem-regeneratif", label: "Diagram rem regeneratif" },
+  { id: "eaxle-8in1", label: "Diagram e-Axle 8-in-1" },
 ];
 export const illustrationUrl = (id: string) => `/lab/ilustrasi/${id}.webp`;
 export type TeachingModule = {
@@ -326,7 +327,7 @@ export const DEFAULT_MODULES: TeachingModule[] = [
   },
   {
     id: "penggerak",
-    title: "Motor Listrik & Inverter",
+    title: "Motor, Inverter & e-Axle 8-in-1",
     color: MODULE_COLORS[2],
     slides: [
       {
@@ -351,6 +352,10 @@ export const DEFAULT_MODULES: TeachingModule[] = [
         image: "sasis-ev",
         caption: "Rangka EV: unit penggerak di poros roda",
       },
+      {"title": "PDU: pembagi listrik tegangan tinggi", "body": "Power Distribution Unit adalah \"panel listrik\" tegangan tinggi di mobil.\n- Relai utama (kontaktor) menyambung / memutus baterai\n- Rangkaian pra-isi mengisi kapasitor inverter pelan-pelan agar relai tidak meletik\n- Sekring melindungi tiap cabang\n- Membagi arus ke inverter, OBC, DC-DC, kompresor AC, dan pemanas", "image": "eaxle-8in1", "caption": "PDU di tengah aliran energi"},
+      {"title": "VCU: otak kendaraan", "body": "Vehicle Control Unit memutuskan apa yang dilakukan mobil.\n- Membaca pedal gas, pedal rem, posisi gigi (D/N/R), dan kecepatan\n- Bertanya ke BMS: berapa daya yang boleh diambil / dimasukkan\n- Memerintah inverter: torsi maju, atau torsi negatif untuk rem regeneratif\n- Berkomunikasi lewat jaringan CAN dengan semua modul", "image": "eaxle-8in1", "caption": "VCU memerintah lewat sinyal, bukan arus besar"},
+      {"title": "e-Axle 8-in-1", "body": "Platform EV terbaru menyatukan delapan modul dalam satu rumah di poros roda.\n- Penggerak: Motor, Inverter, Reducer\n- Daya: OBC, DC-DC, PDU\n- Kendali: VCU, BMS\nContoh: BYD e-Platform 3.0. Sebelumnya modul-modul ini terpisah dan dihubungkan banyak kabel oranye.", "image": "eaxle-8in1", "caption": "Delapan modul dalam satu e-Axle"},
+      {"title": "Untung-rugi integrasi", "body": "Kelebihan:\n- Lebih ringan dan ringkas (±15–20 %), kabel tegangan tinggi lebih pendek\n- Efisiensi sistem naik, satu rangkaian pendingin untuk semua\n- Perakitan di pabrik lebih cepat\nKekurangan:\n- Satu modul rusak bisa berarti mengganti satu unit besar\n- Diagnosis butuh alat pindai khusus pabrikan", "image": "motor-listrik", "caption": "Unit penggerak di lab"},
     ],
   },
   {
