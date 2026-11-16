@@ -277,11 +277,11 @@ const drawGrass = (ctx: CanvasRenderingContext2D) => {
 const drawRipple = (ctx: CanvasRenderingContext2D) => {
   ctx.fillStyle = "#1e5aa8";
   ctx.fillRect(0, 0, 256, 256);
-  ctx.strokeStyle = "rgba(186,230,253,0.45)";
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(186,230,253,0.18)";
+  ctx.lineWidth = 2;
   let seed = 5;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 22; i++) {
     const x = rnd() * 256;
     const y = rnd() * 256;
     ctx.beginPath();
@@ -908,7 +908,7 @@ export function ThermalCircuit({ hall }: { hall: { x0: number; x1: number; z0: n
         {[0, 1, 2, 3].map((k) => (
           <mesh key={k} position={[0, 0.22 + k * 0.44, -0.9 + k * 0.62]} raycast={noRaycast}>
             <boxGeometry args={[24, 0.44 + k * 0.88, 0.62]} />
-            <meshStandardMaterial color={k % 2 ? "#cbd5e1" : "#94a3b8"} roughness={0.8} />
+            <meshStandardMaterial color={k === 3 ? "#1e3a8a" : k % 2 ? "#cbd5e1" : "#94a3b8"} roughness={0.8} />
           </mesh>
         ))}
         {[0, 1, 2, 3].map((k) => (
