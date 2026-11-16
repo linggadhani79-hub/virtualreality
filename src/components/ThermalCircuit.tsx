@@ -39,7 +39,7 @@ export const CIRCUIT_SOLIDS = [
   { minX: OVAL.cx - OVAL.hx - OVAL.hw - 1, maxX: OVAL.cx + OVAL.hx + OVAL.hw + 1, minZ: OVAL.cz - OVAL.r - OVAL.hw - 1, maxZ: OVAL.cz + OVAL.r + OVAL.hw + 1 },
   // tribun (bisa dinaiki; lihat Grandstand.tsx) & papan
   ...GRANDSTAND_SOLIDS,
-  { minX: 21.6, maxX: 26.4, minZ: -42.6, maxZ: -41.6 },
+  { minX: 21.1, maxX: 26.9, minZ: -42.6, maxZ: -41.45 },
 ];
 
 /* ---------------- geometri lintasan ---------------- */
@@ -430,41 +430,90 @@ function drawBoard(ctx: CanvasRenderingContext2D, sim: Sim, scen: Exclude<Scenar
     ctx.textAlign = "left";
   });
 
-  // grafik
-  const gx = 730;
-  const gy = 210;
-  const gw = W - gx - 48;
-  const gh = 560;
+  // grafik: bidang plot dengan sumbu suhu (kiri), kecepatan (kanan), waktu termal (bawah)
+  const gx = 800;
+  const gy = 214;
+  const gw = W - gx - 112;
+  const gh = 516;
   ctx.fillStyle = "#111c30";
   ctx.fillRect(gx, gy, gw, gh);
-  const tMin = 20;
-  const tMax = 55;
+  // rentang suhu menyesuaikan data (kelipatan 5 °C, minimal 20 °C lebar)
+  let lo = Math.min(amb, 30), hi = Math.max(amb, 40);
+  for (const h of sim.hist) {
+    lo = Math.min(lo, h.tb, h.tc);
+    hi = Math.max(hi, h.tb, h.tc);
+  }
+  const tMin = Math.floor((lo - 1) / 5) * 5;
+  const tMax = Math.max(tMin + 20, Math.ceil((hi + 1) / 5) * 5);
   const yT = (t: number) => gy + gh - ((t - tMin) / (tMax - tMin)) * gh;
-  ctx.font = "600 20px system-ui, sans-serif";
-  for (let t = 20; t <= 55; t += 5) {
-    ctx.strokeStyle = "rgba(148,163,184,0.15)";
-    ctx.lineWidth = 1;
+  const yV = (kmh: number) => gy + gh - (kmh / 180) * gh;
+  ctx.lineWidth = 1;
+  ctx.font = "700 22px system-ui, sans-serif";
+  ctx.textAlign = "right";
+  const step = tMax - tMin > 30 ? 10 : 5;
+  for (let t = Math.ceil(tMin / step) * step; t <= tMax; t += step) {
+    ctx.strokeStyle = "rgba(148,163,184,0.18)";
     ctx.beginPath();
     ctx.moveTo(gx, yT(t));
     ctx.lineTo(gx + gw, yT(t));
     ctx.stroke();
-    ctx.fillStyle = "#64748b";
-    ctx.fillText(`${t}°`, gx + 8, yT(t) - 12);
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillText(`${t} °C`, gx - 12, yT(t));
   }
-  // batas chiller
-  ctx.setLineDash([10, 8]);
-  ctx.strokeStyle = "#38bdf8";
-  ctx.beginPath();
-  ctx.moveTo(gx, yT(36));
-  ctx.lineTo(gx + gw, yT(36));
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = "#38bdf8";
-  ctx.textAlign = "right";
-  ctx.fillText("chiller menyala ≥ 36 °C", gx + gw - 10, yT(36) - 14);
   ctx.textAlign = "left";
+  for (let k = 0; k <= 180; k += 45) {
+    ctx.fillStyle = "rgba(226,232,240,0.55)";
+    ctx.fillText(`${k}`, gx + gw + 12, yV(k));
+  }
+  ctx.save();
+  ctx.translate(W - 30, gy + gh / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = "center";
+  ctx.fillText("km/jam", 0, 0);
+  ctx.restore();
+  // sumbu waktu: 120 sampel × 0,5 dt × 40 = 40 menit waktu termal
+  const SPAN = 120;
+  const mins = (SPAN * 0.5 * TS) / 60;
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#94a3b8";
+  for (let m = 0; m <= mins; m += 10) {
+    const x = gx + gw - (m / mins) * gw;
+    ctx.strokeStyle = "rgba(148,163,184,0.12)";
+    ctx.beginPath();
+    ctx.moveTo(x, gy);
+    ctx.lineTo(x, gy + gh);
+    ctx.stroke();
+    ctx.fillText(m === 0 ? "sekarang" : `−${m} menit`, x, gy + gh + 22);
+  }
+  ctx.strokeStyle = "#475569";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(gx, gy, gw, gh);
+  // garis acuan: udara luar & batas chiller
+  const ref = (t: number, color: string, text: string, dy: number) => {
+    if (t < tMin || t > tMax) return;
+    ctx.setLineDash([10, 8]);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(gx, yT(t));
+    ctx.lineTo(gx + gw, yT(t));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = color;
+    ctx.textAlign = "left";
+    ctx.font = "700 20px system-ui, sans-serif";
+    ctx.fillText(text, gx + 12, yT(t) + dy);
+  };
+  ref(36, "#38bdf8", "chiller menyala ≥ 36 °C", -14);
+  ref(amb, "#a3a3a3", `udara luar ${amb} °C`, 14);
+  // garis data: sampel terbaru di tepi kanan, dipotong di dalam bidang plot
   const n = sim.hist.length;
-  const xAt = (i: number) => gx + (i / 119) * gw;
+  const xAt = (i: number) => gx + gw - ((n - 1 - i) / (SPAN - 1)) * gw;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(gx, gy, gw, gh);
+  ctx.clip();
+  ctx.lineJoin = "round";
   const line = (get: (h: Sim["hist"][number]) => number, color: string, w: number) => {
     if (n < 2) return;
     ctx.strokeStyle = color;
@@ -473,21 +522,38 @@ function drawBoard(ctx: CanvasRenderingContext2D, sim: Sim, scen: Exclude<Scenar
     sim.hist.forEach((h, i) => (i ? ctx.lineTo(xAt(i), get(h)) : ctx.moveTo(xAt(i), get(h))));
     ctx.stroke();
   };
-  line((h) => gy + gh - (h.v * 3.6 / 180) * gh, "rgba(226,232,240,0.35)", 3);
-  line((h) => yT(h.tc), "#22d3ee", 5);
-  line((h) => yT(h.tb), "#ef4444", 6);
+  line((h) => yV(h.v * 3.6), "rgba(226,232,240,0.4)", 3);
+  line((h) => yT(h.tc), "#22d3ee", 4);
+  line((h) => yT(h.tb), "#ef4444", 5);
+  ctx.restore();
+  // titik nilai terkini di ujung kanan (angkanya ada di tabel kiri)
+  if (n > 0) {
+    const last = sim.hist[n - 1];
+    const dot = (y: number, c: string) => {
+      ctx.fillStyle = c;
+      ctx.beginPath();
+      ctx.arc(gx + gw, Math.min(gy + gh, Math.max(gy, y)), 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#0b1220";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    };
+    dot(yT(last.tc), "#22d3ee");
+    dot(yT(last.tb), "#ef4444");
+  }
+  ctx.textAlign = "left";
   ctx.font = "800 24px system-ui, sans-serif";
   const legend: [string, string][] = [
-    ["#ef4444", "Suhu baterai"],
-    ["#22d3ee", "Suhu cairan"],
-    ["rgba(226,232,240,0.6)", "Kecepatan (0–180 km/jam)"],
+    ["#ef4444", "Suhu baterai (°C)"],
+    ["#22d3ee", "Suhu cairan (°C)"],
+    ["rgba(226,232,240,0.6)", "Kecepatan (km/jam, kanan)"],
   ];
   legend.forEach(([c, t], i) => {
-    const x = gx + 10 + i * 270;
+    const x = gx + i * 250;
     ctx.fillStyle = c;
-    ctx.fillRect(x, gy + gh + 30, 34, 8);
+    ctx.fillRect(x, gy + gh + 62, 34, 8);
     ctx.fillStyle = "#cbd5e1";
-    ctx.fillText(t, x + 44, gy + gh + 34);
+    ctx.fillText(t, x + 44, gy + gh + 66, 200);
   });
   if (scen === "genangan" || sim.sector.startsWith("Genangan")) {
     const bx = gx + 20;
@@ -727,8 +793,8 @@ export function ThermalCircuit({ hall }: { hall: { x0: number; x1: number; z0: n
                   : "Lurus";
       for (const w of wheels.current[0] ?? []) w.node.rotation.z += ds / w.radius;
       st.histT += dt;
-      if (st.histT > 0.5) {
-        st.histT = 0;
+      if (st.histT >= 0.5) {
+        st.histT -= 0.5;
         st.hist.push({ tb: st.tb, tc: st.tc, v: st.v });
         if (st.hist.length > 120) st.hist.shift();
       }
@@ -910,12 +976,59 @@ export function ThermalCircuit({ hall }: { hall: { x0: number; x1: number; z0: n
 
       {/* papan simulasi + tombol */}
       <group position={[24, 0, -42.1]}>
-        {[-2.5, 2.5].map((x) => (
-          <mesh key={x} position={[x, 1.6, -0.1]} raycast={noRaycast}>
-            <cylinderGeometry args={[0.08, 0.1, 3.2, 14]} />
-            <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.35} />
+        {/* dua tiang baja kotak dari pondasi sampai atas papan, menempel di punggung papan */}
+        {[-2.1, 2.1].map((x) => (
+          <group key={x}>
+            <mesh position={[x, 2.5, -0.21]} raycast={noRaycast}>
+              <boxGeometry args={[0.2, 5.0, 0.2]} />
+              <meshStandardMaterial color="#475569" metalness={0.8} roughness={0.35} />
+            </mesh>
+            <mesh position={[x, 0.12, -0.21]} raycast={noRaycast}>
+              <boxGeometry args={[0.6, 0.24, 0.6]} />
+              <meshStandardMaterial color="#9ca3af" roughness={0.9} />
+            </mesh>
+            {[1.8, 4.7].map((y) => (
+              <mesh key={y} position={[x, y, -0.13]} raycast={noRaycast}>
+                <boxGeometry args={[0.34, 0.16, 0.08]} />
+                <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.35} />
+              </mesh>
+            ))}
+          </group>
+        ))}
+        {/* palang penguat di belakang papan */}
+        {[2.1, 4.4].map((y) => (
+          <mesh key={y} position={[0, y, -0.21]} raycast={noRaycast}>
+            <boxGeometry args={[4.2, 0.12, 0.12]} />
+            <meshStandardMaterial color="#475569" metalness={0.8} roughness={0.35} />
           </mesh>
         ))}
+        {/* bingkai aluminium */}
+        {(
+          [
+            [0, 4.88, 5.66, 0.08],
+            [0, 1.62, 5.66, 0.08],
+            [-2.79, 3.25, 0.08, 3.34],
+            [2.79, 3.25, 0.08, 3.34],
+          ] as [number, number, number, number][]
+        ).map(([x, y, w, h], k) => (
+          <mesh key={k} position={[x, y, -0.02]} raycast={noRaycast}>
+            <boxGeometry args={[w, h, 0.14]} />
+            <meshStandardMaterial color="#cbd5e1" metalness={0.85} roughness={0.3} />
+          </mesh>
+        ))}
+        {/* konsol tombol */}
+        <mesh position={[0, 0.42, 0.4]} raycast={noRaycast}>
+          <boxGeometry args={[5.8, 0.84, 0.44]} />
+          <meshStandardMaterial color="#1e293b" metalness={0.4} roughness={0.5} />
+        </mesh>
+        <mesh position={[0, 0.7, 0.623]} raycast={noRaycast}>
+          <boxGeometry args={[5.8, 0.05, 0.01]} />
+          <meshBasicMaterial color="#22d3ee" toneMapped={false} />
+        </mesh>
+        <mesh position={[0, 1.1, 0.4]} rotation={[-0.45, 0, 0]} raycast={noRaycast}>
+          <boxGeometry args={[5.8, 0.48, 0.06]} />
+          <meshStandardMaterial color="#0f172a" metalness={0.4} roughness={0.5} />
+        </mesh>
         <mesh position={[0, 3.25, -0.05]} raycast={noRaycast}>
           <boxGeometry args={[5.5, 3.2, 0.1]} />
           <meshStandardMaterial color="#111827" metalness={0.5} roughness={0.45} />
@@ -924,7 +1037,7 @@ export function ThermalCircuit({ hall }: { hall: { x0: number; x1: number; z0: n
           <planeGeometry args={[5.33, 3.0]} />
           <meshBasicMaterial map={board.t} toneMapped={false} />
         </mesh>
-        <group position={[0, 1.15, 0.05]} scale={2}>
+        <group position={[0, 1.1 + 0.04 * Math.sin(0.45), 0.4 + 0.04 * Math.cos(0.45)]} rotation={[-0.45, 0, 0]} scale={2}>
           {(
             [
               ["ngebut", "NGEBUT", "#dc2626"],
