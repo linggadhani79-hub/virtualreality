@@ -12,6 +12,7 @@ import { BatteryGame } from "./BatteryGame";
 import { CoolingSystem } from "./CoolingSystem";
 import { ObeBoard, ObeTracker } from "./ObeBoard";
 import { ThermalCircuit, CIRCUIT_SOLIDS } from "./ThermalCircuit";
+import { grandstandFloor } from "./Grandstand";
 import { ParkingArea, PARKING_SOLIDS } from "./ParkingArea";
 import { DrivingTrack } from "./DrivingTrack";
 import { boxAt, worldBounds, type Box } from "../lib/worldBounds";
@@ -542,7 +543,7 @@ export function TestLabEnvironment() {
 
   // Tembok dan aset menahan pemain dari sisi mana pun; keluar-masuk hanya lewat pintu depan
   useEffect(() => {
-    worldBounds.current = { boxes: SOLIDS, limit: { minX: -85, maxX: 95, minZ: -85, maxZ: 85 } };
+    worldBounds.current = { boxes: SOLIDS, limit: { minX: -85, maxX: 95, minZ: -85, maxZ: 85 }, floor: grandstandFloor };
     return () => {
       worldBounds.current = null;
     };

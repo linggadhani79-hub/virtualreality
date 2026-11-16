@@ -31,7 +31,7 @@ import { HomeScreen } from "./components/HomeScreen";
 import { ObePanel, openObePanel } from "./components/ObePanel";
 import { GuardianBoundary } from "./components/GuardianBoundary";
 import { TRIAL_NO_AUTH, LOCAL_ONLY } from "./lib/appConfig";
-import { clampToWorld } from "./lib/worldBounds";
+import { clampToWorld, playerTeleport, worldBounds } from "./lib/worldBounds";
 import { qualityTier, setQualityTier } from "./lib/quality";
 import { ModuleEditor } from "./components/ModuleEditor";
 import { SampleEVCar } from "./components/SampleEVCar";
@@ -281,6 +281,18 @@ function Player({
     if (!playerRef.current) return;
     const delta = Math.min(rawDelta, 0.05);
 
+    // Pindah tempat atas permintaan aset (mis. duduk di baris teratas tribun)
+    const tp = playerTeleport.pending;
+    if (tp) {
+      playerTeleport.pending = null;
+      const floorFn = worldBounds.current?.floor;
+      playerRef.current.position.set(tp.x, floorFn ? floorFn(tp.x, tp.z) : 0, tp.z);
+      playerRef.current.rotation.y = tp.yaw;
+      smoothVelocityRef.current.set(0, 0, 0);
+      yaw.current = tp.yaw;
+      pitch.current = 0;
+    }
+
     let moveX = joystickState.x;
     let moveZ = -joystickState.y; // Invert joystick Y to move forward (negative Z)
 
@@ -439,6 +451,9 @@ function Player({
           }
         }
       }
+      // lantai bertingkat milik lingkungan (anak tangga tribun)
+      const floorFn = worldBounds.current?.floor;
+      if (floorFn) targetFloorY = Math.max(targetFloorY, floorFn(playerPos.x, playerPos.z));
       if (Math.abs(playerRef.current.position.y - targetFloorY) > 0.0001) {
         playerRef.current.position.y = THREE.MathUtils.lerp(
           playerRef.current.position.y,

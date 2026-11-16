@@ -6,6 +6,7 @@ import { modelUrl } from "../lib/quality";
 import { playVRClickSound } from "../lib/vrAudio";
 import { recordActivity } from "../lib/obe";
 import { Btn, useLiveCanvas } from "./BatteryGame";
+import { Grandstand, GRANDSTAND_SOLIDS } from "./Grandstand";
 
 /**
  * "Sirkuit Uji Termal": oval datar di atas pelataran beton dengan rintangan (genangan air untuk uji
@@ -13,7 +14,8 @@ import { Btn, useLiveCanvas } from "./BatteryGame";
  * (I²R), dan kerja sistem pendingin (pompa, radiator + kipas, chiller, AC kabin). Papan besar di
  * depan tribun menampilkan angka dan grafik suhu secara langsung.
  *
- * Pemain menonton dari tribun / sisi selatan; seluruh area sirkuit menjadi kotak tabrakan
+ * Pemain menonton dari tribun (bisa dinaiki; tombol "DUDUK DI ATAS" ke kursi pantau teratas) / sisi
+ * selatan; seluruh area sirkuit menjadi kotak tabrakan
  * (CIRCUIT_SOLIDS) karena pemain berjalan di permukaan datar (tidak bisa naik tanjakan / tikungan
  * miring).
  */
@@ -35,8 +37,8 @@ const TS = 40; // waktu termal dipercepat 40×
 
 export const CIRCUIT_SOLIDS = [
   { minX: OVAL.cx - OVAL.hx - OVAL.hw - 1, maxX: OVAL.cx + OVAL.hx + OVAL.hw + 1, minZ: OVAL.cz - OVAL.r - OVAL.hw - 1, maxZ: OVAL.cz + OVAL.r + OVAL.hw + 1 },
-  // tribun & papan
-  { minX: -12.2, maxX: 12.2, minZ: -41.8, maxZ: -36.6 },
+  // tribun (bisa dinaiki; lihat Grandstand.tsx) & papan
+  ...GRANDSTAND_SOLIDS,
   { minX: 21.6, maxX: 26.4, minZ: -42.6, maxZ: -41.6 },
 ];
 
@@ -903,21 +905,8 @@ export function ThermalCircuit({ hall }: { hall: { x0: number; x1: number; z0: n
         </group>
       ))}
 
-      {/* tribun penonton di sisi selatan */}
-      <group position={[0, 0, -39.2]}>
-        {[0, 1, 2, 3].map((k) => (
-          <mesh key={k} position={[0, 0.22 + k * 0.44, -0.9 + k * 0.62]} raycast={noRaycast}>
-            <boxGeometry args={[24, 0.44 + k * 0.88, 0.62]} />
-            <meshStandardMaterial color={k === 3 ? "#1e3a8a" : k % 2 ? "#cbd5e1" : "#94a3b8"} roughness={0.8} />
-          </mesh>
-        ))}
-        {[0, 1, 2, 3].map((k) => (
-          <mesh key={`seat${k}`} position={[0, 0.48 + k * 0.88, -0.95 + k * 0.62]} raycast={noRaycast}>
-            <boxGeometry args={[23.6, 0.06, 0.32]} />
-            <meshStandardMaterial color={["#2563eb", "#dc2626", "#16a34a", "#f59e0b"][k]} roughness={0.6} />
-          </mesh>
-        ))}
-      </group>
+      {/* tribun penonton di sisi selatan (bisa dinaiki, kursi pantau di baris teratas) */}
+      <Grandstand />
 
       {/* papan simulasi + tombol */}
       <group position={[24, 0, -42.1]}>
