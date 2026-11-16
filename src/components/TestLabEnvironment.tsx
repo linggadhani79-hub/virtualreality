@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { ExhibitStand, InfoSign, QuizStation, Scenery, StaticModel } from "./LabStations";
@@ -10,6 +11,7 @@ import { EnergyRoom } from "./SolarPower";
 import { BatteryGame } from "./BatteryGame";
 import { CoolingSystem } from "./CoolingSystem";
 import { ObeBoard, ObeTracker } from "./ObeBoard";
+import { ThermalCircuit, CIRCUIT_SOLIDS } from "./ThermalCircuit";
 import { ParkingArea, PARKING_SOLIDS } from "./ParkingArea";
 import { DrivingTrack } from "./DrivingTrack";
 import { boxAt, worldBounds, type Box } from "../lib/worldBounds";
@@ -39,6 +41,7 @@ const stand = (x: number, z: number, size: number): Box => boxAt(x, z, (Math.max
 const SOLIDS: Box[] = [
   // area parkir & SPBU di luar lintasan (lihat ParkingArea.tsx)
   ...PARKING_SOLIDS,
+  ...CIRCUIT_SOLIDS,
   // tembok: belakang, kiri, kanan, depan kiri & kanan pintu (bukaan X -5..5)
   { minX: HALL.x0 - T, maxX: HALL.x1 + T, minZ: HALL.z0 - T, maxZ: HALL.z0 },
   { minX: HALL.x0 - T, maxX: HALL.x0, minZ: HALL.z0, maxZ: HALL.z1 },
@@ -485,6 +488,28 @@ function GlassWindow({ position, width, height }: { position: [number, number, n
   );
 }
 
+/**
+ * Menyembunyikan isi gedung (stasiun, model etalase, game) saat kamera di luar gedung dan lebih
+ * dari ±14 m dari dindingnya, kecuali bila sedang menatap pintu depan dari halaman. Dari jauh isi
+ * gedung hanya terlihat lewat pintu/jendela, tetapi tetap memakan ±0,6–1 juta segitiga.
+ */
+function InteriorCull({ hall, children }: { hall: { x0: number; x1: number; z0: number; z1: number }; children: React.ReactNode }) {
+  const ref = useRef<THREE.Group>(null);
+  const cam = useMemo(() => new THREE.Vector3(), []);
+  useFrame((state) => {
+    const g = ref.current;
+    if (!g) return;
+    const camera: THREE.Camera = (import.meta.env.DEV && (window as any).__shotCam) || state.camera;
+    camera.getWorldPosition(cam);
+    const dx = Math.max(hall.x0 - cam.x, 0, cam.x - hall.x1);
+    const dz = Math.max(hall.z0 - cam.z, 0, cam.z - hall.z1);
+    const away = Math.hypot(dx, dz);
+    const doorView = cam.z > hall.z1 && Math.abs(cam.x) < 16 && cam.z - hall.z1 < 45;
+    g.visible = away < 14 || doorView;
+  });
+  return <group ref={ref}>{children}</group>;
+}
+
 export function TestLabEnvironment() {
   const W = HALL.x1 - HALL.x0;
   const D = HALL.z1 - HALL.z0;
@@ -685,6 +710,8 @@ export function TestLabEnvironment() {
         <meshBasicMaterial map={flow} toneMapped={false} />
       </mesh>
 
+      {/* Isi gedung: tidak digambar saat pemain jauh di luar gedung (hemat untuk Quest) */}
+      <InteriorCull hall={HALL}>
       {/* ================= STASIUN BELAJAR ================= */}
       {/* ----- Zona EV: etalase komponen (kiri depan) ----- */}
       <FloorDecal position={[-8.2, 1.05]} size={[5.2, 0.58]} map={txtExhibit} />
@@ -918,6 +945,7 @@ export function TestLabEnvironment() {
       />
       <Workshop position={[HALL.x0 + 0.75, 0, -1.6]} />
 
+      </InteriorCull>
       {/* ================= LUAR GEDUNG: langit, rumput, taman, pohon ================= */}
       <mesh raycast={noRaycast} position={[0, 0, 0]}>
         <sphereGeometry args={[220, 24, 16]} />
@@ -927,6 +955,8 @@ export function TestLabEnvironment() {
       <DrivingTrack loop={TRACK} />
       {/* area parkir, SPBU, dan perbandingan mobil bensin vs listrik di sisi barat */}
       <ParkingArea hall={HALL} />
+      {/* sirkuit uji termal baterai (oval miring, tanjakan, macet) di utara lintasan uji */}
+      <ThermalCircuit hall={HALL} />
       <Scenery
         model="pohon"
         size={8.5}
