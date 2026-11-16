@@ -155,7 +155,7 @@ function buildRoad() {
       pos.push(P.x + P.nx * u, surfaceY(s), P.z + P.nz * u);
       uv.push(u < 0 ? 0 : 1, (i / N) * reps);
     }
-    if (i < N) idx.push(i * 2, i * 2 + 2, i * 2 + 1, i * 2 + 1, i * 2 + 2, i * 2 + 3);
+    if (i < N) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
@@ -212,7 +212,7 @@ function buildWater() {
       pos.push(P.x + P.nx * u, y, P.z + P.nz * u);
       uv.push(u < 0 ? 0 : 3, s / 4);
     }
-    if (i < N) idx.push(i * 2, i * 2 + 2, i * 2 + 1, i * 2 + 1, i * 2 + 2, i * 2 + 3);
+    if (i < N) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
