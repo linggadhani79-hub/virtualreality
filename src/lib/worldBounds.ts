@@ -9,7 +9,13 @@ import type * as THREE from "three";
  */
 export type Box = { minX: number; maxX: number; minZ: number; maxZ: number };
 
-export const worldBounds: { current: null | { boxes: Box[]; limit: Box } } = { current: null };
+/** Tinggi lantai tambahan di (x, z) (mis. anak tangga tribun); 0 = tanah. */
+export type FloorFn = (x: number, z: number) => number;
+
+export const worldBounds: { current: null | { boxes: Box[]; limit: Box; floor?: FloorFn } } = { current: null };
+
+/** Permintaan memindahkan pemain (mis. tombol "Duduk di atas" di tribun); dikerjakan di frame berikutnya. */
+export const playerTeleport: { pending: null | { x: number; z: number; yaw: number } } = { pending: null };
 
 /** Kotak dari titik tengah + setengah ukuran. */
 export const boxAt = (x: number, z: number, hx: number, hz = hx): Box => ({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
