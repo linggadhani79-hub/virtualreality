@@ -15,6 +15,7 @@ import { modelUrl } from "../lib/quality";
  * simpangan samping (untuk zig-zag dan menepi), jadi tidak ada fisika yang perlu dihitung.
  */
 
+type Vec3 = [number, number, number];
 const noRaycast = () => null;
 const ROAD_W = 6;
 const CRUISE = 6.5; // m/s
@@ -246,6 +247,110 @@ function makeTeethTexture() {
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
   return t;
+}
+
+/* ---------------- panel surya atap stasiun ---------------- */
+
+/** Tekstur satu panel: 6 × 10 sel monokristal (sudut terpotong), busbar perak, bingkai aluminium. */
+function makePanelTexture() {
+  const W = 512;
+  const H = 768;
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#cbd5e1"; // bingkai
+  ctx.fillRect(0, 0, W, H);
+  const fr = 14;
+  ctx.fillStyle = "#e5e7eb"; // lembar belakang putih di sela sel
+  ctx.fillRect(fr, fr, W - fr * 2, H - fr * 2);
+  const cols = 6;
+  const rows = 10;
+  const gap = 5;
+  const cw = (W - fr * 2 - gap * (cols + 1)) / cols;
+  const ch = (H - fr * 2 - gap * (rows + 1)) / rows;
+  const cut = cw * 0.16;
+  for (let j = 0; j < rows; j++)
+    for (let i = 0; i < cols; i++) {
+      const x = fr + gap + i * (cw + gap);
+      const y = fr + gap + j * (ch + gap);
+      const g = ctx.createLinearGradient(x, y, x + cw, y + ch);
+      g.addColorStop(0, "#1e2b4d");
+      g.addColorStop(0.5, "#141d36");
+      g.addColorStop(1, "#1b2747");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(x + cut, y);
+      ctx.lineTo(x + cw - cut, y);
+      ctx.lineTo(x + cw, y + cut);
+      ctx.lineTo(x + cw, y + ch - cut);
+      ctx.lineTo(x + cw - cut, y + ch);
+      ctx.lineTo(x + cut, y + ch);
+      ctx.lineTo(x, y + ch - cut);
+      ctx.lineTo(x, y + cut);
+      ctx.closePath();
+      ctx.fill();
+      // jari-jari halus + 3 busbar
+      ctx.fillStyle = "rgba(148,163,184,0.18)";
+      for (let k = 1; k < 12; k++) ctx.fillRect(x + 2, y + (ch * k) / 12, cw - 4, 1);
+      ctx.fillStyle = "#9ca3af";
+      for (let k = 1; k <= 3; k++) ctx.fillRect(x + (cw * k) / 4 - 1.5, y, 3, ch);
+    }
+  // kotak sambungan (junction box) label kecil di tepi
+  ctx.fillStyle = "#94a3b8";
+  ctx.fillRect(W / 2 - 30, H - fr - 2, 60, 2);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+const DECK = { w: 3.3, l: 7.9, tilt: 0.1, cols: 2, rows: 7, rise: 0.12 };
+const panelGeometry = new THREE.BoxGeometry(DECK.w / DECK.cols - 0.012, 0.035, DECK.l / DECK.rows - 0.012);
+const railGeometry = new THREE.BoxGeometry(0.05, 0.06, DECK.l);
+
+/** Deretan panel surya miring ±6° di atas rel aluminium (satu InstancedMesh untuk semua panel). */
+function SolarDeck({ position }: { position: Vec3 }) {
+  const tex = useMemo(makePanelTexture, []);
+  useEffect(() => () => tex.dispose(), [tex]);
+  // matriks tiap panel diisi begitu mesh dibuat (ref callback: tidak bergantung urutan efek)
+  const place = (m: THREE.InstancedMesh | null) => {
+    if (!m || m.userData.placed) return;
+    m.userData.placed = true;
+    const o = new THREE.Object3D();
+    let k = 0;
+    for (let i = 0; i < DECK.cols; i++)
+      for (let j = 0; j < DECK.rows; j++) {
+        o.position.set(-DECK.w / 2 + (i + 0.5) * (DECK.w / DECK.cols), 0, -DECK.l / 2 + (j + 0.5) * (DECK.l / DECK.rows));
+        o.updateMatrix();
+        m.setMatrixAt(k++, o.matrix);
+      }
+    m.instanceMatrix.needsUpdate = true;
+    m.computeBoundingSphere();
+  };
+  return (
+    <group position={position}>
+      {/* rel penyangga (tegak lurus kemiringan) */}
+      {[-1.25, 0, 1.25].map((x) => {
+        const h = DECK.rise + 0.1 + x * Math.tan(DECK.tilt) - 0.02;
+        return (
+          <mesh key={x} geometry={railGeometry} position={[x, h / 2, 0]} scale={[1, h / 0.06, 1]} raycast={noRaycast}>
+            <meshStandardMaterial color="#9ca3af" metalness={0.8} roughness={0.35} />
+          </mesh>
+        );
+      })}
+      <group position={[0, DECK.rise + 0.1, 0]} rotation={[0, 0, DECK.tilt]}>
+        <instancedMesh ref={place} args={[panelGeometry, undefined, DECK.cols * DECK.rows]} raycast={noRaycast}>
+          <meshStandardMaterial map={tex} metalness={0.2} roughness={0.38} envMapIntensity={1.0} />
+        </instancedMesh>
+        {/* pelat gelap di bawah deretan panel: sela antarpanel tidak memperlihatkan atap putih */}
+        <mesh position={[0, -0.03, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
+          <planeGeometry args={[DECK.w, DECK.l]} />
+          <meshStandardMaterial color="#1f2937" metalness={0.5} roughness={0.5} side={THREE.DoubleSide} />
+        </mesh>
+      </group>
+    </group>
+  );
 }
 
 export function DrivingTrack({ loop }: { loop: Loop }) {
@@ -678,6 +783,8 @@ export function DrivingTrack({ loop }: { loop: Loop }) {
       <group position={[station.p.x, 0, station.p.z]} rotation={[0, Math.PI / 2, 0]}>
         {solar && <primitive object={solar} />}
       </group>
+      {/* panel surya baru di atas atap model stasiun (atap datar y ±4,37; 3,3 × 7,9 m) */}
+      {solar && <SolarDeck position={[station.p.x, 4.37, station.p.z]} />}
       <mesh position={[bay.p.x, 0.022, bay.p.z]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
         <planeGeometry args={[2.6, 6.2]} />
         <meshBasicMaterial color="#16a34a" transparent opacity={0.55} toneMapped={false} />

@@ -670,7 +670,9 @@ export function ParkingArea({ hall }: { hall: { x0: number; x1: number; z0: numb
     const cam: THREE.Camera = (import.meta.env.DEV && (window as any).__shotCam) || state.camera;
     cam.getWorldPosition(camPos);
     const inside = camPos.x > hall.x0 && camPos.x < hall.x1 && camPos.z > hall.z0 && camPos.z < hall.z1;
-    group.visible = !inside;
+    // jauh di sisi lain (mis. sirkuit atau stasiun surya timur): tidak digambar, ±0,8 juta segitiga
+    const far = Math.hypot(camPos.x - PARKING.cx, camPos.z - PARKING.cz) > 80;
+    group.visible = !inside && !far;
     if (inside) return;
 
     const delta = Math.min(rawDelta, 0.05);
